@@ -21,6 +21,7 @@
 #include <linux/bsearch.h>
 #include <linux/cpumask.h>
 #include <linux/percpu.h>
+#include <linux/crash_dump.h>
 #include <linux/sort.h>
 #include <linux/stop_machine.h>
 #include <linux/types.h>
@@ -121,6 +122,7 @@ EXPORT_SYMBOL(cpu_hwcap_keys);
 static bool __maybe_unused
 cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused);
 
+static void cpu_enable_cnp(struct arm64_cpu_capabilities const *cap);
 
 /*
  * NOTE: Any changes to the visibility of features should be kept in
@@ -967,6 +969,29 @@ static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
 	return !meltdown_safe;
 }
 
+static bool nocnp;
+
+static int __init early_nocnp(char *p)
+{
+	nocnp = true;
+	return 0;
+}
+early_param("nocnp", early_nocnp);
+
+static bool __maybe_unused
+has_useable_cnp(const struct arm64_cpu_capabilities *entry, int scope)
+{
+	/*
+	 * Kdump isn't guaranteed to power-off all secondary CPUs, CNP
+	 * may share TLB entries with a CPU stuck in the crashed
+	 * kernel.
+	 */
+	 if (is_kdump_kernel())
+		return false;
+
+	return has_cpuid_feature(entry, scope) && !nocnp;
+}
+
 #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
 static void __nocfi
 kpti_install_ng_mappings(const struct arm64_cpu_capabilities *__unused)
@@ -1337,6 +1362,19 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.min_field_value = 2,
 		.matches = has_hw_dbm,
 		.cpu_enable = cpu_enable_hw_dbm,
+	},
+#endif
+#ifdef CONFIG_ARM64_CNP
+	{
+		.desc = "Common not Private translations",
+		.capability = ARM64_HAS_CNP,
+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+		.matches = has_useable_cnp,
+		.sys_reg = SYS_ID_AA64MMFR2_EL1,
+		.sign = FTR_UNSIGNED,
+		.field_pos = ID_AA64MMFR2_CNP_SHIFT,
+		.min_field_value = 1,
+		.cpu_enable = cpu_enable_cnp,
 	},
 #endif
 #ifdef CONFIG_ARM64_SSBD
@@ -1828,6 +1866,11 @@ static bool __maybe_unused
 cpufeature_pan_not_uao(const struct arm64_cpu_capabilities *entry, int __unused)
 {
 	return (cpus_have_const_cap(ARM64_HAS_PAN) && !cpus_have_const_cap(ARM64_HAS_UAO));
+}
+
+static void __maybe_unused cpu_enable_cnp(struct arm64_cpu_capabilities const *cap)
+{
+	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
 }
 
 /*

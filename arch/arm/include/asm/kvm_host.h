@@ -292,7 +292,7 @@ static inline void __cpu_init_stage2(void)
 	kvm_call_hyp(__init_stage2_translation);
 }
 
-static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+static inline int kvm_arch_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 {
 	return 0;
 }
@@ -380,6 +380,17 @@ static inline int kvm_arm_get_spectre_bhb_state(void)
 {
 	/* 32bit guests don't need firmware for this */
 	return SPECTRE_VULNERABLE; /* aka SMCCC_RET_NOT_SUPPORTED */
+}
+
+static inline int kvm_arm_setup_stage2(struct kvm *kvm, unsigned long type)
+{
+	/*
+	 * On 32bit ARM, VMs get a static 40bit IPA stage2 setup,
+	 * so any non-zero value used as type is illegal.
+	 */
+	if (type)
+		return -EINVAL;
+	return 0;
 }
 
 #endif /* __ARM_KVM_HOST_H__ */
