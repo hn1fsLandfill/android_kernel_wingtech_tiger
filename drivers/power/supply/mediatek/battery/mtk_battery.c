@@ -64,7 +64,6 @@
 #include <mt-plat/upmu_common.h>
 #include <pmic_lbat_service.h>
 
-#include <linux/iio/consumer.h>
 
 
 /* ============================================================ */
@@ -123,8 +122,6 @@ static enum power_supply_property battery_props[] = {
 	POWER_SUPPLY_PROP_CAPACITY_LEVEL,
 	POWER_SUPPLY_PROP_TIME_TO_FULL_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-	POWER_SUPPLY_PROP_CHARGE_RATE,
-	POWER_SUPPLY_PROP_AGE,
 };
 
 /* boot mode */
@@ -316,27 +313,6 @@ int battery_get_boot_mode(void)
 	return boot_mode;
 }
 
-#ifdef CONFIG_BATTERY_MM8013
-/* ============================================================ */
-/* custom setting */
-/* ============================================================ */
-static bool get_batt_temp_from_fg(void)
-{
-	struct device_node *np = of_find_node_by_path("/odm");
-	int val;
-
-	if (of_property_read_u32(np, "BATTERY_TMP_TO_ENABLE_EXTFG", &val)) {
-		bm_err("Get BATTERY_TMP_TO_ENABLE_EXTFG failed\n");
-		of_node_put(np);
-		return -1;
-	}
-	bm_err("Get BATTERY_TMP_TO_ENABLE_EXTFG %d\n",val);
-	of_node_put(np);
-
-	return val;
-}
-#endif
-
 bool is_fg_disabled(void)
 {
 	return gm.disableGM30;
@@ -414,25 +390,6 @@ void set_hw_ocv_unreliable(bool _flag_unreliable)
 /* functions */
 /* ============================================================ */
 
-#ifdef CONFIG_BATTERY_MM8013
-int mmi_get_prop_from_bms(enum power_supply_property psp, union power_supply_propval *val)
-{
-	int rc;
-	struct power_supply *bms;
-
-	bms = power_supply_get_by_name("bms");
-
-	if (bms == NULL || IS_ERR(bms)) {
-		bm_err("%s Couldn't get bms\n", __func__);
-		return -EINVAL;
-	}
-
-	rc = power_supply_get_property(bms, psp, val);
-
-	return rc;
-}
-#endif
-
 signed int battery_meter_get_tempR(signed int dwVolt)
 {
 
@@ -496,12 +453,7 @@ static int battery_get_property(struct power_supply *psy,
 {
 	int ret = 0;
 	int fgcurrent = 0;
-#ifdef CONFIG_BATTERY_MM8013
-	//bool b_ischarging = 0;
-	union power_supply_propval prop = {0};
-#else
 	bool b_ischarging = 0;
-#endif
 
 	struct battery_data *data =
 		container_of(psy->desc, struct battery_data, psd);
@@ -511,7 +463,6 @@ static int battery_get_property(struct power_supply *psy,
 		val->intval = data->BAT_STATUS;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
-		data->BAT_HEALTH = mmi_batt_health_check();
 		val->intval = data->BAT_HEALTH;/* do not change before*/
 		break;
 	case POWER_SUPPLY_PROP_PRESENT:
@@ -521,16 +472,7 @@ static int battery_get_property(struct power_supply *psy,
 		val->intval = data->BAT_TECHNOLOGY;
 		break;
 	case POWER_SUPPLY_PROP_CYCLE_COUNT:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS cycle count ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
 		val->intval = gm.bat_cycle;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY:
 		/* 1 = META_BOOT, 4 = FACTORY_BOOT 5=ADVMETA_BOOT */
@@ -541,118 +483,36 @@ static int battery_get_property(struct power_supply *psy,
 			break;
 		}
 
-#ifdef CONFIG_BATTERY_MM8013
-		if (gm.fixed_uisoc != 0xffff) {
-			val->intval = gm.fixed_uisoc;
-		} else if(gm.disableGM30 == true) {
-			val->intval = data->BAT_CAPACITY;
-		} else {
-			ret = mmi_get_prop_from_bms(psp,&prop);
-			if (ret < 0) {
-				pr_err("[%s]Error getting BMS Capacity ret = %d\n", __func__, ret);
-			} else {
-				data->BAT_CAPACITY = prop.intval;
-			}
-			val->intval = data->BAT_CAPACITY;
-		}
-#else
 		if (gm.fixed_uisoc != 0xffff)
 			val->intval = gm.fixed_uisoc;
 		else
 			val->intval = data->BAT_CAPACITY;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS Current ret = %d\n", __func__, ret);
-		} else {
-			fgcurrent = prop.intval;
-		}
-		fgcurrent = 0 - fgcurrent;
-		val->intval = fgcurrent;
-#else
 		b_ischarging = gauge_get_current(&fgcurrent);
 		if (b_ischarging == false)
 			fgcurrent = 0 - fgcurrent;
+
 		val->intval = fgcurrent * 100;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_AVG:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(POWER_SUPPLY_PROP_CURRENT_NOW,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS Current ret = %d\n", __func__, ret);
-		} else {
-			fgcurrent = prop.intval;
-		}
-		fgcurrent = 0 - fgcurrent;
-		val->intval = fgcurrent;
-#else
 		val->intval = battery_get_bat_avg_current() * 100;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS qmax ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
 		val->intval =
 			fg_table_cust_data.fg_profile[gm.battery_id].q_max
 			* 1000;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS charge counter ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
 		val->intval = gm.ui_soc *
 			fg_table_cust_data.fg_profile[gm.battery_id].q_max
 			* 1000 / 100;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS voltage now ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
-		val->intval = battery_get_bat_voltage()* 1000;
-#endif
+		val->intval = data->BAT_batt_vol * 1000;
 		break;
 	case POWER_SUPPLY_PROP_TEMP:
-#ifdef CONFIG_BATTERY_MM8013
-		if (gm.battery_tmp_to_enable_extfg) {
-			ret = mmi_get_prop_from_bms(POWER_SUPPLY_PROP_TEMP,&prop);
-			if (ret < 0) {
-				pr_err("[%s]Error getting BMS TEMP ret = %d\n", __func__, ret);
-				val->intval = 250;
-			} else {
-				val->intval = prop.intval;
-			}
-		} else {
-			val->intval = gm.tbat_precise;
-		}
-		if (gm.fixed_bat_tmp != 0xffff) {
-			gm.tbat_precise = gm.fixed_bat_tmp * 10;
-			val->intval = gm.tbat_precise;
-		}
-#else
 		val->intval = gm.tbat_precise;
-#endif
 		break;
 	case POWER_SUPPLY_PROP_CAPACITY_LEVEL:
 		val->intval = check_cap_level(data->BAT_CAPACITY);
@@ -684,14 +544,6 @@ static int battery_get_property(struct power_supply *psy,
 		ret = 0;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS full design ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
 		if (check_cap_level(data->BAT_CAPACITY) ==
 			POWER_SUPPLY_CAPACITY_LEVEL_UNKNOWN)
 			val->intval = 0;
@@ -701,7 +553,7 @@ static int battery_get_property(struct power_supply *psy,
 
 			q_max_mah =
 				fg_table_cust_data.fg_profile[
-				gm.battery_id].q_max;
+				gm.battery_id].q_max / 10;
 
 			q_max_uah = q_max_mah * 1000;
 			if (q_max_uah <= 100000) {
@@ -711,25 +563,8 @@ static int battery_get_property(struct power_supply *psy,
 			}
 			val->intval = q_max_uah;
 		}
-#endif
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_RATE:
-		val->intval = mmi_chrg_rate_check();
-		break;
-	case POWER_SUPPLY_PROP_AGE:
-#ifdef CONFIG_BATTERY_MM8013
-		ret = mmi_get_prop_from_bms(psp,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS full design ret = %d\n", __func__, ret);
-		} else {
-			val->intval = prop.intval;
-		}
-#else
-		if (gm.aging_factor > 10000)
-			gm.aging_factor = 10000;
-		val->intval = gm.aging_factor /100;
-#endif
-		break;
+
 
 	default:
 		ret = -EINVAL;
@@ -819,28 +654,14 @@ bool fg_interrupt_check(void)
 void battery_update(struct battery_data *bat_data)
 {
 	struct power_supply *bat_psy = bat_data->psy;
-#ifdef CONFIG_BATTERY_MM8013
-	int ret = 0;
-	union power_supply_propval prop = {0};
-#endif
 
 	battery_update_psd(&battery_main);
-//	bat_data->BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LION;
-	bat_data->BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LIPO;
+	bat_data->BAT_TECHNOLOGY = POWER_SUPPLY_TECHNOLOGY_LION;
 	bat_data->BAT_HEALTH = POWER_SUPPLY_HEALTH_GOOD;
 	bat_data->BAT_PRESENT = 1;
 
 #if defined(CONFIG_MTK_DISABLE_GAUGE)
 	return;
-#endif
-
-#ifdef CONFIG_BATTERY_MM8013
-	ret = mmi_get_prop_from_bms(POWER_SUPPLY_PROP_CAPACITY,&prop);
-	if (ret < 0) {
-		pr_err("[%s]Error getting BMS Capacity ret = %d\n", __func__, ret);
-	} else {
-		bat_data->BAT_CAPACITY = prop.intval;
-	}
 #endif
 
 	if (is_fg_disabled())
@@ -1581,15 +1402,15 @@ unsigned int TempConverBattThermistor(int temp)
 	int i;
 	unsigned int TBatt_R_Value = 0xffff;
 
-	if (temp >= Fg_Temperature_Table[22].BatteryTemp) {
-		TBatt_R_Value = Fg_Temperature_Table[22].TemperatureR;
+	if (temp >= Fg_Temperature_Table[20].BatteryTemp) {
+		TBatt_R_Value = Fg_Temperature_Table[20].TemperatureR;
 	} else if (temp <= Fg_Temperature_Table[0].BatteryTemp) {
 		TBatt_R_Value = Fg_Temperature_Table[0].TemperatureR;
 	} else {
 		RES1 = Fg_Temperature_Table[0].TemperatureR;
 		TMP1 = Fg_Temperature_Table[0].BatteryTemp;
 
-		for (i = 0; i <= 22; i++) {
+		for (i = 0; i <= 20; i++) {
 			if (temp <= Fg_Temperature_Table[i].BatteryTemp) {
 				RES2 = Fg_Temperature_Table[i].TemperatureR;
 				TMP2 = Fg_Temperature_Table[i].BatteryTemp;
@@ -1622,13 +1443,13 @@ int BattThermistorConverTemp(int Res)
 
 	if (Res >= Fg_Temperature_Table[0].TemperatureR) {
 		TBatt_Value = -400;
-	} else if (Res <= Fg_Temperature_Table[22].TemperatureR) {
-		TBatt_Value = 700;
+	} else if (Res <= Fg_Temperature_Table[20].TemperatureR) {
+		TBatt_Value = 600;
 	} else {
 		RES1 = Fg_Temperature_Table[0].TemperatureR;
 		TMP1 = Fg_Temperature_Table[0].BatteryTemp;
 
-		for (i = 0; i <= 22; i++) {
+		for (i = 0; i <= 20; i++) {
 			if (Res >= Fg_Temperature_Table[i].TemperatureR) {
 				RES2 = Fg_Temperature_Table[i].TemperatureR;
 				TMP2 = Fg_Temperature_Table[i].BatteryTemp;
@@ -1788,10 +1609,6 @@ int force_get_tbat_internal(bool update)
 	static struct timespec pre_time;
 	struct timespec ctime, dtime;
 
-#ifdef CONFIG_BATTERY_MM8013
-	int ret = 0;
-	union power_supply_propval prop = {0};
-#endif
 	if (is_battery_init_done() == false) {
 		gm.tbat_precise = 250;
 		return 25;
@@ -1920,17 +1737,6 @@ int force_get_tbat_internal(bool update)
 		bat_temperature_val = pre_bat_temperature_val;
 	}
 
-#ifdef CONFIG_BATTERY_MM8013
-	if (gm.battery_tmp_to_enable_extfg) {
-		ret = mmi_get_prop_from_bms(POWER_SUPPLY_PROP_TEMP,&prop);
-		if (ret < 0) {
-			pr_err("[%s]Error getting BMS TEMP ret = %d\n", __func__, ret);
-			bat_temperature_val = 250;
-		} else {
-			bat_temperature_val = prop.intval;
-		}
-	}
-#endif
 	gm.tbat_precise = bat_temperature_val;
 
 	return bat_temperature_val / 10;
@@ -1956,8 +1762,8 @@ int force_get_tbat(bool update)
 
 	bat_temperature_val = force_get_tbat_internal(update);
 
-	while (counts < 5 && bat_temperature_val >= 70) {
-		bm_err("[%s]over70 count=%d, bat_temp=%d\n",
+	while (counts < 5 && bat_temperature_val >= 60) {
+		bm_err("[%s]over60 count=%d, bat_temp=%d\n",
 			__func__,
 			counts, bat_temperature_val);
 		bat_temperature_val = force_get_tbat_internal(true);
@@ -4176,7 +3982,6 @@ static int battery_callback(
 	case CHARGER_NOTIFY_EOC:
 		{
 /* CHARGING FULL */
-			battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_FULL;
 			notify_fg_chr_full();
 		}
 		break;
@@ -4584,6 +4389,7 @@ static const struct file_operations adc_cali_fops = {
 	.release = adc_cali_release,
 };
 
+
 /*************************************/
 static struct wakeup_source *battery_lock;
 static int __init battery_probe(struct platform_device *dev)
@@ -4638,8 +4444,6 @@ static int __init battery_probe(struct platform_device *dev)
 		return ret;
 	}
 	bm_err("[BAT_probe] power_supply_register Battery Success !!\n");
-	if (is_kernel_power_off_charging())
-		battery_main.BAT_STATUS = POWER_SUPPLY_STATUS_CHARGING;
 #endif
 	ret = device_create_file(&(dev->dev), &dev_attr_Battery_Temperature);
 	ret = device_create_file(&(dev->dev), &dev_attr_UI_SOC);
@@ -4750,10 +4554,6 @@ static int __init battery_probe(struct platform_device *dev)
 		register_charger_manager_notifier(gm.pbat_consumer, &gm.bat_nb);
 	}
 
-#ifdef CONFIG_BATTERY_MM8013
-	gm.battery_tmp_to_enable_extfg = get_batt_temp_from_fg();
-#endif
-
 	battery_debug_init();
 
 	__pm_relax(battery_lock);
@@ -4767,10 +4567,8 @@ static int __init battery_probe(struct platform_device *dev)
 
 	mtk_battery_last_init(dev);
 
+
 	gm.is_probe_done = true;
-#ifdef CONFIG_BATTERY_MM8013
-	fg_bat_temp_int_internal(); //Enable batt temp interrupt
-#endif
 
 	return 0;
 }

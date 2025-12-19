@@ -58,7 +58,6 @@
 #include "mtk_charger_intf.h"
 #include "mtk_switch_charging.h"
 #include "mtk_intf.h"
-#include <linux/gpio.h>
 
 struct tag_bootmode {
 	u32 size;
@@ -83,12 +82,6 @@ static void _disable_all_charging(struct charger_manager *info)
 		mtk_pe20_set_is_enable(info, false);
 		if (mtk_pe20_get_is_connect(info))
 			mtk_pe20_reset_ta_vchr(info);
-	}
-
-	if (wlc_get_online()) {
-		mtk_wlc_set_is_enable(info, false);
-		if (mtk_wlc_get_is_connect(info))
-			mtk_wlc_reset_ta_vchr(info);
 	}
 
 	if (mtk_pe_get_is_enable(info)) {
@@ -143,7 +136,7 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 	mutex_lock(&swchgalg->ichg_aicr_access_mutex);
 
 	/* AICL */
-	if (!mtk_pe20_get_is_connect(info) &&!wlc_get_online() && !mtk_pe_get_is_connect(info) &&
+	if (!mtk_pe20_get_is_connect(info) && !mtk_pe_get_is_connect(info) &&
 	    !mtk_is_TA_support_pd_pps(info) && !mtk_pdc_check_charger(info)) {
 		charger_dev_run_aicl(info->chg1_dev,
 				&pdata->input_current_limit_by_aicl);
@@ -193,25 +186,18 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 		pdata->input_current_limit = 200000; /* 200mA */
 		goto done;
 	}
-#ifdef MTK_BASE
+
 	if (info->atm_enabled == true && (info->chr_type == STANDARD_HOST ||
 	    info->chr_type == CHARGING_HOST)) {
 		pdata->input_current_limit = 100000; /* 100mA */
 		goto done;
 	}
-#endif
+
 	if (is_typec_adapter(info)) {
 		if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL)
 			== 3000) {
-			if (pdata->typec_input_current_limit > 1500000
-				&& pdata->typec_input_current_limit < 3000000)
-				pdata->input_current_limit =
-					pdata->typec_input_current_limit;
-			else
-				pdata->input_current_limit = 3000000;
-
+			pdata->input_current_limit = 3000000;
 			pdata->charging_current_limit = 3000000;
-			chr_err("type-C:aicr:%d\n", pdata->input_current_limit);
 		} else if (adapter_dev_get_property(info->pd_adapter,
 			TYPEC_RP_LEVEL) == 1500) {
 			pdata->input_current_limit = 1500000;
@@ -226,15 +212,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 			info->pd_type,
 			adapter_dev_get_property(info->pd_adapter,
 				TYPEC_RP_LEVEL));
-	} else if (mtk_pe20_get_is_connect(info) == true) {
-                       pdata->input_current_limit = 3000000;
-                       pdata->charging_current_limit = 3000000;
-	}else if ( wlc_get_online() == true) {
-                       pdata->input_current_limit = info->wlc.wireless_charger_max_input_current;
-                       pdata->charging_current_limit =  info->wlc.wireless_charger_max_current;
-		mtk_wlc_set_charging_current(info,
-					&pdata->input_current_limit,
-					&pdata->charging_current_limit);
 	} else if (info->chr_type == STANDARD_HOST) {
 		if (IS_ENABLED(CONFIG_USBIF_COMPLIANCE)) {
 			if (info->usb_state == USB_SUSPEND)
@@ -264,14 +241,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 				info->data.non_std_ac_charger_current;
 		pdata->charging_current_limit =
 				info->data.non_std_ac_charger_current;
-		if (info->chr_type == WIRELESS_CHARGER) {
-			pdata->input_current_limit = info->wlc.wireless_charger_max_input_current;//1150000;
-			pdata->charging_current_limit = info->wlc.wireless_charger_max_current;//3600000;
-			mtk_wlc_set_charging_current(info,
-					&pdata->input_current_limit,
-					&pdata->charging_current_limit);
-			pr_info("wlc input_current_limit:%d\n",__func__, pdata->input_current_limit);
-		}
 	} else if (info->chr_type == STANDARD_CHARGER) {
 		pdata->input_current_limit =
 				info->data.ac_charger_input_current;
@@ -283,12 +252,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 		mtk_pe_set_charging_current(info,
 					&pdata->charging_current_limit,
 					&pdata->input_current_limit);
-	} else if (info->chr_type == WIRELESS_CHARGER) {
-		pdata->input_current_limit = info->wlc.wireless_charger_max_input_current;//1150000;
-		pdata->charging_current_limit = info->wlc.wireless_charger_max_current;//3600000;
-		mtk_wlc_set_charging_current(info,
-					&pdata->input_current_limit,
-					&pdata->charging_current_limit);
 	} else if (info->chr_type == CHARGING_HOST) {
 		pdata->input_current_limit =
 				info->data.charging_host_charger_current;
@@ -318,21 +281,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 		}
 	}
 
-	pdata->charging_current_limit = ((info->mmi.target_fcc < 0) ? 0 : info->mmi.target_fcc);
-
-	if (info->mmi.target_usb == 0) {
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	}
-
-	info->mmi.target_usb = pdata->input_current_limit;
-
-	if (pdata->cp_ichg_limit!= -1) {
-		if (pdata->cp_ichg_limit <
-		    pdata->charging_current_limit)
-			pdata->charging_current_limit =
-					pdata->cp_ichg_limit;
-	}
-
 	sc_select_charging_current(info, pdata);
 
 	if (pdata->thermal_input_current_limit != -1) {
@@ -343,35 +291,14 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 	}
 
 	if (pdata->input_current_limit_by_aicl != -1 &&
-	    !mtk_pe20_get_is_connect(info) && !wlc_get_online() && !mtk_pe_get_is_connect(info) &&
+	    !mtk_pe20_get_is_connect(info) && !mtk_pe_get_is_connect(info) &&
 	    !mtk_is_TA_support_pd_pps(info)) {
 		if (pdata->input_current_limit_by_aicl <
 		    pdata->input_current_limit)
 			pdata->input_current_limit =
 					pdata->input_current_limit_by_aicl;
 	}
-
-	if (pdata->moto_chg_tcmd_ibat != -1)
-		pdata->charging_current_limit = pdata->moto_chg_tcmd_ibat;
-
-	if (pdata->moto_chg_tcmd_ichg != -1)
-		pdata->input_current_limit = pdata->moto_chg_tcmd_ichg;
-
-	if (info->mmi.adaptive_charging_disable_ibat
-		&& !info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-		info->mmi.battery_charging_disable = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_ERROR);
-	} else if (!info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		info->mmi.battery_charging_disable = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	} else if (info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-	}
 done:
-
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
 	if (ret != -ENOTSUPP && pdata->charging_current_limit < ichg1_min)
 		pdata->charging_current_limit = 0;
@@ -380,7 +307,7 @@ done:
 	if (ret != -ENOTSUPP && pdata->input_current_limit < aicr1_min)
 		pdata->input_current_limit = 0;
 
-	chr_err("force:%d thermal:%d,%d pe4:%d,%d,%d setting:%d %d %d sc:%d,%d,%d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
+	chr_err("force:%d thermal:%d,%d pe4:%d,%d,%d setting:%d %d sc:%d,%d,%d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
 		_uA_to_mA(pdata->force_charging_current),
 		_uA_to_mA(pdata->thermal_input_current_limit),
 		_uA_to_mA(pdata->thermal_charging_current_limit),
@@ -389,7 +316,6 @@ done:
 		_uA_to_mA(info->pe4.input_current_limit),
 		_uA_to_mA(pdata->input_current_limit),
 		_uA_to_mA(pdata->charging_current_limit),
-		_uA_to_mA(pdata->cp_ichg_limit),
 		_uA_to_mA(info->sc.pre_ibat),
 		_uA_to_mA(info->sc.sc_ibat),
 		info->sc.solution,
@@ -401,22 +327,6 @@ done:
 					pdata->input_current_limit);
 	charger_dev_set_charging_current(info->chg1_dev,
 					pdata->charging_current_limit);
-
-	if ((info->mmi.adaptive_charging_disable_ichg || info->mmi.demo_discharging)
-			&& !(info->mmi.charging_enable_hz)) {
-
-		charger_dev_enable_hz(info->chg1_dev, true);
-		info->mmi.charging_enable_hz = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_STOP_CHARGING);
-
-	} else if (info->mmi.charging_enable_hz
-			&& !info->mmi.adaptive_charging_disable_ichg
-			&& !info->mmi.demo_discharging) {
-
-		charger_dev_enable_hz(info->chg1_dev, false);
-		info->mmi.charging_enable_hz = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_START_CHARGING);
-	}
 
 	/* If AICR < 300mA, stop PE+/PE+20 */
 	if (pdata->input_current_limit < 300000) {
@@ -458,7 +368,6 @@ static void swchg_select_cv(struct charger_manager *info)
 	constant_voltage = info->data.battery_cv;
 	mtk_get_dynamic_cv(info, &constant_voltage);
 
-	constant_voltage = info->mmi.target_fv;
 	charger_dev_set_constant_voltage(info->chg1_dev, constant_voltage);
 }
 
@@ -498,11 +407,10 @@ static void swchg_turn_on_charging(struct charger_manager *info)
 					info->chg1_data.input_current_limit);
 		chr_err("In meta mode, disable charging and set input current limit to 200mA\n");
 	} else {
-	 	#ifdef MTK_BASE
 		mtk_pe20_start_algorithm(info);
 		if (mtk_pe20_get_is_connect(info) == false)
 			mtk_pe_start_algorithm(info);
-		#endif
+
 		swchg_select_charging_current_limit(info);
 		if (info->chg1_data.input_current_limit == 0
 		    || info->chg1_data.charging_current_limit == 0) {
@@ -535,7 +443,6 @@ static int mtk_switch_charging_plug_out(struct charger_manager *info)
 	swchgalg->total_charging_time = 0;
 
 	mtk_pe20_set_is_cable_out_occur(info, true);
-	mtk_wlc_set_is_cable_out_occur(info, true);
 	mtk_pe_set_is_cable_out_occur(info, true);
 	mtk_pdc_plugout(info);
 
@@ -548,15 +455,6 @@ static int mtk_switch_charging_plug_out(struct charger_manager *info)
 	info->leave_pe5 = false;
 	info->leave_pe4 = false;
 	info->leave_pdc = false;
-
-	if (info->mmi.charging_enable_hz) {
-		charger_dev_enable_hz(info->chg1_dev, false);
-		info->mmi.charging_enable_hz = false;
-	}
-
-	info->mmi.battery_charging_disable = false;
-
-	info->mmi.target_usb = 0;
 
 	return 0;
 }
@@ -677,13 +575,12 @@ static int select_pe40_charging_current_limit(struct charger_manager *info)
 	if (ret != -ENOTSUPP && pdata->input_current_limit < aicr1_min)
 		pdata->input_current_limit = 0;
 
-	chr_err("force:%d thermal:%d,%d setting:%d %d %d sc:%d %d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
+	chr_err("force:%d thermal:%d,%d setting:%d %d sc:%d %d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
 		_uA_to_mA(pdata->force_charging_current),
 		_uA_to_mA(pdata->thermal_input_current_limit),
 		_uA_to_mA(pdata->thermal_charging_current_limit),
 		_uA_to_mA(pdata->input_current_limit),
 		_uA_to_mA(pdata->charging_current_limit),
-		_uA_to_mA(pdata->cp_ichg_limit),
 		info->sc.pre_ibat,
 		info->sc.sc_ibat,
 		info->sc.solution,
@@ -785,33 +682,8 @@ static int select_pdc_charging_current_limit(struct charger_manager *info)
 
 	pdata->input_current_limit =
 		info->data.pd_charger_current;
-
-#ifdef MTK_BASE
 	pdata->charging_current_limit =
 		info->data.pd_charger_current;
-#else
-	pdata->charging_current_limit = ((info->mmi.target_fcc < 0) ? 0 : info->mmi.target_fcc);
-
-	if (info->mmi.target_usb == 0) {
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	}
-
-	info->mmi.target_usb = pdata->input_current_limit;
-
-	if (info->mmi.adaptive_charging_disable_ibat
-		&& !info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-		info->mmi.battery_charging_disable = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_ERROR);
-	} else if (!info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		info->mmi.battery_charging_disable = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	} else if (info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-	}
-#endif
 
 	sc_select_charging_current(info, pdata);
 
@@ -822,22 +694,6 @@ static int select_pdc_charging_current_limit(struct charger_manager *info)
 					pdata->thermal_input_current_limit;
 	}
 
-	if ((info->mmi.adaptive_charging_disable_ichg || info->mmi.demo_discharging)
-			&& !(info->mmi.charging_enable_hz)) {
-
-		charger_dev_enable_hz(info->chg1_dev, true);
-		info->mmi.charging_enable_hz = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_STOP_CHARGING);
-
-	} else if (info->mmi.charging_enable_hz
-			&& !info->mmi.adaptive_charging_disable_ichg
-			&& !info->mmi.demo_discharging) {
-
-		charger_dev_enable_hz(info->chg1_dev, false);
-		info->mmi.charging_enable_hz = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_START_CHARGING);
-	}
-
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
 	if (ret != -ENOTSUPP && pdata->charging_current_limit < ichg1_min)
 		pdata->charging_current_limit = 0;
@@ -846,13 +702,12 @@ static int select_pdc_charging_current_limit(struct charger_manager *info)
 	if (ret != -ENOTSUPP && pdata->input_current_limit < aicr1_min)
 		pdata->input_current_limit = 0;
 
-	chr_err("force:%d thermal:%d,%d setting:%d %d %d sc:%d %d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
+	chr_err("force:%d thermal:%d,%d setting:%d %d sc:%d %d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
 		_uA_to_mA(pdata->force_charging_current),
 		_uA_to_mA(pdata->thermal_input_current_limit),
 		_uA_to_mA(pdata->thermal_charging_current_limit),
 		_uA_to_mA(pdata->input_current_limit),
 		_uA_to_mA(pdata->charging_current_limit),
-		_uA_to_mA(pdata->cp_ichg_limit),
 		info->sc.pre_ibat,
 		info->sc.sc_ibat,
 		info->sc.solution,
@@ -880,15 +735,11 @@ static int mtk_switch_chr_pdc_run(struct charger_manager *info)
 	data->pd_vbus_low_bound = pdata->pd_vbus_low_bound;
 	data->pd_vbus_upper_bound = pdata->pd_vbus_upper_bound;
 
-#ifdef MTK_BASE
 	data->battery_cv = pdata->battery_cv;
 	if (info->enable_sw_jeita) {
 		if (info->sw_jeita.cv != 0)
 			data->battery_cv = info->sw_jeita.cv;
 	}
-#else
-	data->battery_cv = info->mmi.target_fv;
-#endif
 
 	if (info->enable_hv_charging == false)
 		goto stop;
@@ -1035,12 +886,7 @@ static int mtk_switch_chr_cc(struct charger_manager *info)
 
 	swchg_turn_on_charging(info);
 
-	#ifdef MTK_BASE
 	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
-	#else
-	if (info->mmi.pres_chrg_step == STEP_FULL)
-		chg_done = true;
-	#endif
 	if (chg_done) {
 		swchgalg->state = CHR_BATFULL;
 		charger_dev_do_event(info->chg1_dev, EVENT_EOC, 0);
@@ -1058,10 +904,7 @@ static int mtk_switch_chr_cc(struct charger_manager *info)
 		mtk_pe20_set_is_enable(info, true);
 		mtk_pe20_set_to_check_chr_type(info, true);
 	}
-	if (!mtk_wlc_get_is_enable(info)) {
-		mtk_wlc_set_is_enable(info, true);
-		mtk_wlc_set_to_check_chr_type(info, true);
-	}
+
 	if (!mtk_pe_get_is_enable(info)) {
 		mtk_pe_set_is_enable(info, true);
 		mtk_pe_set_to_check_chr_type(info, true);
@@ -1108,17 +951,11 @@ static int mtk_switch_chr_full(struct charger_manager *info)
 	 */
 	swchg_select_cv(info);
 	info->polling_interval = CHARGING_FULL_INTERVAL;
-	#ifdef MTK_BASE
 	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
-	#else
-	if (info->mmi.pres_chrg_step == STEP_FULL)
-		chg_done = true;
-	#endif
 	if (!chg_done) {
 		swchgalg->state = CHR_CC;
 		charger_dev_do_event(info->chg1_dev, EVENT_RECHARGE, 0);
 		mtk_pe20_set_to_check_chr_type(info, true);
-		mtk_wlc_set_to_check_chr_type(info, true);
 		mtk_pe_set_to_check_chr_type(info, true);
 		info->enable_dynamic_cv = true;
 		get_monotonic_boottime(&swchgalg->charging_begin_time);
@@ -1149,12 +986,6 @@ static int mtk_switch_charging_run(struct charger_manager *info)
 		mtk_pe20_check_charger(info);
 		if (mtk_pe20_get_is_connect(info) == false)
 			mtk_pe_check_charger(info);
-	}
-
-	chr_err("%s,  %d\n", __func__,mtk_wlc_check_charger_avail());
-
-	if (mtk_wlc_check_charger_avail() == true) {
-			mtk_wlc_set_is_enable(info, true);
 	}
 
 	do {
@@ -1198,6 +1029,8 @@ static int charger_dev_event(struct notifier_block *nb,
 	struct charger_manager *info =
 			container_of(nb, struct charger_manager, chg1_nb);
 	struct chgdev_notify *data = v;
+
+	chr_info("%s %ld", __func__, event);
 
 	switch (event) {
 	case CHARGER_DEV_NOTIFY_EOC:
@@ -1252,257 +1085,6 @@ static int dvchg2_dev_event(struct notifier_block *nb, unsigned long event,
 	return mtk_pe50_notifier_call(info, MTK_PE50_NOTISRC_CHG, event, data);
 }
 
-#define MMI_MUX(_mos1,  _mos2, _boost, _switch, _chipstate) \
-{ \
-	.typec_mos = _mos1, \
-	.wls_mos = _mos2, \
-	.wls_boost_en = _boost, \
-	.wls_loadswtich_en = _switch, \
-	.wls_chip_en = _chipstate, \
-}
-
-static const struct mmi_mux_configure config_mmi_mux[MMI_MUX_CHANNEL_MAX] = {
-	[MMI_MUX_CHANNEL_NONE] = MMI_MUX(MMI_DVCHG_MUX_CLOSE, MMI_DVCHG_MUX_CLOSE, false, false, true),
-	[MMI_MUX_CHANNEL_TYPEC_CHG] = MMI_MUX(MMI_DVCHG_MUX_CHG_OPEN, MMI_DVCHG_MUX_CLOSE, false, false, false),
-	[MMI_MUX_CHANNEL_TYPEC_OTG] = MMI_MUX(MMI_DVCHG_MUX_OTG_OPEN, MMI_DVCHG_MUX_CLOSE, false, false, false),
-	[MMI_MUX_CHANNEL_WLC_CHG] = MMI_MUX(MMI_DVCHG_MUX_CLOSE, MMI_DVCHG_MUX_CHG_OPEN, false, false, true),
-	[MMI_MUX_CHANNEL_WLC_OTG] = MMI_MUX(MMI_DVCHG_MUX_DISABLE, MMI_DVCHG_MUX_DISABLE, true, true, true),
-	[MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG] = MMI_MUX(MMI_DVCHG_MUX_CHG_OPEN, MMI_DVCHG_MUX_CLOSE, true, true, true),
-	[MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG] = MMI_MUX(MMI_DVCHG_MUX_CHG_OPEN, MMI_DVCHG_MUX_CLOSE, false, false, false),
-	[MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG] = MMI_MUX(MMI_DVCHG_MUX_OTG_OPEN, MMI_DVCHG_MUX_CLOSE, false, false, false),
-	[MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG] = MMI_MUX(MMI_DVCHG_MUX_OTG_OPEN, MMI_DVCHG_MUX_CLOSE,  false, false, false),
-	[MMI_MUX_CHANNEL_WLC_FW_UPDATE] = MMI_MUX(MMI_DVCHG_MUX_DISABLE, MMI_DVCHG_MUX_DISABLE, true, true, true),
-	[MMI_MUX_CHANNEL_WLC_FACTORY_TEST] = MMI_MUX(MMI_DVCHG_MUX_CLOSE, MMI_DVCHG_MUX_MANUAL_OPEN, false, false, true),
-};
-
-static int mmi_mux_config(struct charger_manager *info, enum mmi_mux_channel channel)
-{
-	struct power_supply	*cp_psy;
-	union power_supply_propval prop = {0,};
-	int rc = 0;
-
-	cp_psy = power_supply_get_by_name("cp-master");
-	if (!cp_psy)
-		return -ENODEV;
-
-	prop.intval = channel;
-	rc = power_supply_set_property(cp_psy,
-				POWER_SUPPLY_PROP_SELECT_MUX, &prop);
-	if (rc < 0)
-		pr_info("%s: POWER_SUPPLY_PROP_SELECT_MUX  failed, rc = %d\n",
-			__func__, rc);
-
-	//factory mode , no need close wlc ic for upgrade fw
-	if(gpio_is_valid(info->mmi.wls_control_en) && 	!info->mmi.factory_mode) {
-		gpio_set_value(info->mmi.wls_control_en, !config_mmi_mux[channel].wls_chip_en);
-	}
-
-#if 0
-	if (info->dvchg1_dev == NULL) {
-		info->dvchg1_dev = get_charger_by_name("primary_dvchg");
-		if (info->dvchg1_dev)
-			pr_info("mmi_mux_config Found primary divider charger\n");
-		else {
-			chr_err("*** Error : can't find primary divider charger ***\n");
-			return 0;
-		}
-	}
-
-#if 0 //temp
-	if (!info->mmi.factory_mode) {
-		struct chg_alg_device *alg;
-
-		alg = get_chg_alg_by_name("wlc");
-		if ((NULL != alg) && (alg->alg_id & info->fast_charging_indicator))
-			chg_alg_set_prop(alg, ALG_WLC_STATE, config_mmi_mux[channel].wls_chip_en);
-	}
-#endif
-	charger_dev_config_mux(info->dvchg1_dev,
-		config_mmi_mux[channel].typec_mos, config_mmi_mux[channel].wls_mos);
-
-	if(gpio_is_valid(info->mmi.wls_boost_en))
-		gpio_set_value(info->mmi.wls_boost_en, config_mmi_mux[channel].wls_boost_en);
-	if(gpio_is_valid(info->mmi.wls_switch_en))
-		gpio_set_value(info->mmi.wls_switch_en, config_mmi_mux[channel].wls_loadswtich_en);
-#endif
-	return 0;
-}
-
-static int mmi_mux_switch(struct charger_manager *info, enum mmi_mux_channel channel, bool on)
-{
-	int pre_chan, pre_on;
-
-	chr_err("wlc enter %s\n",__func__);
-	if(!info->mmi.enable_mux)
-		return 0;
-
-	mutex_lock(&info->mmi_mux_lock);
-	pre_chan =  info->mmi.mux_channel.chan;
-	pre_on = info->mmi.mux_channel.on;
-	if (pre_chan == channel && pre_on == on) {
-		mutex_unlock(&info->mmi_mux_lock);
-		return 0;
-	}
-	switch (channel) {
-		case MMI_MUX_CHANNEL_NONE:
-			break;
-		case MMI_MUX_CHANNEL_TYPEC_CHG:
-			if (on) {
-				if (pre_chan == MMI_MUX_CHANNEL_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG;
-					info->mmi.mux_channel.on = true;
-				}
-			} else {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_NONE);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_NONE;
-					info->mmi.mux_channel.on = false;
-				}
-			}
-			break;
-		case MMI_MUX_CHANNEL_TYPEC_OTG:
-			if (on) {
-				if (pre_chan == MMI_MUX_CHANNEL_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG;
-					info->mmi.mux_channel.on = true;
-				}
-			} else {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_NONE);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_NONE;
-					info->mmi.mux_channel.on = false;
-				}
-			}
-			break;
-		case MMI_MUX_CHANNEL_WLC_CHG:
-			if (on) {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_CHG;
-					info->mmi.mux_channel.on = true;
-				}
-			} else {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_NONE);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_NONE;
-					info->mmi.mux_channel.on = false;
-				}
-			}
-			break;
-		case MMI_MUX_CHANNEL_WLC_OTG:
-			if (on) {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_OTG;
-					info->mmi.mux_channel.on = true;
-				}
-			} else {
-				if (pre_chan == MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG;
-					info->mmi.mux_channel.on = true;
-				} else if (pre_chan == MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG) {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_OTG);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_OTG;
-					info->mmi.mux_channel.on = true;
-				} else {
-					mmi_mux_config(info, MMI_MUX_CHANNEL_NONE);
-					info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_NONE;
-					info->mmi.mux_channel.on = false;
-				}
-			}
-			break;
-		case MMI_MUX_CHANNEL_WLC_FW_UPDATE:
-			if (on) {
-				mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_FW_UPDATE);
-				info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_FW_UPDATE;
-			 } else {
-				mmi_mux_config(info, MMI_MUX_CHANNEL_NONE);
-				info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_NONE;
-			 }
-			info->mmi.mux_channel.on = on;
-			break;
-		case MMI_MUX_CHANNEL_WLC_FACTORY_TEST:
-			if (on) {
-				mmi_mux_config(info, MMI_MUX_CHANNEL_WLC_FACTORY_TEST);
-				info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_WLC_FACTORY_TEST;
-			 } else {
-				mmi_mux_config(info, MMI_MUX_CHANNEL_TYPEC_CHG);
-				info->mmi.mux_channel.chan = MMI_MUX_CHANNEL_TYPEC_CHG;
-			 }
-			info->mmi.mux_channel.on = true;
-			break;
-		default:
-			chr_err("[%s] Unknown channel: %d\n",
-			__func__, channel);
-	}
-
-	chr_err("[%s] pre= %d,%d config = %d,%d result =%d,%d\n",
-		__func__, pre_chan, pre_on, channel, on,
-		info->mmi.mux_channel.chan,  info->mmi.mux_channel.on);
-	mutex_unlock(&info->mmi_mux_lock);
-
-	return 0;
-}
-
 int mtk_switch_charging_init2(struct charger_manager *info)
 {
 	struct switch_charging_alg_data *swch_alg;
@@ -1547,7 +1129,6 @@ int mtk_switch_charging_init2(struct charger_manager *info)
 	info->do_charging = mtk_switch_charging_do_charging;
 	info->do_event = charger_dev_event;
 	info->change_current_setting = mtk_switch_charging_current;
-	info->do_mux = mmi_mux_switch;
 
 	mtk_switch_chr_pe50_init(info);
 	mtk_switch_chr_pe40_init(info);

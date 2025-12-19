@@ -110,7 +110,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 	struct switch_charging_alg_data *swchgalg = info->algorithm_data;
 	u32 ichg1_min = 0, aicr1_min = 0;
 	int ret = 0;
-	union power_supply_propval val;
 
 	struct device *dev = NULL;
 	struct device_node *boot_node = NULL;
@@ -194,13 +193,13 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 		pdata->input_current_limit = 200000; /* 200mA */
 		goto done;
 	}
-#ifdef MTK_BASE
+
 	if (info->atm_enabled == true && (info->chr_type == STANDARD_HOST ||
 	    info->chr_type == CHARGING_HOST)) {
 		pdata->input_current_limit = 100000; /* 100mA */
 		goto done;
 	}
-#endif
+
 	if (mtk_is_TA_support_pd_pps(info)) {
 		pdata->input_current_limit =
 			info->data.pe40_single_charger_input_current;
@@ -209,15 +208,8 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 	} else if (is_typec_adapter(info)) {
 		if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL)
 			== 3000) {
-			if (pdata->typec_input_current_limit > 1500000
-				&& pdata->typec_input_current_limit < 3000000)
-				pdata->input_current_limit =
-					pdata->typec_input_current_limit;
-			else
-				pdata->input_current_limit = 3000000;
-
+			pdata->input_current_limit = 3000000;
 			pdata->charging_current_limit = 3000000;
-			chr_err("type-C:aicr:%d\n", pdata->input_current_limit);
 		} else if (adapter_dev_get_property(info->pd_adapter,
 			TYPEC_RP_LEVEL) == 1500) {
 			pdata->input_current_limit = 1500000;
@@ -232,9 +224,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 			info->pd_type,
 			adapter_dev_get_property(info->pd_adapter,
 				TYPEC_RP_LEVEL));
-	} else if (mtk_pe20_get_is_connect(info) == true) {
-			pdata->input_current_limit = 3000000;
-			pdata->charging_current_limit = 3000000;
 	} else if (mtk_pdc_check_charger(info)) {
 		int vbus = 0, cur = 0, idx = 0;
 		info->is_pdc_run = true;
@@ -323,28 +312,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 		}
 	}
 
-	pdata->charging_current_limit = ((info->mmi.target_fcc < 0) ? 0 : info->mmi.target_fcc);
-
-	ret = mmi_get_prop_from_charger(info,
-				POWER_SUPPLY_PROP_ONLINE, &val);
-	if (ret < 0) {
-		pr_err("[%s]Error getting charger online ret = %d\n", __func__, ret);
-		val.intval = 0;
-	}
-
-	if (info->mmi.target_usb == 0 && val.intval) {
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	}
-
-	info->mmi.target_usb = pdata->input_current_limit;
-
-	if (pdata->cp_ichg_limit!= -1) {
-		if (pdata->cp_ichg_limit <
-		    pdata->charging_current_limit)
-			pdata->charging_current_limit =
-					pdata->cp_ichg_limit;
-	}
-
 	if (pdata->thermal_charging_current_limit != -1) {
 		if (pdata->thermal_charging_current_limit <
 		    pdata->charging_current_limit)
@@ -383,26 +350,6 @@ static void swchg_select_charging_current_limit(struct charger_manager *info)
 			pdata->input_current_limit =
 					pdata->input_current_limit_by_aicl;
 	}
-
-	if (pdata->moto_chg_tcmd_ibat != -1)
-		pdata->charging_current_limit = pdata->moto_chg_tcmd_ibat;
-
-	if (pdata->moto_chg_tcmd_ichg != -1)
-		pdata->input_current_limit = pdata->moto_chg_tcmd_ichg;
-
-	if (info->mmi.adaptive_charging_disable_ibat
-		&& !info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-		info->mmi.battery_charging_disable = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_ERROR);
-	} else if (!info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		info->mmi.battery_charging_disable = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_NORMAL);
-	} else if (info->mmi.adaptive_charging_disable_ibat
-			&& info->mmi.battery_charging_disable) {
-		pdata->charging_current_limit = 0;
-	}
 done:
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
 	if (ret != -ENOTSUPP && pdata->charging_current_limit < ichg1_min)
@@ -412,7 +359,7 @@ done:
 	if (ret != -ENOTSUPP && pdata->input_current_limit < aicr1_min)
 		pdata->input_current_limit = 0;
 
-	chr_err("force:%d thermal:%d,%d pe4:%d,%d,%d setting:%d %d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
+	chr_err("force:%d thermal:%d,%d pe4:%d,%d,%d setting:%d %d type:%d usb_unlimited:%d usbif:%d usbsm:%d aicl:%d atm:%d\n",
 		_uA_to_mA(pdata->force_charging_current),
 		_uA_to_mA(pdata->thermal_input_current_limit),
 		_uA_to_mA(pdata->thermal_charging_current_limit),
@@ -421,7 +368,6 @@ done:
 		_uA_to_mA(info->pe4.input_current_limit),
 		_uA_to_mA(pdata->input_current_limit),
 		_uA_to_mA(pdata->charging_current_limit),
-		_uA_to_mA(pdata->cp_ichg_limit),
 		info->chr_type, info->usb_unlimited,
 		IS_ENABLED(CONFIG_USBIF_COMPLIANCE), info->usb_state,
 		pdata->input_current_limit_by_aicl, info->atm_enabled);
@@ -430,23 +376,6 @@ done:
 					pdata->input_current_limit);
 	charger_dev_set_charging_current(info->chg1_dev,
 					pdata->charging_current_limit);
-
-
-	if ((info->mmi.adaptive_charging_disable_ichg || info->mmi.demo_discharging)
-			&& !(info->mmi.charging_enable_hz)) {
-
-		charger_dev_enable_hz(info->chg1_dev, true);
-		info->mmi.charging_enable_hz = true;
-		charger_manager_notifier(info, CHARGER_NOTIFY_STOP_CHARGING);
-
-	} else if (info->mmi.charging_enable_hz
-			&& !info->mmi.adaptive_charging_disable_ichg
-			&& !info->mmi.demo_discharging) {
-
-		charger_dev_enable_hz(info->chg1_dev, false);
-		info->mmi.charging_enable_hz = false;
-		charger_manager_notifier(info, CHARGER_NOTIFY_START_CHARGING);
-	}
 
 	/* If AICR < 300mA, stop PE+/PE+20 */
 	if (pdata->input_current_limit < 300000) {
@@ -488,7 +417,6 @@ static void swchg_select_cv(struct charger_manager *info)
 	constant_voltage = info->data.battery_cv;
 	mtk_get_dynamic_cv(info, &constant_voltage);
 
-	constant_voltage = info->mmi.target_fv;
 	charger_dev_set_constant_voltage(info->chg1_dev, constant_voltage);
 }
 
@@ -532,11 +460,10 @@ static void swchg_turn_on_charging(struct charger_manager *info)
 					info->chg1_data.input_current_limit);
 		chr_err("In meta mode, disable charging and set input current limit to 200mA\n");
 	} else {
-		#if defined(MTK_BASE) || defined(CONFIG_MOTO_CHG_PEONEPLUS_SUPPORT)
 		mtk_pe20_start_algorithm(info);
 		if (mtk_pe20_get_is_connect(info) == false)
 			mtk_pe_start_algorithm(info);
-		#endif
+
 		swchg_select_charging_current_limit(info);
 		if (info->chg1_data.input_current_limit == 0
 		    || info->chg1_data.charging_current_limit == 0) {
@@ -573,15 +500,6 @@ static int mtk_switch_charging_plug_out(struct charger_manager *info)
 	mtk_pdc_plugout(info);
 	mtk_pe40_plugout_reset(info);
 	mtk_pe50_plugout_reset(info);
-
-	if (info->mmi.charging_enable_hz) {
-		charger_dev_enable_hz(info->chg1_dev, false);
-		info->mmi.charging_enable_hz = false;
-	}
-
-	info->mmi.battery_charging_disable = false;
-
-	info->mmi.target_usb = 0;
 
 	return 0;
 }
@@ -745,12 +663,7 @@ static int mtk_switch_chr_cc(struct charger_manager *info)
 
 	swchg_turn_on_charging(info);
 
-	#ifdef MTK_BASE
 	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
-	#else
-	if (info->mmi.pres_chrg_step == STEP_FULL)
-		chg_done = true;
-	#endif
 	if (chg_done) {
 		swchgalg->state = CHR_BATFULL;
 		charger_dev_do_event(info->chg1_dev, EVENT_EOC, 0);
@@ -815,12 +728,7 @@ int mtk_switch_chr_full(struct charger_manager *info)
 	 */
 	swchg_select_cv(info);
 	info->polling_interval = CHARGING_FULL_INTERVAL;
-	#ifdef MTK_BASE
 	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
-	#else
-	if (info->mmi.pres_chrg_step == STEP_FULL)
-		chg_done = true;
-	#endif
 	if (!chg_done) {
 		swchgalg->state = CHR_CC;
 		charger_dev_do_event(info->chg1_dev, EVENT_RECHARGE, 0);

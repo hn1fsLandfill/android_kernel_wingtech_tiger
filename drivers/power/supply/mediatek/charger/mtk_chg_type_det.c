@@ -44,7 +44,6 @@
 #include <tcpm.h>
 
 #include "mtk_charger_intf.h"
-#include "mtk_intf.h"
 
 struct tag_bootmode {
 	u32 size;
@@ -133,7 +132,6 @@ static void dump_charger_name(enum charger_type type)
 	case APPLE_2_1A_CHARGER:
 	case APPLE_1_0A_CHARGER:
 	case APPLE_0_5A_CHARGER:
-	case WIRELESS_CHARGER:
 		pr_info("%s: charger type: %d, %s\n", __func__, type,
 			mtk_chg_type_name[type]);
 		break;
@@ -163,39 +161,8 @@ struct mt_charger {
 	#endif
 	bool chg_online; /* Has charger in or not */
 	enum charger_type chg_type;
-	int ichg_limit;
-	int wireless_online;
 };
-int wireless_get_charger_type(void);
-int wireless_get_wireless_online(struct mt_charger *info);
-static int mmi_mux_typec_chg_chan(enum mmi_mux_channel channel, bool on)
-{
-	struct charger_manager *info = NULL;
-	struct charger_device *chg_psy = NULL;
 
-	chg_psy = get_charger_by_name("primary_chg");
-	if(chg_psy) {
-		info = (struct charger_manager *)charger_dev_get_drvdata(chg_psy);
-		if(info)
-			pr_err("%s could  get charger_manager\n",__func__);
-		else {
-			pr_err("%s Couldn't get charger_manager\n",__func__);
-			return 0;
-		}
-	} else {
-		pr_err("%s Couldn't get chg_psy\n",__func__);
-		return 0;
-	}
-
-	pr_info("%s open typec chan =%d, on = %d\n", __func__, channel, on);
-	if (info->do_mux)
-		info->do_mux(info, channel, on);
-	else
-		pr_err("%s get info->algo.do_mux fail", __func__);
-	return 0;
-}
-
-#ifdef MTK_BASE
 static int mt_charger_online(struct mt_charger *mtk_chg)
 {
 	int ret = 0;
@@ -235,23 +202,18 @@ static int mt_charger_online(struct mt_charger *mtk_chg)
 
 	return ret;
 }
-#endif
 
 /* Power Supply Functions */
 static int mt_charger_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
 {
 	struct mt_charger *mtk_chg = power_supply_get_drvdata(psy);
-	struct chg_type_info *cti = mtk_chg->cti;
-	bool en;
-	u32 tmp;
-	int rc;
 
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = 0;
 		/* Force to 1 in all charger type */
-		if (mtk_chg->chg_type != CHARGER_UNKNOWN && mtk_chg->chg_type != WIRELESS_CHARGER)
+		if (mtk_chg->chg_type != CHARGER_UNKNOWN)
 			val->intval = 1;
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
@@ -282,26 +244,6 @@ static int mt_charger_get_property(struct power_supply *psy,
 		default:
 		break;
 	}
-	case POWER_SUPPLY_PROP_CHARGE_ENABLED:
-		rc = charger_manager_is_enabled(cti->chg_consumer, MAIN_CHARGER, &en);
-		if (rc < 0)
-			val->intval = 0;
-		else
-		       val->intval = !!en;
-		break;
-	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-		 val->intval  = battery_get_vbus() * 1000; /* uV */
-		 break;
-	case POWER_SUPPLY_PROP_INPUT_CURRENT_NOW:
-		rc = charger_manager_get_ibus(cti->chg_consumer, MAIN_CHARGER, &tmp);
-		if (rc < 0)
-			val->intval = 0;
-		else
-			val->intval = tmp;
-		break;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		val->intval = mtk_chg->ichg_limit;
-		break;
 	default:
 		return -EINVAL;
 	}
@@ -324,82 +266,6 @@ static void usb_extcon_detect_cable(struct work_struct *work)
 }
 #endif
 
-int wireless_get_charger_type(void)
-{
-	static struct power_supply *wl_psy;
-	union power_supply_propval prop_wls;
-	int ret;
-	struct mt_charger *info = NULL;
-	struct power_supply *psy = power_supply_get_by_name("charger");
-	static enum charger_type pre_chg_type = CHARGER_UNKNOWN;
-
-	pr_info("%s enter\n", __func__);
-
-	if (!psy) {
-		pr_info("%s: get power supply failed\n", __func__);
-		return -EINVAL;
-	}
-	info = power_supply_get_drvdata(psy);
-
-	wireless_get_wireless_online(info);
-
-	if (info->wireless_online) {
-		wl_psy = power_supply_get_by_name("wireless");
-		if (wl_psy == NULL || IS_ERR(wl_psy)) {
-			chr_err("%s Couldn't get wl_psy\n", __func__);
-			prop_wls.intval = POWER_SUPPLY_TYPE_UNKNOWN;
-		} else {
-			ret = power_supply_get_property(wl_psy,
-			POWER_SUPPLY_PROP_TYPE, &prop_wls);
-			chr_err("%s type:%d ret:%d\n", __func__, prop_wls.intval,ret);
-			if (POWER_SUPPLY_TYPE_WIRELESS == prop_wls.intval) {
-				chr_err("%s event, wireless online,type:%d\n", __func__, prop_wls.intval);
-			} else {
-				prop_wls.intval = POWER_SUPPLY_TYPE_UNKNOWN;
-			}
-		}
-	}else {
-		prop_wls.intval = POWER_SUPPLY_TYPE_UNKNOWN;
-		pr_info("%s event, wireless online,type:%d\n", __func__, prop_wls.intval);
-	}
-
-
-	pr_info("%s usb_type:%d, wireless_type:%d,pre_chg_type:%d\n", __func__,info->chg_type,prop_wls.intval,pre_chg_type);
-
-	//when wireless plug in, apsd type maybe unknow or nonstandard.  when wlc plug out, vbus int comes before wirless int. pre_chg_type also could handle it.
-	if((NONSTANDARD_CHARGER == info->chg_type ||(CHARGER_UNKNOWN == info->chg_type && pre_chg_type != WIRELESS_CHARGER ) )&& prop_wls.intval == POWER_SUPPLY_TYPE_WIRELESS   ) {
-		info->chg_type = WIRELESS_CHARGER;
-	}
-	pre_chg_type = info->chg_type;
-
-	if(info->chg_type != WIRELESS_CHARGER && CHARGER_UNKNOWN != info->chg_type) {
-		pr_info("%s  normal charger connected, switch mux to usb vbus\n", __func__);
-		mmi_mux_typec_chg_chan(MMI_MUX_CHANNEL_TYPEC_CHG, true);
-	}
-
-	return prop_wls.intval;
-}
-
-int wireless_get_wireless_online(struct mt_charger *info)
-{
-	struct power_supply *wl_psy = NULL;
-	union power_supply_propval prop;
-	int ret;
-
-	wl_psy = power_supply_get_by_name("wireless");
-	if (wl_psy == NULL || IS_ERR(wl_psy)) {
-		chr_err("%s Couldn't get wl_psy\n", __func__);
-		prop.intval = 0;
-	} else {
-		ret = power_supply_get_property(wl_psy,
-			POWER_SUPPLY_PROP_ONLINE, &prop);
-		info->wireless_online = prop.intval;
-		pr_notice("%s wlc event, name:%s online:%d\n", __func__,
-				wl_psy->desc->name, prop.intval);
-	}
-	return ret;
-}
-
 static int mt_charger_set_property(struct power_supply *psy,
 	enum power_supply_property psp, const union power_supply_propval *val)
 {
@@ -419,20 +285,15 @@ static int mt_charger_set_property(struct power_supply *psy,
 #ifdef CONFIG_EXTCON_USB_CHG
 	info = mtk_chg->extcon_info;
 #endif
-	cti = mtk_chg->cti;
 
 	cti = mtk_chg->cti;
 	switch (psp) {
 	case POWER_SUPPLY_PROP_ONLINE:
 		mtk_chg->chg_online = val->intval;
-		wireless_get_wireless_online(mtk_chg);
-		#ifdef MTK_BASE
 		mt_charger_online(mtk_chg);
-		#endif
 		return 0;
 	case POWER_SUPPLY_PROP_CHARGE_TYPE:
 		mtk_chg->chg_type = val->intval;
-		wireless_get_charger_type();
 		if (mtk_chg->chg_type != CHARGER_UNKNOWN)
 			charger_manager_force_disable_power_path(
 				cti->chg_consumer, MAIN_CHARGER, false);
@@ -440,11 +301,6 @@ static int mt_charger_set_property(struct power_supply *psy,
 			charger_manager_force_disable_power_path(
 				cti->chg_consumer, MAIN_CHARGER, true);
 		break;
-	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		charger_manager_cp_set_ichg(cti->chg_consumer, MAIN_CHARGER, val->intval);
-		mtk_chg->ichg_limit =  val->intval;
-		return 0;
-
 	default:
 		return -EINVAL;
 	}
@@ -480,7 +336,6 @@ static int mt_charger_set_property(struct power_supply *psy,
 #endif
 	power_supply_changed(mtk_chg->ac_psy);
 	power_supply_changed(mtk_chg->usb_psy);
-	power_supply_changed(mtk_chg->chg_psy);
 
 	return 0;
 }
@@ -494,12 +349,11 @@ static int mt_ac_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = 0;
 		/* Force to 1 in all charger type */
-		if (mtk_chg->chg_type != CHARGER_UNKNOWN )
+		if (mtk_chg->chg_type != CHARGER_UNKNOWN)
 			val->intval = 1;
 		/* Reset to 0 if charger type is USB */
 		if ((mtk_chg->chg_type == STANDARD_HOST) ||
-			(mtk_chg->chg_type == CHARGING_HOST) ||
-			(mtk_chg->chg_type == WIRELESS_CHARGER))
+			(mtk_chg->chg_type == CHARGING_HOST))
 			val->intval = 0;
 		break;
 	default:
@@ -523,10 +377,7 @@ static int mt_usb_get_property(struct power_supply *psy,
 			val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-		if (mtk_chg->chg_type == STANDARD_HOST)
-			val->intval = 500000;
-		else
-			val->intval = 1500000;
+		val->intval = 500000;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		val->intval = 5000000;
@@ -540,11 +391,6 @@ static int mt_usb_get_property(struct power_supply *psy,
 
 static enum power_supply_property mt_charger_properties[] = {
 	POWER_SUPPLY_PROP_ONLINE,
-	POWER_SUPPLY_PROP_CHARGE_TYPE,
-	POWER_SUPPLY_PROP_CHARGE_ENABLED,
-	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-	POWER_SUPPLY_PROP_INPUT_CURRENT_NOW,
-	POWER_SUPPLY_PROP_CURRENT_MAX,
 };
 
 static enum power_supply_property mt_ac_properties[] = {
@@ -560,9 +406,7 @@ static enum power_supply_property mt_usb_properties[] = {
 static void tcpc_power_off_work_handler(struct work_struct *work)
 {
 	pr_info("%s\n", __func__);
-	#ifdef MTK_BASE
 	kernel_power_off();
-	#endif
 }
 
 static void charger_in_work_handler(struct work_struct *work)
@@ -592,9 +436,7 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 	struct tcp_notify *noti = data;
 	struct chg_type_info *cti = container_of(pnb,
 		struct chg_type_info, pd_nb);
-	#ifdef MTK_BASE
 	int vbus = 0;
-	#endif
 	struct power_supply *ac_psy = power_supply_get_by_name("ac");
 	struct power_supply *usb_psy = power_supply_get_by_name("usb");
 	struct mt_charger *mtk_chg_ac;
@@ -634,14 +476,12 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 		    noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
 			pr_info("%s USB Plug in, pol = %d\n", __func__,
 					noti->typec_state.polarity);
-//			mmi_mux_typec_chg_chan(MMI_MUX_CHANNEL_TYPEC_CHG, true);
 			plug_in_out_handler(cti, true, false);
 		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SNK ||
 		    noti->typec_state.old_state == TYPEC_ATTACHED_CUSTOM_SRC ||
 		    noti->typec_state.old_state == TYPEC_ATTACHED_NORP_SRC ||
 		    noti->typec_state.old_state == TYPEC_ATTACHED_AUDIO)
 			&& noti->typec_state.new_state == TYPEC_UNATTACHED) {
-			#ifdef MTK_BASE
 			if (cti->tcpc_kpoc) {
 				vbus = battery_get_vbus();
 				pr_info("%s KPOC Plug out, vbus = %d\n",
@@ -655,19 +495,15 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 					      &cti->pwr_off_work);
 				break;
 			}
-			#endif
 			pr_info("%s USB Plug out\n", __func__);
-			mmi_mux_typec_chg_chan(MMI_MUX_CHANNEL_TYPEC_CHG, false);
 			plug_in_out_handler(cti, false, false);
 		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
 			pr_info("%s Source_to_Sink\n", __func__);
-//			mmi_mux_typec_chg_chan(MMI_MUX_CHANNEL_TYPEC_CHG, true);
 			plug_in_out_handler(cti, true, true);
 		}  else if (noti->typec_state.old_state == TYPEC_ATTACHED_SNK &&
 			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
 			pr_info("%s Sink_to_Source\n", __func__);
-			mmi_mux_typec_chg_chan(MMI_MUX_CHANNEL_TYPEC_CHG, false);
 			plug_in_out_handler(cti, false, true);
 		}
 		break;
@@ -969,11 +805,7 @@ static int mt_charger_probe(struct platform_device *pdev)
 	//ret = get_boot_mode();
 	if (boot_mode == KERNEL_POWER_OFF_CHARGING_BOOT ||
 	    boot_mode == LOW_POWER_OFF_CHARGING_BOOT)
-#ifdef MTK_BASE
 		cti->tcpc_kpoc = true;
-#else
-		cti->tcpc_kpoc = false;
-#endif
 	pr_info("%s KPOC(%d)\n", __func__, cti->tcpc_kpoc);
 
 	/* Init Charger Detection */

@@ -18,8 +18,6 @@
 #include <mt-plat/v1/mtk_charger.h>
 #include <mt-plat/v1/mtk_battery.h>
 
-#include <linux/power/moto_chg_tcmd.h>
-#include <linux/power_supply.h>
 #include <mtk_gauge_time_service.h>
 
 #include <mt-plat/v1/charger_class.h>
@@ -28,7 +26,6 @@ struct charger_manager;
 struct charger_data;
 #include "mtk_pe_intf.h"
 #include "mtk_pe20_intf.h"
-#include "moto_wlc_intf.h"
 #include "mtk_pe40_intf.h"
 #include "mtk_pe50_intf.h"
 #include "mtk_pdc_intf.h"
@@ -89,9 +86,7 @@ do {								\
 #define CHG_ST_TMO_STATUS	(1 << 4)
 #define CHG_BAT_LT_STATUS	(1 << 5)
 #define CHG_TYPEC_WD_STATUS	(1 << 6)
-/*wireless input current and charging current*/
-#define WIRELESS_FACTORY_MAX_CURRENT			3000000
-#define WIRELESS_FACTORY_MAX_INPUT_CURRENT		600000
+
 /* charger_algorithm notify charger_dev */
 enum {
 	EVENT_EOC,
@@ -112,32 +107,6 @@ enum {
 	CHARGER_DEV_NOTIFY_IBUSUCP_FALL,
 	CHARGER_DEV_NOTIFY_VOUTOVP,
 	CHARGER_DEV_NOTIFY_VDROVP,
-};
-enum mmi_mux_channel {
-	MMI_MUX_CHANNEL_NONE = 0,
-	MMI_MUX_CHANNEL_TYPEC_CHG,
-	MMI_MUX_CHANNEL_TYPEC_OTG,
-	MMI_MUX_CHANNEL_WLC_CHG,
-	MMI_MUX_CHANNEL_WLC_OTG,
-	MMI_MUX_CHANNEL_TYPEC_CHG_WLC_OTG,
-	MMI_MUX_CHANNEL_TYPEC_CHG_WLC_CHG,
-	MMI_MUX_CHANNEL_TYPEC_OTG_WLC_CHG,
-	MMI_MUX_CHANNEL_TYPEC_OTG_WLC_OTG,
-	MMI_MUX_CHANNEL_WLC_FW_UPDATE,
-	MMI_MUX_CHANNEL_WLC_FACTORY_TEST,
-	MMI_MUX_CHANNEL_MAX
-};
-struct mmi_mux_chan {
-	enum mmi_mux_channel chan;
-	bool on;
-};
-
-struct mmi_mux_configure {
-	u32 typec_mos;
-	u32 wls_mos;
-	bool wls_boost_en;
-	bool wls_loadswtich_en;
-	bool wls_chip_en;
 };
 
 /*
@@ -245,8 +214,6 @@ struct charger_custom_data {
 	int ta_start_battery_soc;
 	int ta_stop_battery_soc;
 
-	int wlc_ichg_level_threshold;	/* ma */
-	
 	/* pe4.0 */
 	int pe40_single_charger_input_current;	/* ma */
 	int pe40_single_charger_current;
@@ -300,10 +267,6 @@ struct charger_custom_data {
 
 	int vsys_watt;
 	int ibus_err;
-
-	/*wireless charger*/
-	int wireless_factory_max_current;
-	int wireless_factory_max_input_current;
 };
 
 struct charger_data {
@@ -316,97 +279,6 @@ struct charger_data {
 	int input_current_limit_by_aicl;
 	int junction_temp_min;
 	int junction_temp_max;
-	int moto_chg_tcmd_ichg;
-	int moto_chg_tcmd_ibat;
-	int typec_input_current_limit;
-	int cp_ichg_limit;
-};
-
-struct mmi_ffc_zone  {
-	int		ffc_max_mv;
-	int		ffc_chg_iterm;
-};
-
-struct mmi_temp_zone {
-	int		temp_c;
-	int		norm_mv;
-	int		fcc_max_ma;
-	int		fcc_norm_ma;
-};
-
-#define MAX_NUM_STEPS 10
-enum mmi_temp_zones {
-	ZONE_FIRST = 0,
-	/* states 0-9 are reserved for zones */
-	ZONE_LAST = MAX_NUM_STEPS + ZONE_FIRST - 1,
-	ZONE_HOT,
-	ZONE_COLD,
-	ZONE_NONE = 0xFF,
-};
-
-enum mmi_chrg_step {
-	STEP_MAX,
-	STEP_NORM,
-	STEP_FULL,
-	STEP_FLOAT,
-	STEP_DEMO,
-	STEP_STOP,
-	STEP_NONE = 0xFF,
-};
-
-enum charging_limit_modes {
-	CHARGING_LIMIT_OFF,
-	CHARGING_LIMIT_RUN,
-	CHARGING_LIMIT_UNKNOWN,
-};
-
-struct mmi_params {
-	bool			init_done;
-	bool			factory_mode;
-	int			demo_mode;
-	bool			demo_discharging;
-
-	bool			factory_kill_armed;
-
-	/*adaptive charging*/
-	bool adaptive_charging_disable_ichg;
-	bool adaptive_charging_disable_ibat;
-	bool charging_enable_hz;
-	bool battery_charging_disable;
-
-	/* Charge Profile */
-	int			num_temp_zones;
-	struct mmi_temp_zone	*temp_zones;
-	enum mmi_temp_zones	pres_temp_zone;
-	enum mmi_chrg_step	pres_chrg_step;
-	int			chrg_taper_cnt;
-	int			temp_state;
-	int			chrg_iterm;
-        int			back_chrg_iterm;
-
-	struct mmi_ffc_zone	*ffc_zones;
-
-	bool			enable_charging_limit;
-	bool			is_factory_image;
-	enum charging_limit_modes	charging_limit_modes;
-	int			upper_limit_capacity;
-	int			lower_limit_capacity;
-	int			base_fv_mv;
-	int			vfloat_comp_mv;
-	int			batt_health;
-	int			max_chrg_temp;
-
-	/*target parameter*/
-	int			target_fv;
-	bool			chg_disable;
-	int			target_fcc;
-	int			target_usb;
-	struct notifier_block	chg_reboot;
-	bool			enable_mux;
-	struct			mmi_mux_chan mux_channel;
-	int			wls_switch_en;
-	int			wls_boost_en;
-	int			wls_control_en;
 };
 
 struct charger_manager {
@@ -492,10 +364,6 @@ struct charger_manager {
 	bool enable_pe_2;
 	struct mtk_pe20 pe2;
 
-	/* wlc */
-	bool enable_wlc;
-	struct mtk_wlc wlc;
-
 	/* pe 4.0 */
 	bool enable_pe_4;
 	bool leave_pe4;
@@ -505,9 +373,6 @@ struct charger_manager {
 	bool enable_pe_5;
 	bool leave_pe5;
 	struct mtk_pe50 pe5;
-
-	/* 3rd charge pump */
-	bool enable_cp;
 
 	/* type-C*/
 	bool enable_type_c;
@@ -562,16 +427,6 @@ struct charger_manager {
 	bool force_disable_pp[TOTAL_CHARGER];
 	bool enable_pp[TOTAL_CHARGER];
 	struct mutex pp_lock[TOTAL_CHARGER];
-
-	struct moto_chg_tcmd_client chg_tcmd_client;
-	struct power_supply		*battery_psy;
-	struct power_supply 		*charger_psy;
-	struct mmi_params	mmi;
-	struct power_supply  *wl_psy;
-	int wireless_online;
-	struct mutex mmi_mux_lock;
-	int (*do_mux)(struct charger_manager *info, enum mmi_mux_channel channel, bool on);
-
 };
 
 /* charger related module interface */
@@ -585,9 +440,6 @@ extern int mtk_get_dynamic_cv(struct charger_manager *info, unsigned int *cv);
 extern bool is_dual_charger_supported(struct charger_manager *info);
 extern int charger_enable_vbus_ovp(struct charger_manager *pinfo, bool enable);
 extern bool is_typec_adapter(struct charger_manager *info);
-extern int mmi_get_prop_from_charger(struct charger_manager *info,
-				enum power_supply_property psp,
-				union power_supply_propval *val);
 
 /* pmic API */
 extern unsigned int upmu_get_rgs_chrdet(void);
@@ -622,8 +474,6 @@ bool __attribute__((weak)) is_usb_rdy(void)
 	return false;
 }
 #endif
-
-extern void aee_kernel_RT_Monitor_api_factory(void);
 
 /* procfs */
 #define PROC_FOPS_RW(name)						\

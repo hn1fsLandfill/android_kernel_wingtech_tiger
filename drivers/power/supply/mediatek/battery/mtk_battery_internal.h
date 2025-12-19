@@ -18,8 +18,6 @@
 #include <mtk_gauge_time_service.h>
 #include <mtk_gauge_class.h>
 
-#include <linux/power/moto_chg_tcmd.h>
-
 
 /* ============================================================ */
 /* Define Macro Value */
@@ -46,13 +44,7 @@
 #define SHUTDOWN_TIME 40
 #define AVGVBAT_ARRAY_SIZE 30
 #define INIT_VOLTAGE 3450
-#ifdef MTK_BASE
 #define BATTERY_SHUTDOWN_TEMPERATURE 60
-#elif defined(CONFIG_MTK_DISABLE_BAT_HIGH_TEMP_PROTECT)
-#define BATTERY_SHUTDOWN_TEMPERATURE 100
-#else
-#define BATTERY_SHUTDOWN_TEMPERATURE 70
-#endif
 
 /* ============================================================ */
 /* typedef and Struct*/
@@ -667,8 +659,6 @@ struct battery_data {
 	/* Add for Battery Service */
 	int BAT_batt_vol;
 	int BAT_batt_temp;
-
-	struct moto_chg_tcmd_client bat_tcmd_client;
 };
 
 struct BAT_EC_Struct {
@@ -895,11 +885,6 @@ struct mtk_battery {
 	int algo_ocv_to_soc;
 	int algo_vtemp;
 
-#ifdef CONFIG_BATTERY_MM8013
-/* cust batt_temp read fg */
-	int battery_tmp_to_enable_extfg;
-#endif
-
 	bool is_reset_aging_factor;
 	int aging_factor;
 
@@ -1091,8 +1076,5 @@ int zcv_filter_add(struct zcv_filter *zf);
 void zcv_filter_dump(struct zcv_filter *zf);
 bool zcv_check(struct zcv_filter *zf);
 void zcv_filter_init(struct zcv_filter *zf);
-
-extern int mmi_chrg_rate_check(void);
-extern int mmi_batt_health_check(void);
 
 #endif /* __MTK_BATTERY_INTF_H__ */

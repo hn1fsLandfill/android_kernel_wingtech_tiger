@@ -20,8 +20,8 @@
 #include <linux/reboot.h>
 
 #include <mt-plat/upmu_common.h>
-#include <mt-plat/v1/charger_class.h>
-#include <mt-plat/v1/charger_type.h>
+#include <mt-plat/charger_class.h>
+#include <mt-plat/charger_type.h>
 #ifdef CONFIG_RT_REGMAP
 #include <mt-plat/rt-regmap.h>
 #endif /* CONFIG_RT_REGMAP */
@@ -1086,14 +1086,6 @@ static int __rt9471_enable_bc12(struct rt9471_chip *chip, bool en)
 	else
 		return rt9471_clr_bit(chip, RT9471_REG_DPDMDET,
 				      RT9471_BC12_EN_MASK);
-}
-
-static int __rt9471_enable_stat_pin(struct rt9471_chip *chip, bool en)
-{
-	dev_info(chip->dev, "%s en = %d\n", __func__, en);
-
-	return (en ? rt9471_set_bit : rt9471_clr_bit)
-	       (chip, RT9471_REG_TOP, RT9471_STAT_EN_MASK);
 }
 
 static int __rt9471_dump_registers(struct rt9471_chip *chip)
@@ -2209,10 +2201,6 @@ static int rt9471_init_setting(struct rt9471_chip *chip)
 	if (ret < 0)
 		dev_notice(chip->dev, "%s dis bc12 fail(%d)\n", __func__, ret);
 
-	ret = __rt9471_enable_stat_pin(chip, false);
-	if (ret < 0)
-		dev_notice(chip->dev, "%s disable_stat_pin fail(%d)\n", __func__, ret);
-
 	/*
 	 * Customization for MTK platform
 	 * Primary charger: HZ controlled by sink vbus with TCPC enabled,
@@ -2413,16 +2401,6 @@ static int rt9471_set_cv(struct charger_device *chg_dev, u32 uV)
 	struct rt9471_chip *chip = dev_get_drvdata(&chg_dev->dev);
 
 	return __rt9471_set_cv(chip, uV);
-}
-
-static int rt9471_get_vbus(struct charger_device *chg_dev, u32 *vbus)
-{
-        int val = 0;
-
-        val = battery_get_vbus();
-	*vbus = val * 1000;
-        pr_info("%s: vbus = %d , mv = %d \n", __func__, val, *vbus);
-        return val * 1000;
 }
 
 static int rt9471_get_ichg(struct charger_device *chg_dev, u32 *uA)
@@ -2892,9 +2870,6 @@ static struct charger_ops rt9471_chg_ops = {
 	.get_constant_voltage = rt9471_get_cv,
 	.set_constant_voltage = rt9471_set_cv,
 
-        /* ADC */
-        .get_vbus_adc = rt9471_get_vbus,
-
 	/* get/set charging current*/
 	.get_charging_current = rt9471_get_ichg,
 	.set_charging_current = rt9471_set_ichg,
@@ -3101,7 +3076,6 @@ static int rt9471_probe(struct i2c_client *client,
 	}
 
 	__rt9471_dump_registers(chip);
-
 	dev_info(chip->dev, "%s successfully\n", __func__);
 	return 0;
 
