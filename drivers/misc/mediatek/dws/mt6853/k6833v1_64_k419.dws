@@ -2241,11 +2241,6 @@
                 <channel>I2C_CHANNEL_4</channel>
                 <address>0x1A</address>
             </device11>
-            <device12>
-                <varName>CAMERA_SUB_EEPROM</varName>
-                <channel>I2C_CHANNEL_4</channel>
-                <address>0xA2</address>
-            </device12>
             <device14>
                 <varName>SUBPMIC</varName>
                 <channel>I2C_CHANNEL_5</channel>
@@ -2276,11 +2271,6 @@
                 <channel>I2C_CHANNEL_8</channel>
                 <address>0x1A</address>
             </device24>
-            <device25>
-                <varName>CAMERA_MAIN_EEPROM</varName>
-                <channel>I2C_CHANNEL_2</channel>
-                <address>0xA0</address>
-            </device25>
             <device26>
                 <varName>CAMERA_MAIN_AF</varName>
                 <channel>I2C_CHANNEL_8</channel>
@@ -2297,9 +2287,9 @@
                 <address>0x10</address>
             </device29>
             <device31>
-                <varName>CAMERA_MAIN_THREE_EEPROM</varName>
-                <channel>I2C_CHANNEL_8</channel>
-                <address>0xA4</address>
+                <varName>CAMERA_MAIN_THREE_AF</varName>
+                <channel>I2C_CHANNEL_2</channel>
+                <address>0x0C</address>
             </device31>
         </module>
         <module name="md1_eint">

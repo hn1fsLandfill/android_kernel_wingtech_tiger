@@ -8,61 +8,17 @@
 #include "mclk/mclk.h"
 #include "regulator/regulator.h"
 #include "gpio/gpio.h"
-#ifdef CONFIG_MOT_WL2868
-#include "wl2868/wl2868.h"
-#endif
+
 #include "imgsensor_hw.h"
 #include "imgsensor_cfg_table.h"
 enum IMGSENSOR_RETURN (*hw_open[IMGSENSOR_HW_ID_MAX_NUM])
 	(struct IMGSENSOR_HW_DEVICE **) = {
 	imgsensor_hw_mclk_open,
 	imgsensor_hw_regulator_open,
-	imgsensor_hw_gpio_open,
-#ifdef CONFIG_MOT_WL2868
-	imgsensor_hw_wl2868_open
-#endif
+	imgsensor_hw_gpio_open
 };
 
 struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
-#ifdef CONFIG_MOT_LYRIQ
-	{
-                IMGSENSOR_SENSOR_IDX_MAIN,
-                IMGSENSOR_I2C_DEV_0,
-                {
-                        {IMGSENSOR_HW_PIN_MCLK,  IMGSENSOR_HW_ID_MCLK},
-                        {IMGSENSOR_HW_PIN_AVDD,  IMGSENSOR_HW_ID_REGULATOR},
-                        {IMGSENSOR_HW_PIN_DOVDD, IMGSENSOR_HW_ID_REGULATOR},
-                        {IMGSENSOR_HW_PIN_DVDD,  IMGSENSOR_HW_ID_GPIO},
-                        {IMGSENSOR_HW_PIN_PDN,   IMGSENSOR_HW_ID_GPIO},
-                        {IMGSENSOR_HW_PIN_RST,   IMGSENSOR_HW_ID_GPIO},
-                        {IMGSENSOR_HW_PIN_NONE,  IMGSENSOR_HW_ID_NONE},
-                },
-        },
-	{
-		IMGSENSOR_SENSOR_IDX_SUB,
-		IMGSENSOR_I2C_DEV_1,
-		{
-			{IMGSENSOR_HW_PIN_MCLK,  IMGSENSOR_HW_ID_MCLK},
-			{IMGSENSOR_HW_PIN_AVDD,  IMGSENSOR_HW_ID_REGULATOR},
-			{IMGSENSOR_HW_PIN_DOVDD, IMGSENSOR_HW_ID_REGULATOR},
-			{IMGSENSOR_HW_PIN_DVDD,  IMGSENSOR_HW_ID_REGULATOR},
-			{IMGSENSOR_HW_PIN_RST,   IMGSENSOR_HW_ID_GPIO},
-			{IMGSENSOR_HW_PIN_NONE, IMGSENSOR_HW_ID_NONE},
-		},
-	},
-	{
-		IMGSENSOR_SENSOR_IDX_MAIN2,
-		IMGSENSOR_I2C_DEV_2,
-		{
-			{IMGSENSOR_HW_PIN_MCLK,  IMGSENSOR_HW_ID_MCLK},
-			{IMGSENSOR_HW_PIN_AVDD,  IMGSENSOR_HW_ID_GPIO},
-			{IMGSENSOR_HW_PIN_DOVDD, IMGSENSOR_HW_ID_REGULATOR},
-			{IMGSENSOR_HW_PIN_DVDD,  IMGSENSOR_HW_ID_REGULATOR},
-			{IMGSENSOR_HW_PIN_RST,   IMGSENSOR_HW_ID_GPIO},
-			{IMGSENSOR_HW_PIN_NONE,  IMGSENSOR_HW_ID_NONE},
-		},
-	},
-#else
 	{
 		IMGSENSOR_SENSOR_IDX_MAIN,
 		IMGSENSOR_I2C_DEV_0,
@@ -76,7 +32,6 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 			{IMGSENSOR_HW_PIN_NONE,  IMGSENSOR_HW_ID_NONE},
 		},
 	},
-
 	{
 		IMGSENSOR_SENSOR_IDX_SUB,
 		IMGSENSOR_I2C_DEV_1,
@@ -103,7 +58,6 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 			{IMGSENSOR_HW_PIN_NONE,  IMGSENSOR_HW_ID_NONE},
 		},
 	},
-#endif
 	{
 		IMGSENSOR_SENSOR_IDX_SUB2,
 		IMGSENSOR_I2C_DEV_3,
@@ -271,3 +225,4 @@ struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
 
 	{NULL}
 };
+

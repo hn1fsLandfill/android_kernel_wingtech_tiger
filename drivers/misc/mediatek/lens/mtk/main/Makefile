@@ -23,7 +23,6 @@ MTK_CUSTOM_PATH  := $(srctree)/drivers/misc/mediatek
 
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main/inc
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main/common/lc898122af
-subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main/common/mot_gnevan_dw9800vaf/MOT_GNEVAN_DW9800VAF.c
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main/common/lc898212xdaf/inc
 ifeq ($(CONFIG_MTK_LENS_BU63165AF_SUPPORT), y)
   subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main/common/bu63165af/inc
@@ -34,18 +33,9 @@ ifeq ($(CONFIG_MACH_MT6779), y)
   ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync/
 endif
 
-subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/ois/inc
-subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/ois/dw9781
-
-ifeq ($(CONFIG_ARCH_MOTO_PROJECT),"corfu")
-obj-y += corfu/
-else
-
 obj-$(CONFIG_MTK_LENS)    += mainaf.o
 
 mainaf-y  += main_lens.o
-mainaf-y  += common/mot_gnevan_dw9800vaf/MOT_GNEVAN_DW9800VAF.o
-mainaf-y  += common/cn3938aaf/CN3938AAF.o
 mainaf-y  += common/fp5510e2af/FP5510E2AF.o
 mainaf-y  += common/bu6424af/BU6424AF.o
 mainaf-y  += common/bu6429af/BU6429AF.o
@@ -53,7 +43,6 @@ mainaf-y  += common/bu64748af/bu64748_function.o
 mainaf-y  += common/bu64748af/bu64748af.o
 mainaf-y  += common/dw9714af/DW9714AF.o
 mainaf-y  += common/dw9800waf/DW9800WAF.o
-mainaf-y  += common/mot_austin_dw9800vaf/MOT_AUSTIN_DW9800VAF.o
 mainaf-y  += common/dw9814af/DW9814AF.o
 mainaf-y  += common/dw9718af/DW9718AF.o
 mainaf-y  += common/dw9718saf/DW9718SAF.o
@@ -62,8 +51,6 @@ mainaf-y  += common/dw9719taf/DW9719TAF.o
 mainaf-y  += common/dw9763af/DW9763AF.o
 mainaf-y  += common/dw9839af/DW9839AF.o
 mainaf-y  += common/gt9764af/GT9764AF.o
-mainaf-y  += common/mot_lyriq_gt9764af/MOT_LYRIQ_GT9764AF.o
-mainaf-y  += common/gt9772af/GT9772AF.o
 mainaf-y  += common/lc898212af/LC898212AF.o
 mainaf-y  += common/lc898212xdaf/LC898212XDAF.o
 mainaf-y  += common/lc898212xdaf/AfInter.o
@@ -88,4 +75,3 @@ mainaf-y  += common/bu64253gwzaf/BU64253GWZAF.o
 mainaf-y  += common/gt9768af/GT9768AF.o
 mainaf-y  += common/gt9772af/GT9772AF.o
 
-endif # CONFIG_ARCH_MOTO_PROJECT == corfu

@@ -41,18 +41,12 @@ int disp_lcm_update(struct disp_lcm_handle *plcm,
 	int x, int y, int w, int h, int force);
 int disp_lcm_esd_check(struct disp_lcm_handle *plcm);
 int disp_lcm_esd_recover(struct disp_lcm_handle *plcm);
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-bool disp_lcm_notify_support(struct disp_lcm_handle *plcm);
-#endif
 int disp_lcm_suspend(struct disp_lcm_handle *plcm);
 int disp_lcm_resume(struct disp_lcm_handle *plcm);
 int disp_lcm_is_support_adjust_fps(struct disp_lcm_handle *plcm);
 int disp_lcm_adjust_fps(void *cmdq, struct disp_lcm_handle *plcm, int fps);
 int disp_lcm_set_backlight(struct disp_lcm_handle *plcm,
 	void *handle, int level);
-#ifdef CONFIG_BACKLIGHT_LEVEL_LCM
-int disp_lcm_get_max_brightness(struct disp_lcm_handle *plcm);
-#endif
 int disp_lcm_read_fb(struct disp_lcm_handle *plcm);
 int disp_lcm_ioctl(struct disp_lcm_handle *plcm, enum LCM_IOCTL ioctl,
 	unsigned int arg);
@@ -83,7 +77,6 @@ bool disp_lcm_need_send_cmd(
 	unsigned int last_dynfps, unsigned int new_dynfps);
 void disp_lcm_dynfps_send_cmd(struct disp_lcm_handle *plcm, void *cmdq_handle,
 	unsigned int from_fps, unsigned int to_fps);
-int get_lcm_backlight_level(void);
 
 /*-----------------------DynFPS end-----------------------------------*/
 #endif

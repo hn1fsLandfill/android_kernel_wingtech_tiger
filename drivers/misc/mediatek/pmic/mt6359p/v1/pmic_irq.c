@@ -44,22 +44,22 @@ irqreturn_t key_int_handler(int irq, void *data)
 	case INT_PWRKEY:
 		IRQLOG("Press pwrkey %d\n",
 			pmic_get_register_value(PMIC_PWRKEY_DEB));
-		//kpd_pwrkey_pmic_handler(0x1);
+		kpd_pwrkey_pmic_handler(0x1);
 		break;
 	case INT_PWRKEY_R:
 		IRQLOG("Release pwrkey %d\n",
 			pmic_get_register_value(PMIC_PWRKEY_DEB));
-		//kpd_pwrkey_pmic_handler(0x0);
-		//break;
+		kpd_pwrkey_pmic_handler(0x0);
+		break;
 	case INT_HOMEKEY:
 		IRQLOG("Press homekey %d\n",
 			pmic_get_register_value(PMIC_HOMEKEY_DEB));
-		//kpd_pmic_rstkey_handler(0x1);
+		kpd_pmic_rstkey_handler(0x1);
 		break;
 	case INT_HOMEKEY_R:
 		IRQLOG("Release homekey %d\n",
 			pmic_get_register_value(PMIC_HOMEKEY_DEB));
-		//kpd_pmic_rstkey_handler(0x0);
+		kpd_pmic_rstkey_handler(0x0);
 		break;
 	}
 #endif

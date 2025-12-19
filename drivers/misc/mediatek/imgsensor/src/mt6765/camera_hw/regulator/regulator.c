@@ -29,12 +29,8 @@ struct reg_oc_debug_t {
 	bool is_md_reg;
 };
 
-static struct reg_oc_debug_t reg_oc_debug[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM];
-static int regulator_status[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM] = {0};
-static void check_for_regulator_get(struct REGULATOR *preg, struct device *pdevice, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index);
-static void check_for_regulator_put(struct REGULATOR *preg, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index);
-static struct device_node *of_node_record = NULL;
-static DEFINE_MUTEX(g_regulator_state_mutex);
+static struct reg_oc_debug_t
+	reg_oc_debug[IMGSENSOR_SENSOR_IDX_MAX_NUM][REGULATOR_TYPE_MAX_NUM];
 
 static const int regulator_voltage[] = {
 	REGULATOR_VOLTAGE_0,
@@ -86,26 +82,13 @@ static int regulator_oc_notify(
 enum IMGSENSOR_RETURN imgsensor_oc_interrupt(
 	enum IMGSENSOR_SENSOR_IDX sensor_idxU, bool enable)
 {
-	struct device *pdevice = gimgsensor_device;
 	int i = 0;
-	struct device_node *pof_node;
 	int ret = 0;
 	unsigned int sensor_idx = 0;
 
 	sensor_idx = sensor_idxU;
 
 	mutex_lock(&oc_mutex);
-	pr_debug("[regulator] %s idx=%d %s enable=%d\n",
-					__func__,
-					sensor_idx,
-					regulator_control[i].pregulator_type,
-					enable);
-
-	pof_node = pdevice->of_node;
-	pdevice->of_node =
-		of_find_compatible_node(NULL, NULL, "mediatek,camera_hw");
-	pr_debug("[regulator] %s pdevice->of_node=%p\n", __func__, pdevice->of_node);
-
 	if (enable) {
 		mdelay(5);
 		for (i = 0; i < REGULATOR_TYPE_MAX_NUM; i++) {
@@ -160,7 +143,6 @@ enum IMGSENSOR_RETURN imgsensor_oc_interrupt(
 
 	}
 	mutex_unlock(&oc_mutex);
-	pdevice->of_node = pof_node;
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 
@@ -195,8 +177,6 @@ static enum IMGSENSOR_RETURN regulator_init(void *pinstance)
 		return IMGSENSOR_RETURN_ERROR;
 	}
 
-	of_node_record = pdevice->of_node;
-
 	for (j = IMGSENSOR_SENSOR_IDX_MIN_NUM;
 		j < IMGSENSOR_SENSOR_IDX_MAX_NUM;
 		j++) {
@@ -216,7 +196,6 @@ static enum IMGSENSOR_RETURN regulator_init(void *pinstance)
 					j, i, str_regulator_name);
 
 			atomic_set(&preg->enable_cnt[j][i], 0);
-			regulator_status[j][i] = 1;
 		}
 	}
 	pdevice->of_node = pof_node;
@@ -268,9 +247,6 @@ static enum IMGSENSOR_RETURN regulator_set(
 		return IMGSENSOR_RETURN_ERROR;
 
 	reg_type_offset = REGULATOR_TYPE_VCAMA;
-	if(pin == IMGSENSOR_HW_PIN_DVDD){
-		check_for_regulator_get(preg, gimgsensor_device, sensor_idx, (reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD));
-	}
 
 	pregulator =
 		preg->pregulator[sensor_idx][
@@ -317,9 +293,6 @@ static enum IMGSENSOR_RETURN regulator_set(
 					return IMGSENSOR_RETURN_ERROR;
 				}
 			}
-			if(pin == IMGSENSOR_HW_PIN_DVDD){
-				check_for_regulator_put(preg, sensor_idx, (reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD));
-			}
 			atomic_dec(enable_cnt);
 		}
 	} else {
@@ -347,39 +320,3 @@ enum IMGSENSOR_RETURN imgsensor_hw_regulator_open(
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 
-static void check_for_regulator_get(struct REGULATOR *preg, struct device *pdevice, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index)
-{
-	struct device_node *pof_node;
-	char str_regulator_name[LENGTH_FOR_SNPRINTF];
-
-	mutex_lock(&g_regulator_state_mutex);
-	if(regulator_status[sensor_idx][index]==0)
-	{
-		snprintf(str_regulator_name,
-			sizeof(str_regulator_name),
-			"cam%d_%s",
-			sensor_idx,
-			regulator_control[index].pregulator_type);
-
-		pof_node = pdevice->of_node;
-		pdevice->of_node = of_node_record;
-		preg->pregulator[sensor_idx][index] = regulator_get_optional(pdevice, str_regulator_name);
-		pdevice->of_node = pof_node;
-		regulator_status[sensor_idx][index] = 1;
-		pr_info("regulator_dbg regulator_get %s, of_node:%p\n", str_regulator_name, of_node_record);
-	}
-	mutex_unlock(&g_regulator_state_mutex);
-}
-
-static void check_for_regulator_put(struct REGULATOR *preg, enum IMGSENSOR_SENSOR_IDX sensor_idx, int index)
-{
-	mutex_lock(&g_regulator_state_mutex);
-	if(regulator_status[sensor_idx][index]==1)
-	{
-		regulator_put(preg->pregulator[sensor_idx][index]);
-		preg->pregulator[sensor_idx][index] = NULL;
-		regulator_status[sensor_idx][index]=0;
-		pr_info("regulator_dbg regulator_put cam%d index=%d\n", sensor_idx, index);
-	}
-	mutex_unlock(&g_regulator_state_mutex);
-}

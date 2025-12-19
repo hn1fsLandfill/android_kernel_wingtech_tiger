@@ -23,21 +23,13 @@
 #include "eeprom_i2c_common_driver.h"
 #include "cam_cal_list.h"
 
-#include "eeprom_driver_moto.h"
 #include "cam_cal.h"
 
 #define DEV_NODE_NAME_PREFIX "camera_eeprom"
 #define DEV_NAME_FMT "camera_eeprom%u"
 #define DEV_CLASS_NAME_FMT "camera_eepromdrv%u"
 #define EEPROM_DEVICE_NNUMBER 255
-extern struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainData;
-extern struct stCAM_CAL_DATAINFO_STRUCT *g_eepromSubData;
-extern struct stCAM_CAL_DATAINFO_STRUCT *g_eepromMainMicroData;
-#if defined(MOT_AUSTIN_GC02M1_MIPI_RAW)
-#define GC02M1_AWB_DATA_SIZE 6
-extern unsigned char gc02m1_data_awb[GC02M1_AWB_DATA_SIZE+3];
-static u32 gc02m1_vendor_id = 0x19050000;
-#endif
+
 static struct EEPROM_DRV ginst_drv[MAX_EEPROM_NUMBER];
 
 static struct stCAM_CAL_LIST_STRUCT *get_list(struct CAM_CAL_SENSOR_INFO *sinfo)
@@ -86,13 +78,6 @@ static unsigned int read_region(struct EEPROM_DRV_FD_DATA *pdata,
 		mutex_unlock(&pdata->pdrv->eeprom_mutex);
 	}
 
-	return ret;
-}
-
-unsigned int read_region_fun(struct EEPROM_DRV_FD_DATA *pdata,unsigned char *buf,unsigned int offset, unsigned int size){
-	unsigned int ret;
-
-	ret = read_region(pdata,buf,offset,size);
 	return ret;
 }
 
@@ -175,99 +160,11 @@ static ssize_t eeprom_read(struct file *a_file, char __user *user_buffer,
 
 	if (kbuf == NULL)
 		return -ENOMEM;
-	LOG_INF("SensorID=%x\n", pdata->sensor_info.sensor_id);
-	LOG_DBG("%d,1CAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-	   *offset, size);
 
-	if((g_eepromMainData != NULL)&&(SAIPAN_QTECH_HI4821Q_SENSOR_ID == pdata->sensor_info.sensor_id)){
-		u32 totalLength = (u32)*offset+ (u32)size;
-		if((g_eepromMainData->dataBuffer)&&(totalLength <= g_eepromMainData->dataLength)){
-			if(*offset == 1){//check id
-				if(copy_to_user(user_buffer, (u8*)&g_eepromMainData->sensorVendorid, 4)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d :ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset,size);
-			} else {//read otp data
-				if(copy_to_user(user_buffer, g_eepromMainData->dataBuffer+(u32)*offset, size)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d :ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset, size);
-			}
-		} else {
-			LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainData->dataBuffer,totalLength,g_eepromMainData->dataLength);
-			kfree(kbuf);
-			return -EFAULT;
-		}
-	}else if((g_eepromMainMicroData != NULL)&&(SAIPAN_CXT_GC02M1_SENSOR_ID == pdata->sensor_info.sensor_id)){
-		u32 totalLength = (u32)*offset+ (u32)size;
-		if((g_eepromMainMicroData->dataBuffer)&&(totalLength <= g_eepromMainMicroData->dataLength)){
-			if(*offset == 1){//check id
-				if(copy_to_user(user_buffer, (u8*)&g_eepromMainMicroData->sensorVendorid, 4)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d,ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset,size);
-			} else {//read otp data
-				if(copy_to_user(user_buffer, g_eepromMainMicroData->dataBuffer+(u32)*offset, size)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d,ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset, size);
-			}
-		} else {
-			LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromMainMicroData->dataBuffer,totalLength,g_eepromMainMicroData->dataLength);
-			kfree(kbuf);
-			return -EFAULT;
-		}
-#if defined(MOT_AUSTIN_GC02M1_MIPI_RAW)
-	} else if((gc02m1_data_awb !=NULL)&&(MOT_AUSTIN_GC02M1_SENSOR_ID == pdata->sensor_info.sensor_id)) {
-			if(*offset == 0x10) {//check id
-				if(copy_to_user(user_buffer, (u8 *)&gc02m1_vendor_id, 4)) {
-					return -EFAULT;
-				}
-				LOG_DBG("%d,ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset,size);
-			} else if(*offset == 0x78) {//read otp data
-				    if(copy_to_user(user_buffer, (u8 *) gc02m1_data_awb, size)) {
-					return -EFAULT;
-				    }
-				LOG_DBG("%d, ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset, size);
-			        } else {
-			LOG_INF("maybe some error buf\n");
-			kfree(kbuf);
-			return -EFAULT;
-		}
-#endif
-	}else if((g_eepromSubData != NULL)&&(SAIPAN_DMEGC_HI1336_SENSOR_ID== pdata->sensor_info.sensor_id)){
-		u32 totalLength = (u32)*offset+ (u32)size;
-		if((g_eepromSubData->dataBuffer)&&(totalLength <= g_eepromSubData->dataLength)){
-			if(*offset == 1){//check id
-				if(copy_to_user(user_buffer, (u8*)&g_eepromSubData->sensorVendorid, 4)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d,ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset,size);
-			} else {//read otp data
-				if(copy_to_user(user_buffer, g_eepromSubData->dataBuffer+(u32)*offset, size)){
-					return -EFAULT;
-				}
-				LOG_DBG("%d,ifCAM_CALIOC_G_READ start! offset=%llu, length=%lu\n",__LINE__,
-					*offset, size);
-			}
-		} else {
-			LOG_INF("maybe some error buf(%p)read(%d)have(%d) \n",g_eepromSubData->dataBuffer,totalLength,g_eepromSubData->dataLength);
-			kfree(kbuf);
-			return -EFAULT;
-		}
-	} else {
-		if (read_region(pdata, kbuf, *offset, size) != size ||
-			copy_to_user(user_buffer, kbuf, size)) {
-			kfree(kbuf);
-			return -EFAULT;
-		}
+	if (read_region(pdata, kbuf, *offset, size) != size ||
+	    copy_to_user(user_buffer, kbuf, size)) {
+		kfree(kbuf);
+		return -EFAULT;
 	}
 
 	*offset += size;

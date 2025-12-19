@@ -29,6 +29,7 @@
 #include <linux/clk.h>
 #endif
 
+#include <mt-plat/mtk_wd_api.h>
 #include <linux/time.h>
 
 #define __MT_MTK_LVTS_TC_C__
@@ -315,6 +316,13 @@ mt_ptp_lock(unsigned long *flags)
 mt_ptp_unlock(unsigned long *flags)
 {
 	pr_notice("[Power/CPU_Thermal]%s doesn't exist\n", __func__);
+}
+
+	int __attribute__ ((weak))
+get_wd_api(struct wd_api **obj)
+{
+	pr_notice("[Power/CPU_Thermal]%s doesn't exist\n", __func__);
+	return -1;
 }
 
 void mt_reg_sync_writel_print(unsigned int val, void *addr)
@@ -1846,12 +1854,31 @@ void lvts_tscpu_thermal_initial_all_tc(void)
 
 static void lvts_disable_rgu_reset(void)
 {
-    //TODO
+	struct wd_api *wd_api;
+
+	if (get_wd_api(&wd_api) >= 0) {
+		/* reset mode */
+		wd_api->wd_thermal_direct_mode_config(
+				WD_REQ_DIS, WD_REQ_RST_MODE);
+
+	} else {
+		lvts_warn("%d FAILED TO GET WD API\n", __LINE__);
+		WARN_ON_ONCE(1);
+	}
 }
 
 static void lvts_enable_rgu_reset(void)
 {
-    //TODO
+	struct wd_api *wd_api;
+
+	if (get_wd_api(&wd_api) >= 0) {
+		/* reset mode */
+		wd_api->wd_thermal_direct_mode_config(
+				WD_REQ_EN, WD_REQ_RST_MODE);
+	} else {
+		lvts_warn("%d FAILED TO GET WD API\n", __LINE__);
+		WARN_ON_ONCE(1);
+	}
 }
 
 void lvts_config_all_tc_hw_protect(int temperature, int temperature2)

@@ -1375,24 +1375,7 @@ int disp_lcm_esd_check(struct disp_lcm_handle *plcm)
 	return 0;
 }
 
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-bool disp_lcm_notify_support(struct disp_lcm_handle *plcm)
-{
-	struct LCM_DRIVER *lcm_drv = NULL;
 
-	DISPFUNC();
-	if (_is_lcm_inited(plcm)) {
-		lcm_drv = plcm->drv;
-		if (lcm_drv->set_lcm_notify) {
-			DISPDBG("disp lcm need notify\n");
-			return true;
-		}
-		return false;
-	}
-	DISPINFO("lcm_drv is null\n");
-	return false;
-}
-#endif
 
 int disp_lcm_esd_recover(struct disp_lcm_handle *plcm)
 {
@@ -1513,10 +1496,6 @@ int disp_lcm_adjust_fps(void *cmdq, struct disp_lcm_handle *plcm, int fps)
 	return -1;
 }
 
-static int g_last_level;
-int get_lcm_backlight_level(void){
-	return g_last_level;
-}
 int disp_lcm_set_backlight(struct disp_lcm_handle *plcm,
 	void *handle, int level)
 {
@@ -1529,7 +1508,6 @@ int disp_lcm_set_backlight(struct disp_lcm_handle *plcm,
 	}
 
 	lcm_drv = plcm->drv;
-	g_last_level=level;
 	if (lcm_drv->set_backlight_cmdq) {
 		lcm_drv->set_backlight_cmdq(handle, level);
 	} else {
@@ -1539,30 +1517,6 @@ int disp_lcm_set_backlight(struct disp_lcm_handle *plcm,
 
 	return 0;
 }
-
-#ifdef CONFIG_BACKLIGHT_LEVEL_LCM
-int disp_lcm_get_max_brightness(struct disp_lcm_handle *plcm)
-{
-	struct LCM_DRIVER *lcm_drv = NULL;
-	unsigned int bl_max_level = 0;
-
-	DISPFUNC();
-	if (!_is_lcm_inited(plcm)) {
-		DISPERR("lcm_drv is null\n");
-		return 0;
-	}
-
-	lcm_drv = plcm->drv;
-	if (lcm_drv->get_max_brightness) {
-		bl_max_level = lcm_drv->get_max_brightness();
-		DISPMSG("%s:get max_brightness:%d", __func__, bl_max_level);
-	} else {
-		DISPERR("FATAL ERROR, lcm_drv->set_backlight is null\n");
-	}
-
-	return bl_max_level;
-}
-#endif
 
 int disp_lcm_ioctl(struct disp_lcm_handle *plcm, enum LCM_IOCTL ioctl,
 	unsigned int arg)

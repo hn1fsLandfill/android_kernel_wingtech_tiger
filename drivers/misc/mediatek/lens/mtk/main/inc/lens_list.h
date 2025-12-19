@@ -8,35 +8,8 @@
 #ifndef _LENS_LIST_H
 
 #define _LENS_LIST_H
-#include "ois_ext_cmd.h"
 
 extern void MAIN2AF_PowerDown(void);
-
-#define MOT_GNEVAN_DW9800VAF_SetI2Cclient MOT_GNEVAN_DW9800VAF_SetI2Cclient_Main
-#define MOT_GNEVAN_DW9800VAF_Ioctl MOT_GNEVAN_DW9800VAF_Ioctl_Main
-#define MOT_GNEVAN_DW9800VAF_Release MOT_GNEVAN_DW9800VAF_Release_Main
-#define MOT_GNEVAN_DW9800VAF_GetFileName MOT_GNEVAN_DW9800VAF_GetFileName_Main
-
-extern int MOT_GNEVAN_DW9800VAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-	spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long MOT_GNEVAN_DW9800VAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-	unsigned long a_u4Param);
-extern int MOT_GNEVAN_DW9800VAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int MOT_GNEVAN_DW9800VAF_GetFileName(unsigned char *pFileName);
-
-#define CN3938AAF_SetI2Cclient CN3938AAF_SetI2Cclient_Main
-#define CN3938AAF_Ioctl CN3938AAF_Ioctl_Main
-#define CN3938AAF_Release CN3938AAF_Release_Main
-#define CN3938AAF_PowerDown CN3938AAF_PowerDown_Main
-#define CN3938AAF_GetFileName CN3938AAF_GetFileName_Main
-extern int CN3938AAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long CN3938AAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-			   unsigned long a_u4Param);
-extern int CN3938AAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int CN3938AAF_PowerDown(struct i2c_client *pstAF_I2Cclient,
-				int *pAF_Opened);
-extern int CN3938AAF_GetFileName(unsigned char *pFileName);
 
 #define AK7371AF_SetI2Cclient AK7371AF_SetI2Cclient_Main
 #define AK7371AF_Ioctl AK7371AF_Ioctl_Main
@@ -271,20 +244,6 @@ extern int GT9764AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
 				int *pAF_Opened);
 extern int GT9764AF_GetFileName(unsigned char *pFileName);
 
-#define GT9772AF_SetI2Cclient GT9772AF_SetI2Cclient_Main
-#define GT9772AF_Ioctl GT9772AF_Ioctl_Main
-#define GT9772AF_Release GT9772AF_Release_Main
-#define GT9772AF_PowerDown GT9772AF_PowerDown_Main
-#define GT9772AF_GetFileName GT9772AF_GetFileName_Main
-extern int GT9772AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-				spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long GT9772AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-				unsigned long a_u4Param);
-extern int GT9772AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int GT9772AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
-				int *pAF_Opened);
-extern int GT9772AF_GetFileName(unsigned char *pFileName);
-
 #define LC898122AF_SetI2Cclient LC898122AF_SetI2Cclient_Main
 #define LC898122AF_Ioctl LC898122AF_Ioctl_Main
 #define LC898122AF_Release LC898122AF_Release_Main
@@ -427,35 +386,4 @@ extern int GT9772AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int GT9772AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
 				int *pAF_Opened);
 extern int GT9772AF_GetFileName(unsigned char *pFileName);
-
-#define DW9781CAF_SetI2Cclient DW9781CAF_SetI2Cclient_Main
-#define DW9781CAF_Ioctl DW9781CAF_Ioctl_Main
-#define DW9781CAF_Release DW9781CAF_Release_Main
-#define DW9781CAF_GetFileName DW9781CAF_GetFileName_Main
-#define MOT_DW9781CAF_EXT_CMD MOT_DW9781CAF_EXT_CMD_HANDLER
-#define MOT_DW9781CAF_GET_RESULT MOT_DW9781CAF_GET_TEST_RESULT
-#define MOT_DW9781CAF_SET_CALI MOT_DW9781CAF_SET_CALIBRATION
-extern int DW9781CAF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long DW9781CAF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-			   unsigned long a_u4Param);
-extern int DW9781CAF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int DW9781CAF_GetFileName(unsigned char *pFileName);
-extern int MOT_DW9781CAF_EXT_CMD_HANDLER(motOISExtIntf *pExtCmd);
-extern int MOT_DW9781CAF_GET_TEST_RESULT(motOISExtIntf *pExtCmd);
-extern int MOT_DW9781CAF_SET_CALIBRATION(motOISExtIntf *pExtCmd);
-
-extern int MOT_AUSTIN_DW9800VAF_SetI2Cclient_Main(struct i2c_client *pstAF_I2Cclient,
-				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long MOT_AUSTIN_DW9800VAF_Ioctl_Main(struct file *a_pstFile, unsigned int a_u4Command,
-			   unsigned long a_u4Param);
-extern int MOT_AUSTIN_DW9800VAF_Release_Main(struct inode *a_pstInode, struct file *a_pstFile);
-extern int MOT_AUSTIN_DW9800VAF_GetFileName_Main(unsigned char *pFileName);
-
-extern int MOT_LYRIQ_GT9764AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
-                                 spinlock_t *pAF_SpinLock, int *pAF_Opened);
-extern long MOT_LYRIQ_GT9764AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
-                           unsigned long a_u4Param);
-extern int MOT_LYRIQ_GT9764AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
-extern int MOT_LYRIQ_GT9764AF_GetFileName(unsigned char *pFileName);
 #endif

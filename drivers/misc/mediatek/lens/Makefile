@@ -18,5 +18,4 @@ obj-$(CONFIG_MTK_LENS)   += mtk/main3/
 obj-$(CONFIG_MTK_LENS)   += mtk/sub2/
 endif
 obj-$(CONFIG_MTK_LENS)   += mtk/sub/
-obj-$(CONFIG_MTK_LENS)   += mtk/ois/
 endif

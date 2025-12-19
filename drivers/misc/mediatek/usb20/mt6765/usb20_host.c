@@ -35,19 +35,12 @@
 
 MODULE_LICENSE("GPL v2");
 
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-#include <charger_class.h>
-static struct charger_device *primary_charger;
-#endif //Introduce External PD & Type-C logic
-
 #include <mt-plat/mtk_boot_common.h>
 
 struct device_node	*usb_node;
 static int		iddig_eint_num;
 static ktime_t		ktime_start, ktime_end;
-#ifdef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
 static struct		regulator *reg_vbus;
-#endif //Introduce External PD & Type-C logic
 
 static struct musb_fifo_cfg fifo_cfg_host[] = {
 { .hw_ep_num = 1, .style = FIFO_TX,
@@ -127,17 +120,6 @@ void set_usb_phy_mode(int mode)
 
 static void _set_vbus(int is_on)
 {
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	if (!primary_charger) {
-		DBG(0, "vbus_init<%d>\n", vbus_on);
-
-		primary_charger = get_charger_by_name("primary_chg");
-		if (!primary_charger) {
-			DBG(0, "get primary charger device failed\n");
-			return;
-		}
-	}
-#else
 	if (!reg_vbus) {
 		DBG(0, "vbus_init\n");
 		reg_vbus = regulator_get(mtk_musb->controller, "usb-otg-vbus");
@@ -146,7 +128,6 @@ static void _set_vbus(int is_on)
 			return;
 		}
 	}
-#endif  //Introduce External PD & Type-C logic
 
 	DBG(0, "op<%d>, status<%d>\n", is_on, vbus_on);
 	if (is_on && !vbus_on) {
@@ -154,11 +135,7 @@ static void _set_vbus(int is_on)
 		 * host mode correct used by PMIC
 		 */
 		vbus_on = true;
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-		charger_dev_enable_otg(primary_charger, true);
-		//Modify, 20201217, change charger boost current
-		charger_dev_set_boost_current_limit(primary_charger, 1200000);
-#else
+
 		if (regulator_set_voltage(reg_vbus, 5000000, 5000000))
 			DBG(0, "vbus regulator set voltage failed\n");
 
@@ -167,17 +144,13 @@ static void _set_vbus(int is_on)
 
 		if (regulator_enable(reg_vbus))
 			DBG(0, "vbus regulator enable failed\n");
-#endif //Introduce External PD & Type-C logic
+
 	} else if (!is_on && vbus_on) {
 		/* disable VBUS 1st then update flag
 		 * to make host mode correct used by PMIC
 		 */
 		vbus_on = false;
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-		charger_dev_enable_otg(primary_charger, false);
-#else
 		regulator_disable(reg_vbus);
-#endif //Introduce External PD & Type-C logic
 	}
 }
 

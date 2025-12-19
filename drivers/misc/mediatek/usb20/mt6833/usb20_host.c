@@ -257,13 +257,6 @@ static bool musb_is_host(void)
 	return host_mode;
 }
 
-bool mmi_musb_is_host(void)
-{
-	return musb_is_host();
-}
-
-EXPORT_SYMBOL(mmi_musb_is_host);
-
 void musb_session_restart(struct musb *musb)
 {
 	void __iomem	*mbase = musb->mregs;
@@ -457,8 +450,8 @@ static void do_host_work(struct work_struct *data)
 #endif
 		/* setup fifo for host mode */
 		ep_config_from_table_for_host(mtk_musb);
-		/*moto modify stay awake*/
-		//if (!mtk_musb->host_suspend)
+
+		if (!mtk_musb->host_suspend)
 			__pm_stay_awake(mtk_musb->usb_lock);
 
 

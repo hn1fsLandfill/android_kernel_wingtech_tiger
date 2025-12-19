@@ -55,14 +55,6 @@ config LCM_WIDTH
 	  LCM width can be set 1080/480/400 etc.
 	  If you want to change LCM width, please define it in ProjectConfig.mk.
 
-config LCM_NOTIFIY_SUPPORT
-        bool "enable medietak lcm notification"
-        default n
-        help
-          To set LCM notification support.
-          Some panel need LCM send notification for TP recover when LCD reset.
-          If unsure, set N.
-
 config CUSTOM_LCM_X
 	string "define LCM fake X coordinate"
 	default "0"
@@ -156,13 +148,6 @@ config MTK_DRE30_SUPPORT
 	  display visual enhancement ver.3.
 	  This feature requires the cowork of AAL user-space algorithm process.
 	  Please also turn on MTK_AAL_SUPPORT amd MTK_DRE30_SUPPORT in ProjectConfig.mk.
-
-config MTK_DISP_IDLE_MGR_DISABLE
-	bool "disable medietak display idle mgr"
-        default n
-        help
-          define CONFIG_MTK_DISP_IDLE_MGR_DISABLE
-          to disable mtk display idle mgr.
 
 config MTK_DISPLAY_LOW_MEMORY_DEBUG_SUPPORT
 	bool "enable medietak display low memory debug"

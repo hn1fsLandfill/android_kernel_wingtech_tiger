@@ -24,18 +24,6 @@
 #include <ddp_aal.h>
 #endif
 
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-#include <bq2560x.h>
-#endif
-
-#if defined(CONFIG_CHARGER_BQ25890) && defined(CONFIG_LEDS_MTK_CHG_SUPPORT)
-#include <bq2589x_reg.h>
-#endif
-
-#if defined(CONFIG_CHARGER_SGM41543) && defined(CONFIG_LEDS_MTK_CHG_SUPPORT)
-#include <sgm41543.h>
-#endif
-
 #ifdef CONFIG_BACKLIGHT_SUPPORT_LP8557
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
@@ -103,7 +91,6 @@ static unsigned int limit_flag;
 static unsigned int last_level;
 static unsigned int current_level;
 static DEFINE_MUTEX(bl_level_limit_mutex);
-static int hbm_state;
 
 /****************************************************************************
  * external functions for display
@@ -115,45 +102,35 @@ int setMaxbrightness(int max_level, int enable)
 {
 #if !defined(CONFIG_MTK_AAL_SUPPORT)
 	struct cust_mt65xx_led *cust_led_list = mt_get_cust_led_list();
-	unsigned int min_level;
 
 	mutex_lock(&bl_level_limit_mutex);
 	if (enable == 1) {
 		limit_flag = 1;
-		if(cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness)
-			limit = max_level*cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness/255;
-		else
-			limit = max_level;
+		limit = max_level;
 		mutex_unlock(&bl_level_limit_mutex);
-		min_level = current_level;
-		if(min_level > last_level)
-			min_level = last_level;
 		if (current_level != 0) {
-			if (limit < min_level) {
+			if (limit < last_level) {
 				pr_info
 				    ("Max brightness limit=%d\n", limit);
-				mt_mt65xx_led_set_cust(&cust_led_list
+				mt65xx_led_set_cust(&cust_led_list
 						    [MT65XX_LED_TYPE_LCD],
 						    limit);
 			} else {
 				mt65xx_led_set_cust(&cust_led_list
 						    [MT65XX_LED_TYPE_LCD],
-						    current_level);
+						    last_level);
 			}
 		}
 	} else {
 		limit_flag = 0;
-		if(cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness)
-			limit = cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness;
-		else
-			limit = 255;
+		limit = 255;
 		mutex_unlock(&bl_level_limit_mutex);
 
 		if (current_level != 0) {
 			pr_info("Control temperature close:limit=%d\n",
 				       limit);
 			mt65xx_led_set_cust(&cust_led_list[MT65XX_LED_TYPE_LCD],
-					    current_level);
+					    last_level);
 
 		}
 	}
@@ -253,13 +230,6 @@ static void mt65xx_led_set(struct led_classdev *led_cdev,
 		}
 		mutex_unlock(&bl_level_limit_mutex);
 #endif
-		if(hbm_state) {
-			if(current_level) {
-				pr_info("[LED] %s: hbm_state %d, backlight level %d, ignore...\n", __func__, hbm_state, current_level);
-				return;
-			} else
-				hbm_state = 0;
-		}
 	}
 #ifdef CONFIG_BACKLIGHT_SUPPORT_LP8557
 	retval = gpio_request(I2C_SET_FOR_BACKLIGHT, "i2c_set_for_backlight");
@@ -290,44 +260,6 @@ static void mt65xx_led_set(struct led_classdev *led_cdev,
 			i2c_smbus_write_byte_data(client, 0x14, 0xdf);
 			i2c_smbus_write_byte_data(client, 0x04, 0xff);
 			i2c_smbus_write_byte_data(client, 0x00, 1);
-		}
-	}
-#endif
-
-//+EKELLIS-48, yaocankun.wt, 20210401, add led control node
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-	if (strcmp(led_data->cust.name, "charging") == 0) {
-		if (level == 0) {
-			bq2560x_enable_statpin(0);
-		}
-		else
-		{
-			bq2560x_enable_statpin(1);
-		}
-	}
-#endif
-//-EKELLIS-48, yaocankun.wt, 20210401, add led control node
-
-#if defined(CONFIG_CHARGER_BQ25890) && defined(CONFIG_LEDS_MTK_CHG_SUPPORT)
-	if (strcmp(led_data->cust.name, "charging") == 0) {
-		if (level == 0) {
-			bq2589x_enable_statpin(0);
-		}
-		else
-		{
-			bq2589x_enable_statpin(1);
-		}
-	}
-#endif
-
-#if defined(CONFIG_CHARGER_SGM41543) && defined(CONFIG_LEDS_MTK_CHG_SUPPORT)
-	if (strcmp(led_data->cust.name, "charging") == 0) {
-		if (level == 0) {
-			sgm41543_enable_statpin(0);
-		}
-		else
-		{
-			sgm41543_enable_statpin(1);
 		}
 	}
 #endif
@@ -460,33 +392,6 @@ int backlight_brightness_set(int level)
 
 }
 EXPORT_SYMBOL(backlight_brightness_set);
-
-/****************************************************************************
- * external functions for HBM
- ***************************************************************************/
-int hbm_brightness_set(int enable)
-{
-	struct cust_mt65xx_led *cust_led_list = mt_get_cust_led_list();
-	int level;
-
-	if(enable) {
-		level = cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness;
-	} else {
-		level = current_level;
-		if (!level) {
-			//check level 0 to avoid potential black issue
-			//keep as max, auto brightness will work then
-			level = cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness;
-		}
-	}
-
-	hbm_state = enable;
-	pr_info("[LED] %s: hbm_state %d, level %d.\n", __func__, hbm_state, level);
-
-	return mt_mt65xx_led_set_cust(&cust_led_list[MT65XX_LED_TYPE_LCD], level);
-}
-EXPORT_SYMBOL(hbm_brightness_set);
-
 #ifdef CONFIG_BACKLIGHT_SUPPORT_LP8557
 static int led_i2c_probe(struct i2c_client *client,
 		const struct i2c_device_id *id);
@@ -571,8 +476,6 @@ static int mt65xx_leds_probe(struct platform_device *pdev)
 
 		g_leds_data[i]->cdev.brightness_set = mt65xx_led_set;
 		g_leds_data[i]->cdev.blink_set = mt65xx_blink_set;
-		if(cust_led_list[i].max_brightness)
-			g_leds_data[i]->cdev.max_brightness = cust_led_list[i].max_brightness;
 
 		INIT_WORK(&g_leds_data[i]->work, mt_mt65xx_led_work);
 
@@ -584,10 +487,7 @@ static int mt65xx_leds_probe(struct platform_device *pdev)
 #ifdef CONTROL_BL_TEMPERATURE
 
 	last_level = 0;
-	if(cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness)
-		limit = cust_led_list[MT65XX_LED_TYPE_LCD].max_brightness;
-	else
-		limit = 255;
+	limit = 255;
 	limit_flag = 0;
 	current_level = 0;
 	pr_debug

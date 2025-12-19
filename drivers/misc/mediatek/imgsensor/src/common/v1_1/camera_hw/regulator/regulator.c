@@ -9,13 +9,7 @@
 static const int regulator_voltage[] = {
 	REGULATOR_VOLTAGE_0,
 	REGULATOR_VOLTAGE_1000,
-#ifdef CONFIG_MOT_LYRIQ
-	REGULATOR_VOLTAGE_1050,
-#endif
 	REGULATOR_VOLTAGE_1100,
-#ifdef CONFIG_MOT_LYRIQ
-	REGULATOR_VOLTAGE_1150,
-#endif
 	REGULATOR_VOLTAGE_1200,
 	REGULATOR_VOLTAGE_1210,
 	REGULATOR_VOLTAGE_1220,
@@ -47,6 +41,7 @@ static enum IMGSENSOR_RETURN regulator_init(
 	struct REGULATOR *preg = (struct REGULATOR *)pinstance;
 	int type, idx, ret = 0;
 	char str_regulator_name[LENGTH_FOR_SNPRINTF];
+
 	for (idx = IMGSENSOR_SENSOR_IDX_MIN_NUM;
 		idx < IMGSENSOR_SENSOR_IDX_MAX_NUM;
 		idx++) {
@@ -112,6 +107,7 @@ static enum IMGSENSOR_RETURN regulator_set(
 	int reg_type_offset;
 	atomic_t             *enable_cnt;
 
+
 	if (pin > IMGSENSOR_HW_PIN_DOVDD   ||
 	    pin < IMGSENSOR_HW_PIN_AVDD    ||
 	    pin_state < IMGSENSOR_HW_PIN_STATE_LEVEL_0 ||
@@ -125,6 +121,7 @@ static enum IMGSENSOR_RETURN regulator_set(
 
 	enable_cnt = &preg->enable_cnt[(unsigned int)sensor_idx][
 		reg_type_offset + pin - IMGSENSOR_HW_PIN_AVDD];
+
 	if (pregulator) {
 		if (pin_state != IMGSENSOR_HW_PIN_STATE_LEVEL_0) {
 			if (regulator_set_voltage(pregulator,
@@ -214,9 +211,7 @@ static struct IMGSENSOR_HW_DEVICE device = {
 enum IMGSENSOR_RETURN imgsensor_hw_regulator_open(
 	struct IMGSENSOR_HW_DEVICE **pdevice)
 {
-
 	*pdevice = &device;
-
 	return IMGSENSOR_RETURN_SUCCESS;
 }
 

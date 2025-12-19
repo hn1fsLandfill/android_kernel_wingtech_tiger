@@ -63,10 +63,6 @@
 #include "disp_partial.h"
 #include "ddp_dsi.h"
 
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-#include "mtkfb.h"
-#endif
-
 /* For abnormal check */
 static struct task_struct *primary_display_check_task;
 /* used for blocking check task  */
@@ -671,10 +667,6 @@ int primary_display_esd_recovery(void)
 	enum DISP_STATUS ret = DISP_STATUS_OK;
 	struct LCM_PARAMS *lcm_param = NULL;
 	mmp_event mmp_r = ddp_mmp_get_events()->esd_recovery_t;
-	unsigned int last_level;
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-	bool lcm_notify_enabled;
-#endif
 
 	DISPFUNC();
 	dprec_logger_start(DPREC_LOGGER_ESD_RECOVERY, 0, 0);
@@ -727,24 +719,11 @@ int primary_display_esd_recovery(void)
 
 	mmprofile_log_ex(mmp_r, MMPROFILE_FLAG_PULSE, 0, 6);
 
-	DISPDBG("[ESD]backlignt off[begin]\n");
-	last_level=get_lcm_backlight_level();
-	disp_lcm_set_backlight(primary_get_lcm(), NULL, 0);
-	mdelay(200);
-	DISPDBG("[ESD] backlignt off[end]\n");
-
 	DISPDBG("[POWER]lcm suspend[begin]\n");
 	/*after dsi_stop, we should enable the dsi basic irq.*/
 	dsi_basic_irq_enable(DISP_MODULE_DSI0, NULL);
 	disp_lcm_suspend(primary_get_lcm());
 	DISPCHECK("[POWER]lcm suspend[end]\n");
-
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-	lcm_notify_enabled = disp_lcm_notify_support(primary_get_lcm());
-	if (lcm_notify_enabled) {
-		mtkfb_lcm_notify_tp_fb_blank_powerdown();
-	}
-#endif
 
 	mmprofile_log_ex(mmp_r, MMPROFILE_FLAG_PULSE, 0, 7);
 
@@ -756,21 +735,12 @@ int primary_display_esd_recovery(void)
 				DDP_DSI_ENABLE_TE, NULL);
 	DISPCHECK("[ESD]dsi power reset[end]\n");
 
+
+
 	DISPDBG("[ESD]lcm recover[begin]\n");
 	disp_lcm_esd_recover(primary_get_lcm());
 	DISPCHECK("[ESD]lcm recover[end]\n");
 	mmprofile_log_ex(mmp_r, MMPROFILE_FLAG_PULSE, 0, 8);
-
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-	if (lcm_notify_enabled) {
-		mtkfb_lcm_notify_tp_fb_blank_unblank();
-	}
-#endif
-
-	mdelay(200);
-	DISPDBG("[ESD]backlight on[begin]\n");
-	disp_lcm_set_backlight(primary_get_lcm(), NULL, last_level);
-	DISPCHECK("[ESD]backlight on[end]\n");
 
 	DISPDBG("[ESD]start dpmgr path[begin]\n");
 	if (disp_partial_is_support()) {

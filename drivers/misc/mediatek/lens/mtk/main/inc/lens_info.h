@@ -23,8 +23,6 @@
 #endif
 
 /* AFDRV_XXXX be the same as AF_DRVNAME in (*af).c */
-#define MOT_GNEVAN_AFDRV_DW9800VAF "MOT_GNEVAN_DW9800VAF"
-#define AFDRV_CN3938AAF "CN3938AAF"
 #define AFDRV_AD5820AF "AD5820AF"
 #define AFDRV_AD5823 "AD5823"
 #define AFDRV_AD5823AF "AD5823AF"
@@ -52,7 +50,6 @@
 #define AFDRV_GAF002AF "GAF002AF"
 #define AFDRV_GAF008AF "GAF008AF"
 #define AFDRV_GT9764AF "GT9764AF"
-#define AFDRV_GT9772AF "GT9772AF"
 #define AFDRV_LC898122AF "LC898122AF"
 #define AFDRV_LC898212AF "LC898212AF"
 #define AFDRV_LC898212XDAF "LC898212XDAF"
@@ -70,9 +67,6 @@
 #define AFDRV_DW9718TAF "DW9718TAF"
 #define AFDRV_GT9772AF "GT9772AF"
 #define AFDRV_GT9768AF "GT9768AF"
-#define AFDRV_DW9781CAF "DW9781CAF"
-#define AFDRV_MOT_AUSTIN_DW9800VAF "MOT_AUSTIN_DW9800VAF"
-#define AFDRV_MOT_LYRIQ_GT9764AF "MOT_LYRIQ_GT9764AF"
 
 #define CONVERT_CCU_TIMESTAMP 0x1000
 
@@ -148,9 +142,6 @@ struct stAF_DrvList {
 	int (*pAF_Release)(struct inode *a_pstInode, struct file *a_pstFile);
 	int (*pAF_GetFileName)(unsigned char *pFileName);
 	int (*pAF_OisGetHallPos)(int *PosX, int *PosY);
-	int (*pAF_OisExtIntf)(motOISExtIntf *pExtData);
-	int (*pAF_OisGetResult)(motOISExtIntf *pExtData);
-	int (*pAF_OisSetCalibration)(motOISExtIntf *pExtData);
 };
 
 #define I2CBUF_MAXSIZE 10
@@ -222,7 +213,5 @@ struct stAF_MotorI2CSendCmd {
 #define AFIOC_G_GETDRVNAME _IOWR(AF_MAGIC, 17, struct stAF_MotorName)
 
 #define AFIOC_X_CTRLPARA _IOWR(AF_MAGIC, 18, struct stAF_CtrlCmd)
-
-#define AFIOC_G_OISEXTINTF _IOWR(AF_MAGIC, 20, motOISExtIntf)
 
 #endif

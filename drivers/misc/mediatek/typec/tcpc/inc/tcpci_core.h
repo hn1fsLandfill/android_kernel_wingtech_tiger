@@ -25,13 +25,7 @@
 #include <linux/power_supply.h>
 #endif /* CONFIG_USB_PD_WAIT_BC12 */
 #endif
-#define MMI_DBG_ENABLE	1
-#if MMI_DBG_ENABLE
-#define MMI_INFO(format, args...)	\
-	RT_DBG_INFO(CONFIG_TCPC_DBG_PRESTR "MMI> " format, ##args)
-#else
-#define MMI_INFO(format, args...)
-#endif
+
 /* The switch of log message */
 #define TYPEC_INFO_ENABLE	1
 #define TYPEC_INFO2_ENABLE	1
@@ -213,10 +207,6 @@ struct tcpc_ops {
 	int (*get_fault_status)(struct tcpc_device *tcpc, uint8_t *status);
 	int (*get_cc)(struct tcpc_device *tcpc, int *cc1, int *cc2);
 	int (*set_cc)(struct tcpc_device *tcpc, int pull);
-#if defined(CONFIG_TCPC_WUSB3801)
-	int (*set_role)(struct tcpc_device *tcpc, int status);
-	int (*get_mode)(struct tcpc_device *tcpc, int *typec_mode);
-#endif
 	int (*set_polarity)(struct tcpc_device *tcpc, int polarity);
 	int (*set_low_rp_duty)(struct tcpc_device *tcpc, bool low_rp);
 	int (*set_vconn)(struct tcpc_device *tcpc, int enable);
@@ -497,10 +487,6 @@ struct tcpc_device {
 #ifdef CONFIG_CABLE_TYPE_DETECTION
 	enum tcpc_cable_type typec_cable_type;
 #endif /* CONFIG_CABLE_TYPE_DETECTION */
-
-#ifdef CONFIG_TYPEC_PD_POWER_OFF_CHARGE_DELAY
-       bool mmi_poweroffchg;
-#endif
 };
 
 #define to_tcpc_device(obj) container_of(obj, struct tcpc_device, dev)

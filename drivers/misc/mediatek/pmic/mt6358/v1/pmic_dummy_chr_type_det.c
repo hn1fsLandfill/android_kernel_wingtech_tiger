@@ -90,45 +90,9 @@ static int chrdet_inform_psy_changed(enum charger_type chg_type,
 	return ret;
 }
 
-#ifdef CONFIG_MOTO_CHG_WT6670F_SUPPORT
-extern int wt6670f_start_detection(void);
-extern int wt6670f_get_protocol(void);
-extern void bq2597x_set_psy(void);
-#endif
 
 int hw_charging_get_charger_type(void)
 {
-#ifdef CONFIG_MOTO_CHG_WT6670F_SUPPORT
-        int chg_type = 0;
-        Charger_Detect_Init();
-        wt6670f_start_detection();
-        msleep(3000);
-        chg_type = wt6670f_get_protocol();
-        pr_err("[%s] WT6670F charge type is  0x%x\n",__func__,chg_type);
-        if((chg_type != 0x8) && (chg_type != 0x9)){
-            Charger_Detect_Release();
-	}
-
-        switch (chg_type) {
-            case 0x1:
-                return NONSTANDARD_CHARGER;//FC
-                break;
-            case 0x2:
-                return STANDARD_HOST;//SDP
-                break;
-            case 0x3:
-                return CHARGING_HOST;//CDP
-                break;
-            case 0x4:
-            case 0x8://QC3P_18W
-            case 0x9://QC3P_27W
-                return STANDARD_CHARGER;//DCP
-                break;
-            default:
-                break;
-        }
-#endif
-	
 	return STANDARD_HOST;
 }
 
@@ -152,9 +116,6 @@ void do_charger_detect(void)
 	if (pmic_get_register_value(PMIC_RGS_CHRDET)) {
 		pr_info("charger type: charger IN\n");
 		g_chr_type = hw_charging_get_charger_type();
-#ifdef CONFIG_MOTO_CHG_WT6670F_SUPPORT
-                bq2597x_set_psy();
-#endif
 		chrdet_inform_psy_changed(g_chr_type, 1);
 	} else {
 		pr_info("charger type: charger OUT\n");

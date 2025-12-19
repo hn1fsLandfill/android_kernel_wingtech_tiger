@@ -74,9 +74,6 @@ char *leds_name[MT65XX_LED_TYPE_TOTAL] = {
 	"keyboard-backlight",
 	"button-backlight",
 	"lcd-backlight",
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-	"charging",
-#endif
 };
 
 struct cust_mt65xx_led *pled_dtsi;
@@ -177,7 +174,7 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 	struct device_node *led_node = NULL;
 	bool isSupportDTS = false;
 	int i, ret;
-	int mode, data, max_brightness;
+	int mode, data;
 	int pwm_config[5] = { 0 };
 
 	if (pled_dtsi)
@@ -267,31 +264,6 @@ struct cust_mt65xx_led *get_cust_led_dtsi(void)
 			} else
 				pr_info
 				    ("led dts can't get pwm config\n");
-
-#ifdef CONFIG_BACKLIGHT_LEVEL_LCM
-		max_brightness = 0;
-		if (strstr(leds_name[i], "lcd-backlight")) {
-			// get panel max brightness
-			//pr_info("%s:invoke primary_display_get_max_brightness\n", __func__);
-			max_brightness = primary_display_get_max_brightness();
-			ret = 0;
-		}
-		if (max_brightness < 100) {
-			//get from led dtsi by default
-			ret = of_property_read_u32(led_node, "max-brightness", &max_brightness);
-		}
-#else
-		ret = of_property_read_u32(led_node, "max-brightness", &max_brightness);
-#endif
-		if (!ret) {
-			pled_dtsi[i].max_brightness = max_brightness;
-			pr_info("The %s's led max_brightness is : %d\n",
-				pled_dtsi[i].name, pled_dtsi[i].max_brightness);
-		} else {
-			pr_info("led dts can not get %s led max_brightness\n",
-				pled_dtsi[i].name);
-			pled_dtsi[i].max_brightness = 0;
-		}
 
 			switch (pled_dtsi[i].mode) {
 			case MT65XX_LED_MODE_CUST_LCM:
@@ -666,13 +638,6 @@ int mt_mt65xx_led_set_cust(struct cust_mt65xx_led *cust, int level)
 				button_flag = true;
 			}
 		}
-//+EKELLIS-48, yaocankun.wt, 20210401, add led control node
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-	if (strcmp(cust->name, "charging") == 0) {
-		return 0;
-	}
-#endif
-//-EKELLIS-48, yaocankun.wt, 20210401, add led control node
 		return mt_brightness_set_pmic(cust->data, level, bl_div_hal);
 
 	case MT65XX_LED_MODE_CUST_LCM:

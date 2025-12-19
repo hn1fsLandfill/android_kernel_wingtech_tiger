@@ -1,6 +1,0 @@
-
-config MOTO_GLANCE
-	bool "glance for moto package"
-	default n
-	help
-	  Put the device lie on the table.

@@ -20,11 +20,9 @@
 #define AF_DRVNAME "GT9772AF_DRV"
 #define AF_I2C_SLAVE_ADDR 0x18
 
-#define MOVE_CODE_STEP_MAX 40
-#define WAIT_STABLE_TIME 8  // ms
 #define AF_DEBUG
 #ifdef AF_DEBUG
-#define LOG_INF(format, args...)                                    \
+#define LOG_INF(format, args...)                                               \
 	pr_info(AF_DRVNAME " [%s] " format, __func__, ##args)
 #else
 #define LOG_INF(format, args...)
@@ -35,11 +33,9 @@ static struct i2c_client *g_pstAF_I2Cclient;
 static int *g_pAF_Opened;
 static spinlock_t *g_pAF_SpinLock;
 
-static unsigned long g_u4AF_INF = 0;
+static unsigned long g_u4AF_INF;
 static unsigned long g_u4AF_MACRO = 1023;
-static unsigned long g_u4CurrPosition = 0;
-static unsigned long AF_STARTCODE_UP = 300;
-static unsigned long AF_STARTCODE_DOWN = 150;
+static unsigned long g_u4CurrPosition;
 #define Min_Pos 0
 #define Max_Pos 1023
 
@@ -81,7 +77,7 @@ static int s4AF_WriteReg(u8 a_uLength, u8 a_uAddr, u16 a_u2Data)
 			return -1;
 		}
 	}
-	/*LOG_INF("WriteI2C AF: %x %x\n",a_uAddr,a_u2Data);*/
+
 	return 0;
 }
 
@@ -131,33 +127,25 @@ static inline int getAFInfo(__user struct stAF_MotorInfo *pstMotorInfo)
 /* initAF include driver initialization and standby mode */
 static int initAF(void)
 {
-	LOG_INF(" beg-\n");
-	if (*g_pAF_Opened == 1) {
-		int i4RetValue = 0;
-		char puSendCmdArray[3][2] = {
-			{0x06, 0x84}, {0x07, 0x01}, {0x08, 0x55},
-		};
-		unsigned char cmd_number;
-		i4RetValue = s4AF_WriteReg(0, 0xED, 0xAB); //advance mode
-		LOG_INF("Advance mode ret: %x\n", i4RetValue);
 
-		for (cmd_number = 0; cmd_number < 3; cmd_number++) {
-			i4RetValue = i2c_master_send(g_pstAF_I2Cclient, puSendCmdArray[cmd_number], 2);
-			mdelay(1);
-			if (i4RetValue < 0)
-			{
-				LOG_INF("puSendCmdArray[%d] = %x, WriteI2C failed!!\n",cmd_number, puSendCmdArray[cmd_number]);
-			}
-			else
-			{
-				LOG_INF("puSendCmdArray[%d] = %x, WriteI2C success!!\n",cmd_number, puSendCmdArray[cmd_number]);
-			}
-		}
+	if (*g_pAF_Opened == 1) {
+
+		int ret = 0;
+		unsigned char Temp;
+
+		s4AF_ReadReg(0x00, &Temp);  //ic info
+		LOG_INF("GT Check HW version: %x\n", Temp); //should be 0xF2
+		ret = s4AF_WriteReg(0, 0xED, 0xAB); //advance mode
+		LOG_INF("Advance mode ret: %x\n", ret);
+
+
 		spin_lock(g_pAF_SpinLock);
 		*g_pAF_Opened = 2;
 		spin_unlock(g_pAF_SpinLock);
 	}
-	LOG_INF(" end-\n");
+
+	LOG_INF(" -\n");
+
 	return 0;
 }
 
@@ -166,34 +154,6 @@ static inline int moveAF(unsigned long a_u4Position)
 {
 
 	int ret = 0;
-	unsigned long m_cur_dac_code = 0;
-/* debug
-		unsigned char Temp;
-		s4AF_ReadReg(0x03, &Temp);  //CODE MSB
-		LOG_INF("REG03: %x\n", Temp);
-		s4AF_ReadReg(0x04, &Temp);  //CODE LSB
-		LOG_INF("REG04: %x\n", Temp);
-*/
-    if (!a_u4Position) {
-		m_cur_dac_code = g_u4CurrPosition;
-		if(m_cur_dac_code>(AF_STARTCODE_UP+MOVE_CODE_STEP_MAX)){
-			m_cur_dac_code=AF_STARTCODE_UP+MOVE_CODE_STEP_MAX;
-			setPosition((unsigned short)m_cur_dac_code);
-			LOG_INF("release dac_target_code = %d\n", m_cur_dac_code);
-			msleep(WAIT_STABLE_TIME);
-			g_u4CurrPosition = m_cur_dac_code;
-		}
-        while ((m_cur_dac_code - a_u4Position) >= MOVE_CODE_STEP_MAX) {
-            m_cur_dac_code = m_cur_dac_code - MOVE_CODE_STEP_MAX;
-			setPosition((unsigned short)m_cur_dac_code);
-			LOG_INF("release dac_target_code = %d\n", m_cur_dac_code);
-			msleep(WAIT_STABLE_TIME);
-			g_u4CurrPosition = m_cur_dac_code;
-			if(m_cur_dac_code<AF_STARTCODE_DOWN){
-				m_cur_dac_code=a_u4Position;
-			}
-        }
-    }
 
 	if (setPosition((unsigned short)a_u4Position) == 0) {
 		g_u4CurrPosition = a_u4Position;
@@ -265,50 +225,8 @@ long GT9772AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
 int GT9772AF_Release(struct inode *a_pstInode, struct file *a_pstFile)
 {
 	int Ret = 0;
-	unsigned char Temp;
-	unsigned long m_cur_dac_code = 0;
-	int minReleasePositon = 50;
-	int releaseStep = 50;
+
 	LOG_INF("Start\n");
-
-	if (*g_pAF_Opened == 2) {
-
-		LOG_INF("Wait\n");
-
-		s4AF_ReadReg(0x03, &Temp);  //CODE MSB
-		LOG_INF("REG03: %x\n", Temp);
-		m_cur_dac_code = Temp;
-		s4AF_ReadReg(0x04, &Temp);  //CODE LSB
-		LOG_INF("REG04: %x\n", Temp);
-		m_cur_dac_code = m_cur_dac_code*256 + Temp;
-		g_u4CurrPosition = m_cur_dac_code;
-
-		LOG_INF("current position = %d\n", g_u4CurrPosition);
-		while(g_u4CurrPosition > minReleasePositon)
-		{
-			if(g_u4CurrPosition > (minReleasePositon + releaseStep*5))
-			{
-				setPosition(minReleasePositon + releaseStep*5);//minReleasePositon + releaseStep*5 = 300
-				msleep(WAIT_STABLE_TIME);
-				g_u4CurrPosition = minReleasePositon + releaseStep*5;
-				LOG_INF("release dac_target_code = %d\n", g_u4CurrPosition);
-			}
-			else if(g_u4CurrPosition > (minReleasePositon + releaseStep*2) && g_u4CurrPosition <= (minReleasePositon + releaseStep*5))
-			{
-				setPosition(minReleasePositon + releaseStep*2);//minReleasePositon + releaseStep*2 = 150
-				msleep(WAIT_STABLE_TIME);
-				g_u4CurrPosition = minReleasePositon + releaseStep*2;
-				LOG_INF("release dac_target_code = %d\n", g_u4CurrPosition);
-			}
-			else
-			{
-				setPosition(minReleasePositon);//minReleasePositon = 50
-				msleep(WAIT_STABLE_TIME);
-				g_u4CurrPosition = minReleasePositon;
-				LOG_INF("release dac_target_code = %d\n", g_u4CurrPosition);
-			}
-		}
-	}
 
 	if (*g_pAF_Opened) {
 		LOG_INF("Free\n");
@@ -342,7 +260,6 @@ int GT9772AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
 int GT9772AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
 			    spinlock_t *pAF_SpinLock, int *pAF_Opened)
 {
-	mdelay(1);
 	g_pstAF_I2Cclient = pstAF_I2Cclient;
 	g_pAF_SpinLock = pAF_SpinLock;
 	g_pAF_Opened = pAF_Opened;
@@ -355,10 +272,13 @@ int GT9772AF_GetFileName(unsigned char *pFileName)
 {
 	#if SUPPORT_GETTING_LENS_FOLDER_NAME
 	char FilePath[256];
-	char *FileString;
+	char *FileString = NULL;
 
-	sprintf(FilePath, "%s", __FILE__);
+	if (snprintf(FilePath, sizeof(FilePath), "%s", __FILE__) < 0)
+		return 0;
 	FileString = strrchr(FilePath, '/');
+	if (FileString == NULL)
+		return 0;
 	*FileString = '\0';
 	FileString = (strrchr(FilePath, '/') + 1);
 	strncpy(pFileName, FileString, AF_MOTOR_NAME);

@@ -777,7 +777,7 @@ int mtkts_btsnrpa_get_hw_temp(void)
 	mutex_unlock(&BTSNRPA_lock);
 
 	if (t_ret > 40000)	/* abnormal high temp */
-		pr_info("T_btsnrpa=%d\n", t_ret);
+		mtkts_btsnrpa_printk("T_btsnrpa=%d\n", t_ret);
 
 	mtkts_btsnrpa_dprintk("[%s] T_btsnrpa, %d\n", __func__,
 									t_ret);
@@ -1332,7 +1332,7 @@ struct file *file, const char __user *buffer, size_t count, loff_t *data)
 			/* check unsupport pin value, if unsupport,
 			 * set channel = 1 as default setting.
 			 */
-			g_RAP_ADC_channel = AUX_IN2_NTC;
+			g_RAP_ADC_channel = AUX_IN1_NTC;
 		else {
 			g_RAP_ADC_channel = adc_channel;
 		}

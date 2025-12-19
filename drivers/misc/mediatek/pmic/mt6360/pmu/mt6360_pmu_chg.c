@@ -451,11 +451,6 @@ static int DPDM_Switch_TO_CHG_upstream(struct mt6360_pmu_chg_info *mpci,
 
 static int mt6360_set_usbsw_state(struct mt6360_pmu_chg_info *mpci, int state)
 {
-	if (mmi_musb_is_host()) {
-		dev_info(mpci->dev, "%s: usb is host, skip switch dpdm\n", __func__);
-		return 0;
-	}
-
 	dev_info(mpci->dev, "%s: state = %d\n", __func__, state);
 
 	/* Switch D+D- to AP/MT6360 */
@@ -629,12 +624,6 @@ static int mt6360_chgdet_post_process(struct mt6360_pmu_chg_info *mpci)
 		mpci->psy_usb_type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
 		goto out;
 	}
-
-	if (mmi_musb_is_host()) {
-		mpci->chg_type = NONSTANDARD_CHARGER;
-		goto out;
-	}
-
 	/* Plug in */
 	ret = mt6360_pmu_reg_read(mpci->mpi, MT6360_PMU_USB_STATUS1);
 	if (ret < 0)
@@ -680,12 +669,6 @@ out:
 	if (!inform_psy)
 		return ret;
 	mt6360_power_supply_changed(mpci);
-
-	ret = mt6360_pmu_reg_update_bits(mpci->mpi, MT6360_PMU_DEVICE_TYPE,
-				 MT6360_MASK_USBCHGEN, 0);
-	if (ret < 0)
-		dev_err(mpci->dev, "%s: disable usbchgen  fail\n", __func__);
-
 	return ret;
 }
 #endif /* CONFIG_MT6360_PMU_CHARGER_TYPE_DETECT */
@@ -812,19 +795,6 @@ out:
 	return ret;
 }
 
-static int is_mt6360_enable(struct charger_device *chg_dev, bool *en)
-{
-	struct mt6360_pmu_chg_info *mpci = charger_get_data(chg_dev);
-	int ret = 0;
-
-	ret = mt6360_is_charger_enabled(mpci, en);
-	if (ret < 0) {
-		dev_notice(mpci->dev, "%s: fail, en = %d\n", __func__, *en);
-		return ret;
-	}
-
-	return 0;
-}
 static int mt6360_enable(struct charger_device *chg_dev, bool en)
 {
 	struct mt6360_pmu_chg_info *mpci = charger_get_data(chg_dev);
@@ -1940,7 +1910,6 @@ static const struct charger_ops mt6360_chg_ops = {
 	.plug_out = mt6360_plug_out,
 	/* enable */
 	.enable = mt6360_enable,
-	.is_enabled = is_mt6360_enable,
 	/* charging current */
 	.set_charging_current = mt6360_set_ichg,
 	.get_charging_current = mt6360_get_ichg,

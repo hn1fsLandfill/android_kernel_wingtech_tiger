@@ -12,7 +12,6 @@
 #include "disp_drv_platform.h"
 #include "ddp_manager.h"
 #include "disp_lcm.h"
-#include "primary_display.h"
 
 #if defined(MTK_LCM_DEVICE_TREE_SUPPORT)
 #include <linux/of.h>
@@ -1379,24 +1378,7 @@ int disp_lcm_esd_check(struct disp_lcm_handle *plcm)
 	return 0;
 }
 
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-bool disp_lcm_notify_support(struct disp_lcm_handle *plcm)
-{
-	struct LCM_DRIVER *lcm_drv = NULL;
 
-	DISPFUNC();
-	if (_is_lcm_inited(plcm)) {
-		lcm_drv = plcm->drv;
-		if (lcm_drv->set_lcm_notify) {
-			DISPDBG("disp lcm need notify\n");
-			return true;
-		}
-		return false;
-	}
-	DISPINFO("lcm_drv is null\n");
-	return false;
-}
-#endif
 
 int disp_lcm_esd_recover(struct disp_lcm_handle *plcm)
 {
@@ -1418,21 +1400,6 @@ int disp_lcm_esd_recover(struct disp_lcm_handle *plcm)
 	return -1;
 }
 
-void is_touchscreen_gesture_open(int value)
-{
-	struct LCM_DRIVER *lcm_drv = NULL;
-
-	if (_is_lcm_inited(pgc->plcm)) {
-		lcm_drv = pgc->plcm->drv;
-		if (value == 1) {
-			lcm_drv->tp_gesture_status = GESTURE_ON;
-		} else {
-			lcm_drv->tp_gesture_status = GESTURE_OFF;
-		}
-	}
-}
-EXPORT_SYMBOL(is_touchscreen_gesture_open);
-
 int disp_lcm_suspend(struct disp_lcm_handle *plcm)
 {
 	struct LCM_DRIVER *lcm_drv = NULL;
@@ -1447,20 +1414,9 @@ int disp_lcm_suspend(struct disp_lcm_handle *plcm)
 			return -1;
 		}
 
-		DISPMSG("tp_gesture_status = %d\n",lcm_drv->tp_gesture_status);
-		if(lcm_drv->tp_gesture_status) {
-			if (lcm_drv->tp_gesture_status == GESTURE_OFF) {
-				DISPWARN("tp_gesture_status check, gesture off\n");
-				if (lcm_drv->suspend_power)
-					lcm_drv->suspend_power();
-			}
-			else
-				DISPWARN("tp_gesture_status check, gesture on\n");
+		if (lcm_drv->suspend_power)
+			lcm_drv->suspend_power();
 
-		} else {
-			if (lcm_drv->suspend_power)
-				lcm_drv->suspend_power();
-		}
 
 		return 0;
 	}

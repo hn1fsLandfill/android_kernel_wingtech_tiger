@@ -5,9 +5,6 @@ source "drivers/misc/mediatek/cqdma/Kconfig"
 config MTK_PLATFORM
 	string "MTK platform name"
 
-config MOT_LYRIQ
-	bool "MOTO project lyriq name"
-
 config ARCH_MTK_PROJECT
 	string "MTK project name"
 
@@ -36,17 +33,6 @@ config MTK_LM_MODE
 	  It should only be enabled if hardware can support
 	  more than 4GB DRAM mapping.
 	  If you are not sure about this, set n
-
-config MTK_DTBO_FEATURE
-	bool "Support Device Tree Overlay"
-	default y
-	select BUILD_ARM_DTB_OVERLAY_IMAGE if !ARM64
-	select BUILD_ARM64_DTB_OVERLAY_IMAGE if ARM64
-	help
-	  This allows a central DTB and overlays it dynamically.
-	  An overlay can add nodes to the tree and make changes to properties
-	  in the existing tree.
-	  If you are not sure about this, set y
 
 menu "Storage"
 source "drivers/misc/mediatek/blocktag/Kconfig"
@@ -283,18 +269,6 @@ config MTK_LCM_PHYSICAL_ROTATION_HW
 	  Select "y" if you want to enable LCM 180 rotate.
 	  Select "n" if unsure.
 
-config MTK_CAM_SENSOR_PROBE_RETRY
-	bool "For sensor probe fail"
-	default n
-	help
-	  Add retries for sensor id matching
-
-config MTK_CAM_DISABLE_ISP_LOG
-	bool "For disable camera isp log"
-	default n
-	help
-	  MTK native logic disables the debug switch
-
 config CUSTOM_KERNEL_IMGSENSOR
 	string "Custom image sensor driver"
 	help
@@ -332,7 +306,6 @@ source "drivers/misc/mediatek/smi/Kconfig"
 source "drivers/misc/mediatek/jpeg/Kconfig"
 source "drivers/misc/mediatek/ccu/src/Kconfig"
 source "drivers/misc/mediatek/camera_security/Kconfig"
-source "drivers/misc/mediatek/bias/Kconfig"
 endmenu # MultiMedia
 
 menu "Sensors"
@@ -355,7 +328,6 @@ config MTK_SENSOR_ARCHITECTURE
 	  If unsure, set dummy.
 
 source "drivers/misc/mediatek/sensors-1.0/Kconfig"
-source "drivers/misc/mediatek/sensor/2.0/Kconfig"
 endmenu # Sensors
 
 menu "Modem & Connectivity"
@@ -379,14 +351,6 @@ config MTK_TEE_GP_SUPPORT
 	  enables TEE related modules to use GPAPIs. (depending on
 	  Trustonic TEE Support or Microtrust TEE Support or Google Trusty
 	  TEE or other 3rd-party TEE)
-
-config MOTO_CCCI_SEC_SUPPORT
-	bool "moto ccci sec support"
-	help
-	  Used to enable moto ccci security support,
-	  which transfers moto security data, cid data etc to modem side.
-	  Say Y here if you are need moto ccci security support.
-	  If unsure, say N
 
 source "drivers/misc/mediatek/trusted_mem/Kconfig"
 source "drivers/misc/mediatek/geniezone/Kconfig"
@@ -562,10 +526,6 @@ config MTK_MT6382_BDG
 	  Normal project will disable it first
 	  If you are not sure about this, do not set it to y
 
-config TYPEC_FSA4480
-        tristate "fsa4480 for typec analog headset"
-        depends on I2C
-
 source "drivers/misc/mediatek/met_drv/Kconfig"
 source "drivers/misc/mediatek/mtprof/Kconfig"
 source "drivers/misc/mediatek/aee/Kconfig"
@@ -600,5 +560,4 @@ menu "Misc"
 source "drivers/misc/mediatek/ext_gic/Kconfig"
 source "drivers/misc/mediatek/cirq/Kconfig"
 source "drivers/misc/mediatek/timer/Kconfig"
-source "drivers/misc/mediatek/camera_ldo/Kconfig"
 endmenu # Misc

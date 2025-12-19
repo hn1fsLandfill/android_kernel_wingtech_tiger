@@ -1006,17 +1006,8 @@ enum LCM_DRV_IOCTL_CMD {
 	LCM_DRV_IOCTL_ENABLE_CMD_MODE = 0x100,
 };
 
-/* touchscreen gesture state */
-enum gesture_state {
-	GESTURE_UNKNOWN = 0,
-	GESTURE_OFF = 1,
-	GESTURE_ON =2,
-};
-
 struct LCM_DRIVER {
 	const char *name;
-	const char *supplier;
-	int tp_gesture_status;
 	void (*set_util_funcs)(const struct LCM_UTIL_FUNCS *util);
 	void (*get_params)(struct LCM_PARAMS *params);
 
@@ -1038,7 +1029,6 @@ struct LCM_DRIVER {
 	/* /////////////////////////CABC backlight related function */
 	void (*set_backlight)(unsigned int level);
 	void (*set_backlight_cmdq)(void *handle, unsigned int level);
-	unsigned int (*get_max_brightness)(void);
 	bool (*get_hbm_state)(void);
 	bool (*get_hbm_wait)(void);
 	bool (*set_hbm_wait)(bool wait);
@@ -1058,9 +1048,6 @@ struct LCM_DRIVER {
 	unsigned int (*esd_recover)(void);
 	unsigned int (*check_status)(void);
 	unsigned int (*ata_check)(unsigned char *buffer);
-#ifdef CONFIG_LCM_NOTIFIY_SUPPORT
-	bool (*set_lcm_notify)(void);
-#endif
 	void (*read_fb)(unsigned char *buffer);
 	int (*ioctl)(enum LCM_DRV_IOCTL_CMD cmd, unsigned int data);
 	/* /////////////////////////////////////////////// */

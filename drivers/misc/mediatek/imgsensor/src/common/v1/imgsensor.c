@@ -47,8 +47,8 @@
 #include "imgsensor_proc.h"
 #include "imgsensor_clk.h"
 #include "imgsensor.h"
-/* MOT increase data size to 8192 IKSWR-128016*/
-#define PDAF_DATA_SIZE 8192 //4096
+
+#define PDAF_DATA_SIZE 4096
 
 #ifdef CONFIG_MTK_SMI_EXT
 static int current_mmsys_clk = MMSYS_CLK_MEDIUM;
@@ -443,50 +443,9 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 	UINT32 err = 0;
 	MUINT32 sensorID = 0;
 	MUINT32 retLen = sizeof(MUINT32);
-#ifdef CONFIG_MTK_CAM_SENSOR_PROBE_RETRY
-	int retries = 3;
-	bool matched = false;
-#endif
 
 	IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
 
-#ifdef CONFIG_MTK_CAM_SENSOR_PROBE_RETRY
-	while(retries-- && !matched)
-	{
-		err = imgsensor_hw_power(&pgimgsensor->hw,
-					psensor,
-					psensor_inst->psensor_name,
-					IMGSENSOR_HW_POWER_STATUS_ON);
-
-		if (err == IMGSENSOR_RETURN_SUCCESS)
-			imgsensor_sensor_feature_control(
-				psensor,
-				SENSOR_FEATURE_CHECK_SENSOR_ID,
-				(MUINT8 *)&sensorID,
-				&retLen);
-
-		if (sensorID == 0 || sensorID == 0xFFFFFFFF) {
-			PK_DBG("Fail to get sensor ID %x\n", sensorID);
-			err = ERROR_SENSOR_CONNECT_FAIL;
-		} else {
-			PK_DBG(" Sensor found ID = 0x%x\n", sensorID);
-			err = ERROR_NONE;
-			matched = true;
-		}
-
-		if (err != ERROR_NONE)
-			PK_DBG("ERROR: No imgsensor alive\n");
-
-		imgsensor_hw_power(&pgimgsensor->hw,
-				psensor,
-				psensor_inst->psensor_name,
-				IMGSENSOR_HW_POWER_STATUS_OFF);
-
-		if (!matched && !retries) {
-			PK_DBG("After three matchs,fail to get sensor ID\n");
-		}
-	}
-#else
 	err = imgsensor_hw_power(&pgimgsensor->hw,
 				psensor,
 				psensor_inst->psensor_name,
@@ -514,7 +473,7 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 	    psensor,
 	    psensor_inst->psensor_name,
 	    IMGSENSOR_HW_POWER_STATUS_OFF);
-#endif
+
 	IMGSENSOR_PROFILE(&psensor_inst->profile_time, "CheckIsAlive");
 
 	return err ? -EIO:err;
@@ -617,11 +576,6 @@ int imgsensor_set_driver(struct IMGSENSOR_SENSOR *psensor)
 		 */
 		if (orderedSearchList[i] == -1)
 			continue;
-#ifdef MOT_MT6768_REMOVE_SUB2_PROBE
-		if (psensor->inst.sensor_idx == 3)
-			continue;
-#endif
-
 		drv_idx = orderedSearchList[i];
 		if (pSensorList[drv_idx].init) {
 			pSensorList[drv_idx].init(&psensor->pfunc);
@@ -1055,10 +1009,7 @@ static inline int adopt_CAMERA_HW_GetInfo2(void *pBuf)
 	pSensorInfo->SensorVerFOV = pInfo->SensorVerFOV;
 	pSensorInfo->SensorHorFOV = pInfo->SensorHorFOV;
 	pSensorInfo->SensorOrientation = pInfo->SensorOrientation;
-	/*calibration*/
-	pSensorInfo->calibration_status = pInfo->calibration_status;
-	pSensorInfo->mnf_calibration = pInfo->mnf_calibration;
-	pSensorInfo->calibration_3aInfo = pInfo->calibration_3aInfo;
+
 	imgsensor_sensor_get_info(
 	    psensor,
 	    MSDK_SCENARIO_ID_CUSTOM1,
@@ -1342,7 +1293,6 @@ static inline int check_length_of_para(
 	case SENSOR_FEATURE_GET_PDAF_DATA:
 	case SENSOR_FEATURE_GET_4CELL_DATA:
 	case SENSOR_FEATURE_GET_MIPI_PIXEL_RATE:
-	case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
 	case SENSOR_FEATURE_GET_PIXEL_RATE:
 	{
 		if (length != 24)
@@ -1638,7 +1588,6 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	case SENSOR_FEATURE_GET_SENSOR_PDAF_CAPACITY:
 	case SENSOR_FEATURE_GET_SENSOR_HDR_CAPACITY:
 	case SENSOR_FEATURE_GET_MIPI_PIXEL_RATE:
-	case SENSOR_FEATURE_GET_OFFSET_TO_START_OF_EXPOSURE:
 	case SENSOR_FEATURE_GET_PIXEL_RATE:
 	{
 		MUINT32 *pValue = NULL;

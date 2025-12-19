@@ -27,7 +27,7 @@ extern int mtkfb_set_backlight_level(unsigned int level);
 #include <mt-plat/met_drv.h>
 #endif
 
-//#define CONFIG_LEDS_BRIGHTNESS_CHANGED
+#define CONFIG_LEDS_BRIGHTNESS_CHANGED
 /****************************************************************************
  * variables
  ***************************************************************************/
@@ -95,7 +95,6 @@ int mtk_leds_call_notifier(unsigned long action, void *data)
 EXPORT_SYMBOL_GPL(mtk_leds_call_notifier);
 
 
-#ifdef CONFIG_LEDS_BRIGHTNESS_CHANGED
 static int call_notifier(int event, struct mtk_led_data *led_dat)
 {
 	int err;
@@ -105,7 +104,6 @@ static int call_notifier(int event, struct mtk_led_data *led_dat)
 		pr_info("notifier_call_chain error\n");
 	return err;
 }
-#endif
 
 /****************************************************************************
  * DEBUG MACROS

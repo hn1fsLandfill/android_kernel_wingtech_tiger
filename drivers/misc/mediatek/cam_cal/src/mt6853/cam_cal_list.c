@@ -13,8 +13,6 @@
 
 struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	/*Below is commom sensor */
-	{MOT_AUSTIN_S5KJN1SQ_SENSOR_ID, 0xA0, Common_read_region},
-	{MOT_AUSTIN_HI1336_SENSOR_ID, 0xA2, Common_read_region},
 	{IMX586_SENSOR_ID, 0xA0, Common_read_region, MAX_EEPROM_SIZE_16K,
 		BL24SA64_write_region},
 	{IMX576_SENSOR_ID, 0xA2, Common_read_region},
@@ -38,9 +36,6 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{IMX499_SENSOR_ID, 0xA0, Common_read_region},
 	{IMX481_SENSOR_ID, 0xA4, Common_read_region, DEFAULT_MAX_EEPROM_SIZE_8K,
 		BL24SA64_write_region},
-	{SAIPAN_QTECH_HI4821Q_SENSOR_ID, 0xA0, Common_read_region},
-	{SAIPAN_DMEGC_HI1336_SENSOR_ID, 0xA2, Common_read_region},
-	{SAIPAN_CXT_GC02M1_SENSOR_ID, 0xA4, Common_read_region},
 	/*  ADD before this line */
 	{0, 0, 0}       /*end of list */
 };

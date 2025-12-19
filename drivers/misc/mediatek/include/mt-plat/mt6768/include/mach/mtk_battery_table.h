@@ -22,9 +22,6 @@
 #define Q_MAX_L_CURRENT 0
 #define Q_MAX_H_CURRENT 10000
 
-/* Default use moto serial number feature */
-#define MTK_GET_BATTERY_ID_BY_SERIALNUMBER
-
 /* multiple battery profile compile options */
 /*#define MTK_GET_BATTERY_ID_BY_AUXADC*/
 
@@ -96,21 +93,6 @@ int g_FG_PSEUDO1[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	{ 13, 14, 15, 16} /*T9*/
 };
 
-#if ((defined CONFIG_MOTO_CHG_BQ25601_SUPPORT) || (defined CONFIG_MOTO_CHG_WT6670F_SUPPORT))
-int g_FG_PSEUDO100[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
-	/*bat1,   bat2,   bat3,    bat4*/
-	{ 98, 98, 100, 100},/*T0*/
-	{ 98, 98, 100, 100},/*T1*/
-	{ 98, 98, 100, 100},/*T2*/
-	{ 98, 98, 100, 100},/*T3*/
-	{ 98, 98, 100, 100},/*T4*/
-	{ 100, 100, 100, 100},/*T5*/
-	{ 100, 100, 100, 100},/*T6*/
-	{ 100, 100, 100, 100},/*T7*/
-	{ 100, 100, 100, 100},/*T8*/
-	{ 100, 100, 100, 100} /*T9*/
-};
-#else
 int g_FG_PSEUDO100[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	/*bat1,   bat2,   bat3,    bat4*/
 	{ 100, 100, 100, 100},/*T0*/
@@ -124,7 +106,6 @@ int g_FG_PSEUDO100[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
 	{ 100, 100, 100, 100},/*T8*/
 	{ 100, 100, 100, 100} /*T9*/
 };
-#endif
 
 /* shutdown_hl_zcv */
 int g_SHUTDOWN_HL_ZCV[MAX_TABLE][TOTAL_BATTERY_NUMBER] = {
@@ -223,33 +204,6 @@ int g_temperature[MAX_TABLE] = {
 #define BIF_NTC_R 16000
 
 #if (BAT_NTC_10 == 1)
-#if ((defined CONFIG_MOTO_CHG_BQ25601_SUPPORT) || (defined CONFIG_MOTO_CHG_WT6670F_SUPPORT) || (defined CONFIG_CHARGER_BQ25890))
-struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[23] = {
-                {-40, 202700},
-                {-35, 153000},
-                {-30, 116670},
-                {-25, 89849},
-                {-20, 69814},
-                {-15, 54733},
-                {-10, 43245},
-                {-5, 34388},
-                {0, 27545},
-                {5, 22229},
-                {10, 18050},
-                {15, 14741},
-                {20, 12108},
-                {25, 10000},
-                {30, 8307},
-                {35, 6942},
-                {40, 5828},
-                {45, 4913},
-                {50, 4159},
-                {55, 3531},
-                {60, 3011},
-                {65, 2582},
-                {70, 2224}
-};
-#else
 struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21] = {
 		{-40, 195652},
 		{-35, 148171},
@@ -271,11 +225,8 @@ struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[21] = {
 		{45, 4917},
 		{50, 4161},
 		{55, 3535},
-		{60, 3014},
-                {65, 2588},
-                {70, 2227}
+		{60, 3014}
 };
-#endif
 #endif
 
 #if (BAT_NTC_47 == 1)

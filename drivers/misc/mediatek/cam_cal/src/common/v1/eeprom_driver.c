@@ -5,7 +5,7 @@
 #define PFX "CAM_CAL"
 #define pr_fmt(fmt) PFX "[%s] " fmt, __func__
 
-#ifndef MOT_MT6768_COFUL
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/i2c.h>
@@ -27,10 +27,8 @@
 #include <linux/fs.h>
 #include <linux/compat.h>
 #endif
-#endif
-#ifdef MOT_MT6768_COFUL
-#include "eeprom_driver.h"
-#endif
+
+
 
 #define CAM_CAL_DRV_NAME "CAM_CAL_DRV"
 #define CAM_CAL_DEV_MAJOR_NUMBER 226
@@ -46,48 +44,17 @@ static dev_t g_devNum = MKDEV(CAM_CAL_DEV_MAJOR_NUMBER, 0);
 static struct cdev *g_charDrv;
 static struct class *g_drvClass;
 static unsigned int g_drvOpened;
-#ifdef MOT_MT6768_COFUL
-struct i2c_client *g_pstI2Cclients[I2C_DEV_IDX_MAX] = { NULL };
-#else
 static struct i2c_client *g_pstI2Cclients[I2C_DEV_IDX_MAX] = { NULL };
-#endif
+
 
 static DEFINE_SPINLOCK(g_spinLock);	/*for SMP */
 
 
 static unsigned int g_lastDevID;
-#ifdef MOT_ELLIS_HI556D_MIPI_RAW
-#define HI556_MODULE_INFO_SIZE 7
-#define HI556_LSC_DATA_SIZE 1868
-#define HI556_AWB_DATA_SIZE 16
-#define MOT_ELLIS_HI556D_SENSOR_ID 0x0556
-extern unsigned char hi556_data_lsc[HI556_LSC_DATA_SIZE + 1];
-extern unsigned char hi556_data_awb[HI556_AWB_DATA_SIZE + 1];
-extern unsigned char hi556_lsc_valid;
-extern unsigned char hi556_awb_valid;
 
-static u32 hi556_vendor_id = 0x19050000;
-#endif
-
-#ifdef MOT_TONGA_GC02M1_MIPI_RAW
-#define GC02M1_AWB_DATA_SIZE 6
-extern unsigned char gc02m1_data_awb[GC02M1_AWB_DATA_SIZE+3];
-static u32 gc02m1_vendor_id = 0x19050000;
-#endif
-#ifdef MOT_MAUI_GC02M1_MIPI_RAW
-#define GC02M1_AWB_DATA_SIZE 17
-extern unsigned char gc02m1_data_awb[GC02M1_AWB_DATA_SIZE];
-static u32 gc02m1_vendor_id = 0x19050000;
-#endif
-#ifdef MOT_MAUI_OV02B10_MIPI_RAW
-#define OV02B10_AWB_DATA_SIZE 31
-extern unsigned char ov02b10_otp_data[OV02B10_AWB_DATA_SIZE];
-static u32 ov02b10_vendor_id = 0x11110000;
-#endif
 /***********************************************************
  *
  ***********************************************************/
-#ifndef MOT_MT6768_COFUL
 struct stCAM_CAL_CMD_INFO_STRUCT {
 	unsigned int sensorID;
 	unsigned int deviceID;
@@ -100,7 +67,7 @@ struct stCAM_CAL_CMD_INFO_STRUCT {
 
 static struct stCAM_CAL_CMD_INFO_STRUCT
 	g_camCalDrvInfo[IMGSENSOR_SENSOR_IDX_MAX_NUM];
-#endif
+
 /********************************************************************
  * EEPROM_set_i2c_bus()
  * To i2c client and slave id
@@ -695,151 +662,71 @@ static long EEPROM_drv_ioctl(struct file *file,
 #ifdef CAM_CALGETDLT_DEBUG
 		do_gettimeofday(&ktv1);
 #endif
-#ifdef MOT_ELLIS_HI556D_MIPI_RAW
-		pr_debug("SensorID=%x, DeviceID=%x, offset=%d, length=%d, pu1Params:0x%x\n",
-			ptempbuf->sensorID, ptempbuf->deviceID, ptempbuf->u4Offset, ptempbuf->u4Length, *pu1Params);
-		if(ptempbuf->sensorID == MOT_ELLIS_HI556D_SENSOR_ID) {
-			if(ptempbuf->u4Offset == 2){
-				pr_debug("Do layoutcheck\n");
-				memcpy(pu1Params, (u8 *)&hi556_vendor_id, 4);
-		}else{
-			if (ptempbuf->sensorID == 0x556 && ptempbuf->u4Length == 0x10 && ptempbuf->u4Offset == 0x41b && hi556_awb_valid){//HI556 AWB data
-				pr_debug("awb data copy to user\n");
-				memcpy(pu1Params, (u8 *) hi556_data_awb, ptempbuf->u4Length);
-			}
-			if (ptempbuf->sensorID == 0x556 && ptempbuf->u4Length == 0x74C && ptempbuf->u4Offset == 0x452 && hi556_lsc_valid){//HI556 LSC data
-				pr_debug("lsc data copy to user\n");
-				memcpy(pu1Params, (u8 *) hi556_data_lsc, ptempbuf->u4Length);
-			}
-		}
-			i4RetValue = ptempbuf->u4Length;
-		} else {
-#endif
-#ifdef MOT_TONGA_GC02M1_MIPI_RAW
-        pr_debug("SensorID=%x, DeviceID=%x, offset=%d, length=%d, pu1Params:0x%x\n",
-            ptempbuf->sensorID, ptempbuf->deviceID, ptempbuf->u4Offset, ptempbuf->u4Length, *pu1Params);
-        if(ptempbuf->sensorID == 0x02e0) {
-            if(ptempbuf->u4Offset == 0x10){
-                pr_debug("Do layoutcheck\n");
-                memcpy(pu1Params, (u8 *)&gc02m1_vendor_id, 4);
-            }else{
-                if (ptempbuf->sensorID == 0x02e0 && ptempbuf->u4Length == 0x09 && ptempbuf->u4Offset == 0x78){
-                    pr_debug("awb data copy to user\n");
-                    memcpy(pu1Params, (u8 *) gc02m1_data_awb, ptempbuf->u4Length);
-                }
-            }
-            i4RetValue = ptempbuf->u4Length;
-        } else {
-#endif
-#ifdef MOT_MAUI_GC02M1_MIPI_RAW
-        pr_debug("SensorID=%x, DeviceID=%x, offset=%d, length=%d, pu1Params:0x%x\n",
-            ptempbuf->sensorID, ptempbuf->deviceID, ptempbuf->u4Offset, ptempbuf->u4Length, *pu1Params);
-        if(ptempbuf->sensorID == 0x02e1) {
-            if(ptempbuf->u4Offset == 0x10){
-                pr_debug("Do layoutcheck\n");
-                memcpy(pu1Params, (u8 *)&gc02m1_vendor_id, 4);
-            }else{
-                if (ptempbuf->sensorID == 0x02e1 && ptempbuf->u4Length == 0x11 && ptempbuf->u4Offset == 0x78){
-                    pr_debug("awb data copy to user\n");
-                    memcpy(pu1Params, (u8 *) gc02m1_data_awb, ptempbuf->u4Length);
-                }
-            }
-            i4RetValue = ptempbuf->u4Length;
-        } else {
-#endif
-#ifdef MOT_MAUI_OV02B10_MIPI_RAW
-        pr_debug("SensorID=%x, DeviceID=%x, offset=%d, length=%d, pu1Params:0x%x\n",
-            ptempbuf->sensorID, ptempbuf->deviceID, ptempbuf->u4Offset, ptempbuf->u4Length, *pu1Params);
-        if(ptempbuf->sensorID == 0x002b) {
-            if(ptempbuf->u4Offset == 0x78){
-                pr_debug("Do layoutcheck\n");
-                memcpy(pu1Params, (u8 *)&ov02b10_vendor_id, 4);
-            }else{
-                if (ptempbuf->sensorID == 0x002b && ptempbuf->u4Length == 0x0F && ptempbuf->u4Offset == 0x10){
-                    pr_debug("awb data copy to user\n");
-                    memcpy(pu1Params, (u8 *) &ov02b10_otp_data[16], ptempbuf->u4Length);
-                }
-            }
-            i4RetValue = ptempbuf->u4Length;
-        } else {
-#endif
-			pr_debug("SensorID=%x DeviceID=%x\n",
-				ptempbuf->sensorID, ptempbuf->deviceID);
-			pcmdInf = EEPROM_get_cmd_info_ex(
-				ptempbuf->sensorID,
-				ptempbuf->deviceID);
 
-			/* Check the max size if specified */
-			if (pcmdInf != NULL &&
-				(pcmdInf->maxEepromSize != 0) &&
-				(pcmdInf->maxEepromSize <
-				(ptempbuf->u4Offset + ptempbuf->u4Length))) {
-				pr_debug("Error!! not support address >= 0x%x!!\n",
-					pcmdInf->maxEepromSize);
+		pr_debug("SensorID=%x DeviceID=%x\n",
+			ptempbuf->sensorID, ptempbuf->deviceID);
+		pcmdInf = EEPROM_get_cmd_info_ex(
+			ptempbuf->sensorID,
+			ptempbuf->deviceID);
+
+		/* Check the max size if specified */
+		if (pcmdInf != NULL &&
+		    (pcmdInf->maxEepromSize != 0) &&
+		    (pcmdInf->maxEepromSize <
+		     (ptempbuf->u4Offset + ptempbuf->u4Length))) {
+			pr_debug("Error!! not support address >= 0x%x!!\n",
+				 pcmdInf->maxEepromSize);
+			kfree(pBuff);
+			kfree(pu1Params);
+			return -EFAULT;
+		}
+
+		if (pcmdInf != NULL && g_lastDevID != ptempbuf->deviceID) {
+			if (EEPROM_set_i2c_bus(ptempbuf->deviceID,
+					       pcmdInf) != 0) {
+				pr_debug("deviceID Error!\n");
 				kfree(pBuff);
 				kfree(pu1Params);
 				return -EFAULT;
 			}
-
-
-			if (pcmdInf != NULL && g_lastDevID != ptempbuf->deviceID) {
-				if (EEPROM_set_i2c_bus(ptempbuf->deviceID,
-							pcmdInf) != 0) {
-					pr_debug("deviceID Error!\n");
-					kfree(pBuff);
-					kfree(pu1Params);
-					return -EFAULT;
-				}
-				g_lastDevID = ptempbuf->deviceID;
-			}
-
-			if (pcmdInf != NULL) {
-				if (pcmdInf->readCMDFunc != NULL) {
-					if ((ptempbuf->sensorID == 0x885a)
-					&& (ptempbuf->u4Offset == 0x7500))
-						*pu1Params = i4RetValue = ov8856_af_inf;
-					else if ((ptempbuf->sensorID == 0x885a)
-					&& (ptempbuf->u4Offset == 0x7501))
-						*pu1Params = i4RetValue = ov8856_af_mac;
-					else if ((ptempbuf->sensorID == 0x885a)
-					&& (ptempbuf->u4Offset == 0x7502))
-						*pu1Params = i4RetValue = ov8856_af_lsb;
-					else if ((ptempbuf->sensorID == 0x487b)
-					&& (ptempbuf->u4Offset == 0x7500))
-						*pu1Params = i4RetValue = s5k4h7_af_inf;
-					else if ((ptempbuf->sensorID == 0x487b)
-					&& (ptempbuf->u4Offset == 0x7501))
-						*pu1Params = i4RetValue = s5k4h7_af_mac;
-					else if ((ptempbuf->sensorID == 0x487b)
-					&& (ptempbuf->u4Offset == 0x7502))
-						*pu1Params = i4RetValue = s5k4h7_af_lsb;
-					else
-						i4RetValue =
-							pcmdInf->readCMDFunc(
-								pcmdInf->client,
-								ptempbuf->u4Offset,
-								pu1Params,
-								ptempbuf->u4Length);
-				}
-				else {
-					pr_debug("pcmdInf->readCMDFunc == NULL\n");
-					kfree(pBuff);
-					kfree(pu1Params);
-					return -EFAULT;
-				}
-			}
-#ifdef MOT_ELLIS_HI556D_MIPI_RAW
+			g_lastDevID = ptempbuf->deviceID;
 		}
-#endif
-#ifdef MOT_TONGA_GC02M1_MIPI_RAW
-        }
-#endif
-#ifdef MOT_MAUI_GC02M1_MIPI_RAW
-        }
-#endif
-#ifdef MOT_MAUI_OV02B10_MIPI_RAW
-        }
-#endif
+
+		if (pcmdInf != NULL) {
+			if (pcmdInf->readCMDFunc != NULL) {
+				if ((ptempbuf->sensorID == 0x885a)
+				&& (ptempbuf->u4Offset == 0x7500))
+					*pu1Params = i4RetValue = ov8856_af_inf;
+				else if ((ptempbuf->sensorID == 0x885a)
+				&& (ptempbuf->u4Offset == 0x7501))
+					*pu1Params = i4RetValue = ov8856_af_mac;
+				else if ((ptempbuf->sensorID == 0x885a)
+				&& (ptempbuf->u4Offset == 0x7502))
+					*pu1Params = i4RetValue = ov8856_af_lsb;
+				else if ((ptempbuf->sensorID == 0x487b)
+				&& (ptempbuf->u4Offset == 0x7500))
+					*pu1Params = i4RetValue = s5k4h7_af_inf;
+				else if ((ptempbuf->sensorID == 0x487b)
+				&& (ptempbuf->u4Offset == 0x7501))
+					*pu1Params = i4RetValue = s5k4h7_af_mac;
+				else if ((ptempbuf->sensorID == 0x487b)
+				&& (ptempbuf->u4Offset == 0x7502))
+					*pu1Params = i4RetValue = s5k4h7_af_lsb;
+				else
+					i4RetValue =
+						pcmdInf->readCMDFunc(
+							  pcmdInf->client,
+							  ptempbuf->u4Offset,
+							  pu1Params,
+							  ptempbuf->u4Length);
+			}
+			else {
+				pr_debug("pcmdInf->readCMDFunc == NULL\n");
+				kfree(pBuff);
+				kfree(pu1Params);
+				return -EFAULT;
+			}
+		}
 #ifdef CAM_CALGETDLT_DEBUG
 		do_gettimeofday(&ktv2);
 		if (ktv2.tv_sec > ktv1.tv_sec)

@@ -20,10 +20,6 @@ static const char *this_state_name[DTS_GPIO_STATE_MAX] = {
 	"mode_te1_te",
 	"lcm_rst_out0_gpio",
 	"lcm_rst_out1_gpio",
-	"lcm_vddi_out0_gpio",
-	"lcm_vddi_out1_gpio",
-	"lcm_vci_out0_gpio",
-	"lcm_vci_out1_gpio",
 	"lcm1_rst_out0_gpio",
 	"lcm1_rst_out1_gpio",
 	"lcd_bias_enp0_gpio",
@@ -31,11 +27,7 @@ static const char *this_state_name[DTS_GPIO_STATE_MAX] = {
 	"tp_rst_out1_gpio",
 	"tp_rst_out0_gpio",
 	"6382_rst_out1_gpio",
-	"6382_rst_out0_gpio",
-	"lcd_bias_enp1_gpio",
-	"lcd_bias_enp0_gpio",
-	"lcd_bias_enn1_gpio",
-	"lcd_bias_enn0_gpio"
+	"6382_rst_out0_gpio"
 };
 
 /* pinctrl implementation */
@@ -96,11 +88,5 @@ long disp_dts_gpio_select_state(enum DTS_GPIO_STATE s)
 		pr_info("GPIO STATE is invalid,state=%d\n", (unsigned int)s);
 		return -1;
 	}
-
-	if (!this_state_name[s] || !strlen(this_state_name[s])) {
-		pr_info("%s: GPIO STATE invalid, this_state_name[%d] null\n", __func__, s);
-		return -1;
-	}
-
 	return _set_state(this_state_name[s]);
 }

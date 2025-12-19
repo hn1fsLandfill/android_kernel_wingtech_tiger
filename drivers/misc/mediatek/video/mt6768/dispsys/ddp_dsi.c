@@ -1452,8 +1452,7 @@ enum DSI_STATUS DSI_TXRX_Control(enum DISP_MODULE_ENUM module,
 	bool hstx_cklp_en = dsi_params->cont_clock ? FALSE : TRUE;
 	int max_return_size = 0;
 
-	if (bdg_is_bdg_connected() == 1)
-		hstx_cklp_en = false;
+	hstx_cklp_en = false;
 	switch (lane_num) {
 	case LCM_ONE_LANE:
 		lane_num_bitvalue = 0x1;
@@ -1962,12 +1961,7 @@ int mipi_clk_change(int msg, int en)
 			def_data_rate = 460;
 			if (dsi_params->mode != CMD_MODE)
 				def_dsi_hbp = 0xD2; /* adaptive HBP value */
-		} else if (!strcmp(mtkfb_lcm_name,
-		"mipi_mot_vid_tm_ili7807s_hdp_653")) {
-			def_data_rate = 752;
-			if (dsi_params->mode != CMD_MODE)
-				def_dsi_hbp = 0x26; /* adaptive HBP value */
-                } else {
+		} else {
 			DISPERR("%s,lcm(%s) not support change mipi clock\n",
 				__func__, mtkfb_lcm_name);
 
@@ -2007,9 +2001,6 @@ int mipi_clk_change(int msg, int en)
 			hbp_wc = ALIGN_TO((hbp_wc), 4);
 
 			def_dsi_hbp = hbp_wc; /* origin HBP value */
-			if (!strcmp(mtkfb_lcm_name,"mipi_mot_vid_tm_ili7807s_hdp_653")) {
-				def_dsi_hbp = 0x0E;    /* origin HBP value */
-			}
 		}
 	}
 
@@ -2026,9 +2017,6 @@ int mipi_clk_change(int msg, int en)
 				ddp_dsi_porch_setting(DISP_MODULE_DSI0,
 					handle, DSI_HBP, 4);
 			} else {
-				if (!strcmp(mtkfb_lcm_name,"mipi_mot_vid_tm_ili7807s_hdp_653")) {
-					DSI_MIPI_clk_change(DISP_MODULE_DSI0, handle, def_data_rate);
-				}
 				ddp_dsi_porch_setting(DISP_MODULE_DSI0,
 					handle, DSI_HBP, def_dsi_hbp);
 			}

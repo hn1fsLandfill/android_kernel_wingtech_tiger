@@ -75,11 +75,11 @@ static int hang_detect_counter = 0x7fffffff;
 static int dump_bt_done;
 static bool reboot_flag;
 static struct name_list *white_list;
-#ifndef CONFIG_MTK_USER_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 	struct proc_dir_entry *pe;
 #endif
 
-static int system_server_pid;
+
 
 DECLARE_WAIT_QUEUE_HEAD(dump_bt_start_wait);
 DECLARE_WAIT_QUEUE_HEAD(dump_bt_done_wait);
@@ -226,7 +226,8 @@ int del_white_list(char *name)
 	return 0;
 }
 
-#ifndef CONFIG_MTK_USER_BUILD
+
+#ifdef CONFIG_MTK_ENG_BUILD
 static int monit_hang_flag = 1;
 #define SEQ_printf(m, x...) \
 do {                \
@@ -578,7 +579,7 @@ void trigger_hang_detect_db(void)
 		aee_rr_rec_hang_detect_timeout_count(COUNT_ANDROID_REBOOT);
 #endif
 
-#ifndef CONFIG_MTK_USER_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 	if (monit_hang_flag == 1) {
 #endif
 #ifdef CONFIG_MTK_AEE_IPANIC
@@ -593,7 +594,7 @@ void trigger_hang_detect_db(void)
 		"Hang Detect", NULL);
 #endif
 
-#ifndef CONFIG_MTK_USER_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 	}
 #endif
 
@@ -1954,8 +1955,7 @@ static int hang_detect_thread(void *arg)
 #ifdef BOOT_UP_HANG
 		if (hd_detect_enabled)
 #else
-		system_server_pid = FindTaskByName("system_server");
-		if (hd_detect_enabled && CheckWhiteList() && (system_server_pid != -1))
+		if (hd_detect_enabled && CheckWhiteList())
 #endif
 		{
 
@@ -2041,15 +2041,6 @@ void MonitorHangKick(int lParam)
 	reset_hang_info();
 }
 
-void aee_kernel_RT_Monitor_api_factory(void)
-{
-	reset_hang_info();
-	reboot_flag = 0;
-	hd_detect_enabled = 0;
-	hang_detect_counter = hd_timeout;
-	pr_info("[Hang_Detect] hang_detect disabled for factory\n");
-}
-
 int hang_detect_init(void)
 {
 
@@ -2093,7 +2084,7 @@ static int __init monitor_hang_init(void)
 	}
 	hang_detect_init();
 
-#ifndef CONFIG_MTK_USER_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 	pe = proc_create("monitor_hang", 0664, NULL, &monitor_hang_fops);
 	if (!pe)
 		return -ENOMEM;
@@ -2111,7 +2102,7 @@ static void __exit monitor_hang_exit(void)
 	/* kfree(NULL) is safe */
 	kfree(Hang_Info);
 #endif
-#ifndef CONFIG_MTK_USER_BUILD
+#ifdef CONFIG_MTK_ENG_BUILD
 	if (pe)
 		proc_remove(pe);
 #endif

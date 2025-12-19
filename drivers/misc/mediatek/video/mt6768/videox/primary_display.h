@@ -481,8 +481,6 @@ extern unsigned int gTriggerDispMode;
 /* defined in mtkfb.c should move to mtkfb.h*/
 extern unsigned int islcmconnected;
 
-extern int g_idle_skip;
-extern int g_idle_skip_trigger;
 size_t mtkfb_get_fb_size(void);
 
 int primary_fps_ctx_set_wnd_sz(unsigned int wnd_sz);
@@ -532,6 +530,4 @@ bool primary_display_need_update_hrt_fps(
 /**************function for DynFPS end************************/
 #endif
 
-char* primary_display_get_lcm_supplier(void);
-char* primary_display_get_lcm_name(void);
 #endif

@@ -428,66 +428,6 @@ enum SENSOR_DPCM_TYPE_ENUM {
 	COMP8_DI_2A = 0x2A,
 };
 
-#define MAX_CALIBRATION_STRING 40
-
-typedef struct {
-	MINT32 mnf;
-	MINT32 awb;
-	MINT32 af;
-	MINT32 lsc;
-	MINT32 pdaf;
-	MINT32 af_sync;
-	MINT32 dual;
-} mot_calibration_status_t;
-
-typedef struct {
-	char integrator[MAX_CALIBRATION_STRING];
-	char serial_number[MAX_CALIBRATION_STRING];
-	char table_revision[MAX_CALIBRATION_STRING];
-	char mot_part_number[MAX_CALIBRATION_STRING];
-	char actuator_id[MAX_CALIBRATION_STRING];
-	char lens_id[MAX_CALIBRATION_STRING];
-	char factory_id[MAX_CALIBRATION_STRING];
-	char manufacture_line[MAX_CALIBRATION_STRING];
-	char manufacture_date[MAX_CALIBRATION_STRING];
-} mot_calibration_mnf_t;
-
-typedef struct {
-	unsigned short awb_src_1_golden_r;
-	unsigned short awb_src_1_golden_gr;
-	unsigned short awb_src_1_golden_gb;
-	unsigned short awb_src_1_golden_b;
-	unsigned short awb_src_1_r;
-	unsigned short awb_src_1_gr;
-	unsigned short awb_src_1_gb;
-	unsigned short awb_src_1_b;
-	unsigned short awb_src_1_rg_ratio;
-	unsigned short awb_src_1_bg_ratio;
-	unsigned short awb_src_1_gr_gb_ratio;
-	unsigned short awb_src_1_golden_rg_ratio;
-	unsigned short awb_src_1_golden_bg_ratio;
-	unsigned short awb_src_1_golden_gr_gb_ratio;
-	unsigned short cie_src_1_ev;//big_y_source
-	unsigned short cie_src_1_u;//lil_x_source
-	unsigned short cie_src_1_v;//lil_y_source   from qcom
-} mot_calibration_3aInfo_t;
-
-typedef enum {
-	STATUS_OK,
-	STATUS_CRC_FAIL,
-	STATUS_LIMIT_FAIL
-} MotCalibrationStatus;
-
-typedef struct {
-        MotCalibrationStatus mnf_status;
-        MotCalibrationStatus af_status;
-        MotCalibrationStatus awb_status;
-        MotCalibrationStatus lsc_status;
-        MotCalibrationStatus pdaf_status;
-        MotCalibrationStatus dual_status;
-	mot_calibration_mnf_t mnf_cal_data;
-} mot_calibration_info_t;
-
 struct ACDK_SENSOR_RESOLUTION_INFO_STRUCT {
 	MUINT16 SensorPreviewWidth;
 	MUINT16 SensorPreviewHeight;
@@ -742,10 +682,6 @@ struct ACDK_SENSOR_INFO_STRUCT {
 	MUINT16 SensorVerFOV;
 	MUINT16 SensorOrientation;
 	MUINT32 SensorModuleID;
-	MUINT8 efuseID[64];
-	mot_calibration_status_t calibration_status;
-	mot_calibration_mnf_t mnf_calibration;
-	mot_calibration_3aInfo_t calibration_3aInfo;
 };
 
 #define ACDK_SENSOR_INFO2_STRUCT struct ACDK_SENSOR_INFO_STRUCT

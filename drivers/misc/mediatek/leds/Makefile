@@ -15,13 +15,8 @@ else
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/leds/$(MTK_PLATFORM)
 endif
 
-ifdef CONFIG_LEDS_MTK_CHG_SUPPORT
-ccflags-y += -I$(srctree)/drivers/power/supply/mediatek/charger
-endif
-
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/video/include
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/gate_ic
-ccflags-y += -I$(srctree)/drivers/power/supply
 
 obj-$(CONFIG_MTK_LEDS) += mtk_leds_drv.o
 
@@ -35,4 +30,3 @@ endif
 endif
 obj-$(CONFIG_LEDS_MT6357) += leds-mt6357.o
 obj-$(CONFIG_LEDS_MT6357) += mt_led_trigger.o
-

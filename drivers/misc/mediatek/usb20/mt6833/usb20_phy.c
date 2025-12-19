@@ -156,13 +156,10 @@ void usb_phy_switch_to_usb(void)
 #define SHFT_RG_USB20_TERM_VREF_SEL 8
 #define OFFSET_RG_USB20_PHY_REV6 0x18
 #define SHFT_RG_USB20_PHY_REV6 30
-extern bool mt_usb_is_device(void);
-
 void usb_phy_tuning(void)
 {
 	static bool inited;
 	static s32 u2_vrt_ref, u2_term_ref, u2_enhance;
-	static s32 u2_vrt_ref_host, u2_term_ref_host, u2_enhance_host;
 	struct device_node *of_node;
 
 	if (!inited) {
@@ -184,26 +181,6 @@ void usb_phy_tuning(void)
 		}
 		inited = true;
 	}
-        if (!mt_usb_is_device())
-        {
-		u2_vrt_ref_host = 6;
-		u2_term_ref_host = 4;
-		u2_enhance_host = 3;
-		of_node = of_find_compatible_node(NULL,
-			NULL, "mediatek,host_tuning");
-		if (of_node) {
-			/* value won't be updated if property not being found */
-			of_property_read_u32(of_node,
-				"u2_vrt_ref", (u32 *) &u2_vrt_ref_host);
-			of_property_read_u32(of_node,
-				"u2_term_ref", (u32 *) &u2_term_ref_host);
-			of_property_read_u32(of_node,
-				"u2_enhance", (u32 *) &u2_enhance_host);
-		}
-		u2_vrt_ref = u2_vrt_ref_host;
-		u2_term_ref = u2_term_ref_host;
-		u2_enhance = u2_enhance_host;
-        }
 
 	if (u2_vrt_ref != -1) {
 		if (u2_vrt_ref <= VAL_MAX_WIDTH_3) {
@@ -720,7 +697,6 @@ EXPORT_SYMBOL(usb_phy_savecurrent);
 void usb_phy_recover(void)
 {
 	unsigned int efuse_val = 0;
-	struct device_node *of_node;
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	if (in_uart_mode) {
@@ -814,14 +790,8 @@ void usb_phy_recover(void)
 	/* force enter device mode */
 	set_usb_phy_mode(PHY_DEV_ACTIVE);
 
-	of_node = of_find_compatible_node(NULL,NULL, "mediatek,phy_drv_cap");
-	if (of_node) {
-		/* value won't be updated if property not being found */
-		of_property_read_u32(of_node,"phy-drv-cap", (u32 *) &efuse_val);
-	} else {
-		/* M_ANALOG8[4:0] => RG_USB20_INTR_CAL[4:0] */
-		efuse_val = (get_devinfo_with_index(107) & (0x1f<<0)) >> 0;
-	}
+	/* M_ANALOG8[4:0] => RG_USB20_INTR_CAL[4:0] */
+	efuse_val = (get_devinfo_with_index(107) & (0x1f<<0)) >> 0;
 	if (efuse_val) {
 		DBG(0, "apply efuse setting, RG_USB20_INTR_CAL=0x%x\n",
 			efuse_val);

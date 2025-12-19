@@ -24,9 +24,6 @@ MTK_CUSTOM_PATH  := $(srctree)/drivers/misc/mediatek
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main2/inc
 subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/main2/common/lc898212xdaf_f/inc
 
-subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/ois/inc
-subdir-ccflags-y += -I$(MTK_CUSTOM_PATH)/lens/mtk/ois/dw9781
-
 ifeq ($(CONFIG_MACH_MT6779), y)
   ccflags-y += -I$(srctree)/drivers/misc/mediatek/timer/timesync/
 endif
@@ -46,4 +43,3 @@ main2af-y  += common/lc898217afb/LC898217AFB.o
 main2af-y  += common/lc898217afc/LC898217AFC.o
 main2af-y  += common/dw9718taf/DW9718TAF.o
 main2af-y  += common/gt9772af/GT9772AF.o
-main2af-y  += common/mot_lyriq_dw9800af/MOT_LYRIQ_DW9800AF.o

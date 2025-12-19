@@ -20,9 +20,6 @@ enum mt65xx_led_type {
 	MT65XX_LED_TYPE_KEYBOARD,
 	MT65XX_LED_TYPE_BUTTON,
 	MT65XX_LED_TYPE_LCD,
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-	MT65XX_LED_TYPE_CHAREGING,
-#endif
 	MT65XX_LED_TYPE_TOTAL,
 };
 
@@ -156,7 +153,6 @@ struct cust_mt65xx_led {
 	enum mt65xx_led_mode mode;
 	long data;
 	struct PWM_config config_data;
-	int max_brightness;
 };
 
 /**

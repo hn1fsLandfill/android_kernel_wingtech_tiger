@@ -30,7 +30,6 @@ obj-$(CONFIG_MTK_POWER_THROTTLING_COMMON) += power_throttling/
 endif
 
 obj-$(CONFIG_MTK_RTC)	+= rtc/
-obj-$(CONFIG_TYPEC_FSA4480) += fsa4480/
 obj-$(CONFIG_MTK_ACCDET) += accdet/
 obj-$(CONFIG_MTK_AUXADC) += auxadc/
 obj-$(CONFIG_MTK_PMIC_NEW_ARCH)	+= pmic/
@@ -206,5 +205,3 @@ obj-$(CONFIG_MTK_MDDP_SUPPORT) += mddp/
 obj-$(CONFIG_MTK_GATE_IC) += gate_ic/
 obj-$(CONFIG_MTK_FREQ_HOPPING) += freqhopping/
 obj-$(CONFIG_MTK_TASK_TURBO) += task_turbo/
-obj-$(CONFIG_PANEL_BIAS) += bias/
-obj-$(CONFIG_MOT_CAMERA_LDO) += camera_ldo/
