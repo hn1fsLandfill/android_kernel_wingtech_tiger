@@ -116,7 +116,6 @@ static DEFINE_SPINLOCK(config_data_lock);
 static uint8_t scp_system_ready;
 static uint8_t scp_chre_ready;
 static struct mtk_nanohub_device *mtk_nanohub_dev;
-static struct mot_params *motparams;//moto add
 
 static int mtk_nanohub_send_timestamp_to_hub(void);
 static int mtk_nanohub_server_dispatch_data(uint32_t *currWp);
@@ -685,90 +684,6 @@ static void mtk_nanohub_init_sensor_info(void)
 	p->gain = 100000; /* ois data range [0, 4095], avoid int32 overflow */
 	strlcpy(p->name, "ois", sizeof(p->name));
 	strlcpy(p->vendor, "mtk", sizeof(p->vendor));
-
-//moto add
-	p = &sensor_state[SENSOR_TYPE_FLAT_UP];
-	p->sensorType = SENSOR_TYPE_FLAT_UP;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Flat Up", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_FLAT_DOWN];
-	p->sensorType = SENSOR_TYPE_FLAT_DOWN;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Flat Down", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_STOWED];
-	p->sensorType = SENSOR_TYPE_STOWED;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Stowed", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_CAMERA_ACTIVATE];
-	p->sensorType = SENSOR_TYPE_CAMERA_ACTIVATE;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Camera Gesture", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_CHOPCHOP_GESTURE];
-	p->sensorType = SENSOR_TYPE_CHOPCHOP_GESTURE;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "ChopChop", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_MOTO_GLANCE_GESTURE];
-	p->sensorType = SENSOR_TYPE_MOTO_GLANCE_GESTURE;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Moto Glance", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_LTS];
-	p->sensorType = SENSOR_TYPE_LTS;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "lift to Silence", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_FTM];
-	p->sensorType = SENSOR_TYPE_FTM;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Flip to Mute", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_LTV];
-	p->sensorType = SENSOR_TYPE_LTV;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Lift to View", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_OFFBODY];
-	p->sensorType = SENSOR_TYPE_OFFBODY;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1;
-	strlcpy(p->name, "Off Body", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_LIGHT_1];
-	p->sensorType = SENSOR_TYPE_LIGHT_1;
-	p->gain = 1;
-	strlcpy(p->name, "light_1", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
-
-	p = &sensor_state[SENSOR_TYPE_TAP];
-	p->sensorType = SENSOR_TYPE_TAP;
-	p->rate = SENSOR_RATE_ONCHANGE;
-	p->gain = 1000;
-	strlcpy(p->name, "Tap", sizeof(p->name));
-	strlcpy(p->vendor, "motorola", sizeof(p->vendor));
 }
 
 static void init_sensor_config_cmd(struct ConfigCmd *cmd,
@@ -1943,67 +1858,6 @@ static void mtk_nanohub_restoring_config(void)
 		mtk_nanohub_cfg_to_hub(ID_OIS, data, length);
 		vfree(data);
 	}
-//moto add restore algo params when scp reboot
-#ifdef CONFIG_MOTO_CHOPCHOP_PARAMS
-	length = sizeof(struct mot_chopchop);
-	data = vzalloc(length);
-	if (data) {
-		spin_lock(&config_data_lock);
-		memcpy(data, &motparams->chopchop_params, length);
-		spin_unlock(&config_data_lock);
-		mtk_nanohub_cfg_to_hub(ID_CHOPCHOP, data, length);
-		vfree(data);
-	}
-	msleep(1);
-#endif
-#ifdef CONFIG_MOTO_CAMGEST_PARAMS
-	length = sizeof(struct mot_camgest);
-	data = vzalloc(length);
-	if (data) {
-		spin_lock(&config_data_lock);
-		memcpy(data, &motparams->camgest_params, length);
-		spin_unlock(&config_data_lock);
-		mtk_nanohub_cfg_to_hub(ID_CAMGEST, data, length);
-		vfree(data);
-	}
-	msleep(1);
-#endif
-#ifdef CONFIG_MOTO_GLANCE_PARAMS
-	length = sizeof(struct mot_glance);
-	data = vzalloc(length);
-	if (data) {
-		spin_lock(&config_data_lock);
-		memcpy(data, &motparams->glance_params, length);
-		spin_unlock(&config_data_lock);
-		mtk_nanohub_cfg_to_hub(ID_MOT_GLANCE, data, length);
-		vfree(data);
-	}
-	msleep(1);
-#endif
-#ifdef CONFIG_MOTO_LTV_PARAMS
-	length = sizeof(struct mot_ltv);
-	data = vzalloc(length);
-	if (data) {
-		spin_lock(&config_data_lock);
-		memcpy(data, &motparams->ltv_params, length);
-		spin_unlock(&config_data_lock);
-		mtk_nanohub_cfg_to_hub(ID_LTV, data, length);
-		vfree(data);
-	}
-	msleep(1);
-#endif
-#ifdef CONFIG_MOTO_TAP_PARAMS
-	length = sizeof(struct mot_tap);
-	data = vzalloc(length);
-	if (data) {
-		spin_lock(&config_data_lock);
-		memcpy(data, &motparams->tap_params, length);
-		spin_unlock(&config_data_lock);
-		mtk_nanohub_cfg_to_hub(ID_TAP, data, length);
-		vfree(data);
-	}
-	msleep(1);
-#endif
 }
 
 static void mtk_nanohub_start_timesync(void)
@@ -3142,13 +2996,6 @@ static int mtk_nanohub_probe(struct platform_device *pdev)
 		pr_err("register PM notifier fail, err:%d\n", err);
 		goto exit_attr;
 	}
-//moto add
-	motparams = kzalloc(sizeof(struct mot_params), GFP_KERNEL);
-
-	pr_info("init done, data_unit_t:%d, SCP_SENSOR_HUB_DATA:%d\n",
-		(int)sizeof(struct data_unit_t),
-		(int)sizeof(union SCP_SENSOR_HUB_DATA));
-	return 0;
 
 exit_attr:
 	mtk_nanohub_delete_attr(pdev->dev.driver);

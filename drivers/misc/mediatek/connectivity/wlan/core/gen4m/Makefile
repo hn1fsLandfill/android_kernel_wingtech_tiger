@@ -1373,25 +1373,25 @@ else
 ccflags-y += -DCFG_TX_HIF_PORT_QUEUE=0
 endif
 
-ifeq ($(CONFIG_AOSP_LINK_LAYER_STATS_SUPPORT), y)
-ccflags-y += -DCFG_SUPPORT_LLS=1
-endif
+#ifeq ($(CONFIG_AOSP_LINK_LAYER_STATS_SUPPORT), y)
+#ccflags-y += -DCFG_SUPPORT_LLS=1
+#endif
 
 ifeq ($(CONFIG_SUPPORT_SEPARATE_TXS_PID_POOL), y)
 ccflags-y += -DCFG_SUPPORT_SEPARATE_TXS_PID_POOL=1
 endif
 
-ifeq ($(CONFIG_AOSP_MDDP_LINK_LAYER_STATS_SUPPORT), y)
-    ifneq ($(filter mt6983, $(CONFIG_WLAN_PLATFORM)),)
-        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=0
-    else ifeq ($(WLAN_CONNAC3_DEV), yes)
-        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=0
-    else
-        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=1
-    endif
-else
+#ifeq ($(CONFIG_AOSP_MDDP_LINK_LAYER_STATS_SUPPORT), y)
+#    ifneq ($(filter mt6983, $(CONFIG_WLAN_PLATFORM)),)
+#        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=0
+#    else ifeq ($(WLAN_CONNAC3_DEV), yes)
+#        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=0
+#    else
+#        ccflags-y += -DCFG_SUPPORT_LLS_MDDP=1
+#    endif
+#else
     ccflags-y += -DCFG_SUPPORT_LLS_MDDP=0
-endif
+#endif
 
 ifeq ($(CONFIG_SUPPORT_TX_HIF_CREDIT_FEATURE), y)
 ccflags-y += -DCFG_TX_HIF_CREDIT_FEATURE=1

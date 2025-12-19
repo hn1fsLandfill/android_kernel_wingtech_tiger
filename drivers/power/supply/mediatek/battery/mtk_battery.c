@@ -64,7 +64,6 @@
 #include <mt-plat/upmu_common.h>
 #include <pmic_lbat_service.h>
 
-#include <linux/power/moto_chg_tcmd.h>
 #include <linux/iio/consumer.h>
 
 
@@ -4585,94 +4584,6 @@ static const struct file_operations adc_cali_fops = {
 	.release = adc_cali_release,
 };
 
-/*===================moto chg tcmd interface========================*/
-extern int gauge_get_hwocv(void);
-
-static int battery_tcmd_read_bat_temp(void *input, int* val)
-{
-	*val = battery_get_bat_temperature() * 10;
-
-	return 0;
-}
-
-static int battery_tcmd_read_bat_id(void *input, int* val)
-{
-	int id_volt = 0;
-	int ret = -1;
-	int auxadc_voltage = 0;
-	struct iio_channel *channel;
-	struct device_node *batterty_node;
-	struct platform_device *battery_dev;
-
-	batterty_node = of_find_node_by_name(NULL, "battery");
-	if (!batterty_node) {
-		bm_err("[%s] of_find_node_by_name fail\n", __func__);
-		return ret;
-	}
-
-	battery_dev = of_find_device_by_node(batterty_node);
-	if (!battery_dev) {
-		bm_err("[%s] of_find_device_by_node fail\n", __func__);
-		return ret;
-	}
-
-	channel = iio_channel_get(&(battery_dev->dev), "batteryID-channel");
-	if (IS_ERR(channel)) {
-		ret = PTR_ERR(channel);
-		bm_err("[%s] iio channel not found %d\n",
-		__func__, ret);
-		return ret;
-	}
-
-	if (channel)
-		ret = iio_read_channel_processed(channel, &auxadc_voltage);
-
-
-	if (ret <= 0) {
-		bm_err("[%s] iio_read_channel_processed failed\n", __func__);
-		return ret;
-	}
-
-	bm_err("[%s]auxadc_voltage is %d\n", __func__, auxadc_voltage);
-	id_volt = auxadc_voltage * 1500 / 4096;
-	bm_err("[%s]battery_id_voltage is %d\n", __func__, id_volt);
-
-	*val = id_volt;
-	return 0;
-}
-
-static int battery_tcmd_read_bat_voltage(void *input, int* val)
-{
-	*val = battery_get_bat_voltage() * 1000;
-
-	return 0;
-}
-
-static int battery_tcmd_read_bat_ocv(void *input, int* val)
-{
-	*val = gauge_get_hwocv() / 10;//gauge_get_hwocv unit mV * 10
-
-	return 0;
-}
-
-static int battery_tcmd_register_tcmd(struct battery_data *data)
-{
-	int ret;
-
-	data->bat_tcmd_client.data = data;
-	data->bat_tcmd_client.client_id = MOTO_CHG_TCMD_CLIENT_BAT;
-
-	data->bat_tcmd_client.get_bat_temp = battery_tcmd_read_bat_temp;
-	data->bat_tcmd_client.get_bat_id = battery_tcmd_read_bat_id;
-	data->bat_tcmd_client.get_bat_voltage = battery_tcmd_read_bat_voltage;
-	data->bat_tcmd_client.get_bat_ocv = battery_tcmd_read_bat_ocv;
-
-	ret = moto_chg_tcmd_register(&data->bat_tcmd_client);
-
-	return ret;
-}
-/*===================moto chg tcmd interface end======================*/
-
 /*************************************/
 static struct wakeup_source *battery_lock;
 static int __init battery_probe(struct platform_device *dev)
@@ -4855,8 +4766,6 @@ static int __init battery_probe(struct platform_device *dev)
 		battery_recovery_init();
 
 	mtk_battery_last_init(dev);
-
-	battery_tcmd_register_tcmd(&battery_main);
 
 	gm.is_probe_done = true;
 #ifdef CONFIG_BATTERY_MM8013
