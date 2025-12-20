@@ -40,6 +40,9 @@ irqreturn_t key_int_handler(int irq, void *data)
 	else
 		return IRQ_HANDLED;
 
+	// FIXME: Undefined kpd imports
+	// Commented out for now but without these the power buttons won't work.
+
 	switch (hwirq) {
 	case INT_PWRKEY:
 		IRQLOG("Press pwrkey %d\n",
