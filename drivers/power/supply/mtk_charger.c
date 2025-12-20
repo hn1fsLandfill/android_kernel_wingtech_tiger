@@ -2052,7 +2052,6 @@ static int chg_reboot(struct notifier_block *nb,
 			info->is_suspend = true;
 			/* Disable Factory Kill */
 			info->disable_charger = true;
-			info->chg_tcmd_client.factory_kill_disable = true;
 			/* Disable Charging */
 			charger_dev_enable(info->chg1_dev, false);
 			/* Suspend USB */
@@ -2265,8 +2264,6 @@ void adaptive_charging_disable_ibat(bool on)
 }
 EXPORT_SYMBOL(adaptive_charging_disable_ibat);
 
-static int  mtk_charger_tcmd_set_usb_current(void *input, int  val);
-
 void mmi_init(struct mtk_charger *info)
 {
 	int rc;
@@ -2429,10 +2426,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
-
-        chr_err("lenovo mtk_charger_plug_out, atm_mode=%s\n", atm_mode);
-	if (!strcmp(atm_mode, "enable") && !info->chg_tcmd_client.factory_kill_disable)
-		orderly_poweroff(true);
 
 	return 0;
 }
@@ -3041,127 +3034,6 @@ int chg_alg_event(struct notifier_block *notifier,
 	return NOTIFY_DONE;
 }
 
-/*==================moto chg tcmd interface======================*/
-static int  mtk_charger_tcmd_set_chg_enable(void *input, int  val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret = 0;
-
-	val = !!val;
-	charger_dev_enable(cm->chg1_dev, val);
-
-	charging_enable_flag = val;
-	//val = val ? CHARGER_NOTIFY_START_CHARGING : CHARGER_NOTIFY_STOP_CHARGING;//TODO
-
-	_wake_up_charger(cm);
-	//ret = charger_manager_notifier(cm, val);//TODO
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_set_usb_enable(void *input, int  val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret;
-
-	val = !val;
-	ret = charger_dev_enable_hz(cm->chg1_dev, val);
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_set_chg_current(void *input, int  val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret;
-
-	cm->chg_data[0].moto_chg_tcmd_ibat = val * 1000;
-	//ret = _mtk_charger_change_current_setting(cm);
-        ret = charger_dev_set_charging_current(cm->chg1_dev, val);
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_get_chg_current(void *input, int* val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret = 0;
-
-	*val = cm->chg_data[0].moto_chg_tcmd_ibat / 1000;
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_set_usb_current(void *input, int  val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret;
-
-	cm->chg_data[0].moto_chg_tcmd_ichg = val * 1000;
-	//ret = _mtk_charger_change_current_setting(cm);
-	ret = charger_dev_set_input_current(cm->chg1_dev, val);
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_get_usb_current(void *input, int* val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret = 0;
-
-	*val = cm->chg_data[0].moto_chg_tcmd_ichg / 1000;
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_get_usb_voltage(void *input, int* val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-        int ret = 0;
-
-        *val = get_vbus(cm); /* mV */
-        *val *= 1000; /*convert to uV*/  
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_get_charger_type(void *input, int* val)
-{
-	struct mtk_charger *cm = (struct mtk_charger *)input;
-	int ret = 0;
-
-	//*val = cm->chr_type;
-        *val = get_charger_type(cm);
-
-	return ret;
-}
-
-static int  mtk_charger_tcmd_register(struct mtk_charger *cm)
-{
-	int ret;
-
-	cm->chg_tcmd_client.data = cm;
-	cm->chg_tcmd_client.client_id = MOTO_CHG_TCMD_CLIENT_CHG;
-
-	cm->chg_tcmd_client.set_chg_enable = mtk_charger_tcmd_set_chg_enable;
-	cm->chg_tcmd_client.set_usb_enable = mtk_charger_tcmd_set_usb_enable;
-
-	cm->chg_tcmd_client.get_chg_current = mtk_charger_tcmd_get_chg_current;
-	cm->chg_tcmd_client.set_chg_current = mtk_charger_tcmd_set_chg_current;
-	cm->chg_tcmd_client.get_usb_current = mtk_charger_tcmd_get_usb_current;
-	cm->chg_tcmd_client.set_usb_current = mtk_charger_tcmd_set_usb_current;
-
-	cm->chg_tcmd_client.get_usb_voltage = mtk_charger_tcmd_get_usb_voltage;
-
-	cm->chg_tcmd_client.get_charger_type = mtk_charger_tcmd_get_charger_type;
-
-	ret = moto_chg_tcmd_register(&cm->chg_tcmd_client);
-
-	return ret;
-}
-/*==================================================*/
-
-
 static int mtk_charger_probe(struct platform_device *pdev)
 {
 	struct mtk_charger *info = NULL;
@@ -3201,8 +3073,6 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		info->chg_data[i].thermal_charging_current_limit = -1;
 		info->chg_data[i].thermal_input_current_limit = -1;
 		info->chg_data[i].input_current_limit_by_aicl = -1;
-	        info->chg_data[i].moto_chg_tcmd_ibat = -1;
-	        info->chg_data[i].moto_chg_tcmd_ichg = -1;
 	}
 	info->enable_hv_charging = true;
 
@@ -3266,12 +3136,9 @@ static int mtk_charger_probe(struct platform_device *pdev)
 
 	info->chg_alg_nb.notifier_call = chg_alg_event;
 
-	mtk_charger_tcmd_register(info);
-
 	if (info->mmi.factory_mode) {
 		/* Disable charging when enter ATM mode(factory mode) */
 		charging_enable_flag = 0;
-		mtk_charger_tcmd_set_usb_current((void *)info, 2000);
 	}
 
 	kthread_run(charger_routine_thread, info, "charger_thread");
