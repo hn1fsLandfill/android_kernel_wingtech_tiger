@@ -2133,6 +2133,12 @@ static long mtk_vcu_unlocked_compat_ioctl(struct file *file, unsigned int cmd,
 		if (err != 0)
 			return err;
 		break;
+	// Unknown command?
+	// Maybe added or a bug in the userspace drivers.
+	// Regardless, just ignore it for now to silence the annoying kernel
+	// messages.
+	case 0x4404760b:
+		break;
 	default:
 		pr_err("[VCU] Invalid cmd_number 0x%x.\n", cmd);
 		break;
