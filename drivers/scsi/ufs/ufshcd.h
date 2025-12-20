@@ -81,14 +81,6 @@
 
 #define UFSHCD "ufshcd"
 #define UFSHCD_DRIVER_VERSION "0.2"
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-extern unsigned int ram_size;
-extern unsigned int storage_mfrid;
-#define IS_SAMSUNG_DEVICE(mfrid)   (0x1EC == (mfrid))
-#define IS_SKHYNIX_DEVICE(mfrid)   (0x1AD == (mfrid))
-#define IS_MICRON_DEVICE(mfrid)    (0x12C == (mfrid))
-#define IS_RAM_SIZE_GREATER_THAN_4G(ram_size) (ram_size > 4)
-#endif
 
 struct ufs_hba;
 
@@ -488,18 +480,6 @@ struct ufs_clk_gating {
 	struct workqueue_struct *clk_gating_workq;
 };
 
-#if defined(CONFIG_SCSI_SKHID)
-/* for manual gc */
-struct ufs_manual_gc {
-	int state;
-	bool hagc_support;
-	struct hrtimer hrtimer;
-	unsigned long delay_ms;
-	struct work_struct hibern8_work;
-	struct workqueue_struct *mgc_workq;
-};
-#endif
-
 struct ufs_saved_pwr_info {
 	struct ufs_pa_layer_attr info;
 	bool is_valid;
@@ -585,25 +565,6 @@ enum {
 	UFSHCD_STATE_EH_SCHEDULED,
 };
 
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-struct SEC_UFS_HPB_info {
-	atomic64_t hpb_pinned_rb_cnt;
-	atomic64_t hpb_active_rb_cnt;
-	u64 hpb_amount_R_kb;
-	u64 hpb_amount_R_kb_old;
-	unsigned int hpb_read_err_count;
-	unsigned int hpb_RB_ID_READ_err_count;
-	unsigned int hpb_RB_ID_SET_RT_err_count;
-	unsigned int hpb_WB_ID_PREFETCH_err_count;
-	unsigned int hpb_WB_ID_UNSET_RT_err_count;
-	unsigned int hpb_WB_ID_UNSET_RT_ALL_err_count;
-
-	struct timespec timestamp_old;
-	struct timespec timestamp_new;
-	bool hpb_info_disable;
-	bool hpb_err_count_disable;
-};
-#endif
 /**
  * struct ufs_hba - per adapter private structure
  * @mmio_base: UFSHCI base register address
@@ -833,9 +794,6 @@ struct ufs_hba {
 	/* Keeps information of the UFS device connected to this host */
 	struct ufs_dev_info dev_info;
 	bool auto_bkops_enabled;
-#if defined(CONFIG_SCSI_SKHID)
-	struct ufs_manual_gc manual_gc;
-#endif
 	struct ufs_vreg_info vreg_info;
 	struct list_head clk_list_head;
 
@@ -901,10 +859,6 @@ struct ufs_hba {
 	struct request_queue	*bsg_queue;
 
 	bool invalid_resp_upiu;
-	int HPBControlMode;
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-	struct SEC_UFS_HPB_info SEC_hpb_info;
-#endif
 
 #if defined(CONFIG_SCSI_UFS_FEATURE)
 	struct ufsf_feature ufsf;
@@ -1034,10 +988,6 @@ void ufshcd_print_all_evt_hist(struct ufs_hba *hba,
 				struct seq_file *m, char **buff, unsigned long *size);
 void ufshcd_update_evt_hist(struct ufs_hba *hba, u32 id, u32 val);
 
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-void SEC_ufs_hpb_rb_count(struct ufs_hba *hba, struct ufshpb_region *rgn);
-#endif
-
 static inline void check_upiu_size(void)
 {
 	BUILD_BUG_ON(ALIGNED_UPIU_SIZE <
@@ -1070,14 +1020,6 @@ static inline bool ufshcd_keep_autobkops_enabled_except_suspend(
 	return hba->caps & UFSHCD_CAP_KEEP_AUTO_BKOPS_ENABLED_EXCEPT_SUSPEND;
 }
 
-static inline u8 ufshcd_wb_get_query_index(struct ufs_hba *hba)
-{
-	if (hba->dev_info.b_wb_buffer_type == WB_BUF_MODE_LU_DEDICATED)
-		/*for MTK all UDA is on lun 2*/
-		return 2/*hba->card.wb_dedicated_lu*/;
-	return 0;
-}
-
 extern int ufshcd_runtime_suspend(struct ufs_hba *hba);
 extern int ufshcd_runtime_resume(struct ufs_hba *hba);
 extern int ufshcd_runtime_idle(struct ufs_hba *hba);
@@ -1093,12 +1035,6 @@ extern int ufshcd_config_pwr_mode(struct ufs_hba *hba,
 extern int ufshcd_clock_scaling_prepare(struct ufs_hba *hba);
 extern void ufshcd_clock_scaling_unprepare(struct ufs_hba *hba);
 extern void ufshcd_hba_stop(struct ufs_hba *hba, bool can_sleep);
-#if defined(CONFIG_SCSI_SKHID)
-extern int ufshcd_query_attr_retry(struct ufs_hba *hba,
-	enum query_opcode opcode, enum attr_idn idn, u8 index, u8 selector,
-	u32 *attr_val);
-extern int ufshcd_bkops_ctrl(struct ufs_hba *hba, enum bkops_status status);
-#endif
 
 /* UIC command interfaces for DME primitives */
 #define DME_LOCAL	0
@@ -1159,16 +1095,6 @@ static inline int ufshcd_disable_host_tx_lcc(struct ufs_hba *hba)
 	return ufshcd_dme_set(hba, UIC_ARG_MIB(PA_LOCAL_TX_LCC_ENABLE), 0);
 }
 
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_UFSHID)
-void ufshcd_scsi_unblock_requests(struct ufs_hba *hba);
-void ufshcd_scsi_block_requests(struct ufs_hba *hba);
-int ufshcd_wait_for_doorbell_clr(struct ufs_hba *hba,
-					u64 wait_timeout_us,
-					bool ignore_state,
-					int tr_allowed,
-					int tm_allowed);
-#endif
-
 /* Expose Query-Request API */
 int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
 				  enum query_opcode opcode,
@@ -1203,7 +1129,7 @@ int ufshcd_comp_scsi_upiu(struct ufs_hba *hba, struct ufshcd_lrb *lrbp);
 int ufshcd_map_sg(struct ufs_hba *hba, struct ufshcd_lrb *lrbp);
 #endif
 
-#if defined(CONFIG_SCSI_SKHPB) || defined(CONFIG_SCSI_SKHID)
+#if defined(CONFIG_SCSI_SKHPB)
 int ufshcd_query_flag_retry(struct ufs_hba *hba,
 							enum query_opcode opcode, enum flag_idn idn, bool *flag_res);
 #endif

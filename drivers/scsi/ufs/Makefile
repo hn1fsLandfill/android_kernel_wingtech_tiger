@@ -25,11 +25,6 @@ endif
 
 obj-$(CONFIG_SCSI_UFS_DWC_TC_PCI) += tc-dwc-g210-pci.o ufshcd-dwc.o tc-dwc-g210.o
 obj-$(CONFIG_SCSI_UFS_DWC_TC_PLATFORM) += tc-dwc-g210-pltfrm.o ufshcd-dwc.o tc-dwc-g210.o
-
-ifeq ($(CONFIG_TRUSTONIC_TEE_SUPPORT),y)
-include $(srctree)/drivers/misc/mediatek/gud/Makefile.include
-endif
-
 obj-$(CONFIG_SCSI_UFS_QCOM) += ufs-qcom.o
 obj-$(CONFIG_SCSI_UFSHCD) += ufshcd-core.o
 ufshcd-core-objs := ufshcd.o ufs-sysfs.o
@@ -37,7 +32,6 @@ ufshcd-core-$(CONFIG_SCSI_UFS_BSG)	+= ufs_bsg.o
 obj-$(CONFIG_SCSI_UFS_FEATURE) += ufsfeature.o
 obj-$(CONFIG_SCSI_UFS_HPB) += ufshpb.o
 obj-$(CONFIG_SCSI_UFS_TW) += ufstw.o
-obj-$(CONFIG_UFSHID) += ufshid.o
 obj-$(CONFIG_SCSI_SKHPB) += ufshpb_skh.o
 obj-$(CONFIG_SCSI_UFSHCD_PCI) += ufshcd-pci.o
 obj-$(CONFIG_SCSI_UFSHCD_PLATFORM) += ufshcd-pltfrm.o

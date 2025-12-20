@@ -58,7 +58,6 @@
 #include <linux/reboot.h>
 
 #include "mtk_charger.h"
-#include <linux/qpnp_adaptive_charge.h>
 
 struct tag_bootmode {
 	u32 size;
@@ -66,14 +65,6 @@ struct tag_bootmode {
 	u32 bootmode;
 	u32 boottype;
 };
-
-static char atm_mode[10];
-int __init atm_mode_init(char *s)
-{
-	strlcpy(atm_mode, s, 10);
-	return 1;
-}
-__setup("androidboot.atm=", atm_mode_init);
 
 int chr_get_debug_level(void)
 {
@@ -432,15 +423,6 @@ static void mtk_charger_parse_dt(struct mtk_charger *info,
 			CHARGING_HOST_CHARGER_CURRENT);
 		info->data.charging_host_charger_current =
 					CHARGING_HOST_CHARGER_CURRENT;
-	}
-
-	if (of_property_read_u32(np, "typec_limit_aicr", &val) >= 0) {
-		info->chg_data[CHG1_SETTING].typec_input_current_limit = val;
-		chr_debug("%s: typec_input_current_limit: %d\n", __func__,
-			info->chg_data[CHG1_SETTING].typec_input_current_limit);
-	} else {
-		chr_err("Dont limit type C aicr\n");
-		info->chg_data[CHG1_SETTING].typec_input_current_limit = -1;
 	}
 
 	/* dynamic mivr */
@@ -1264,7 +1246,6 @@ static void mtk_chg_get_tchg(struct mtk_charger *info)
 	}
 }
 
-int charging_enable_flag = 1;
 static void charger_check_status(struct mtk_charger *info)
 {
 	bool charging = true;
@@ -1277,7 +1258,6 @@ static void charger_check_status(struct mtk_charger *info)
 	temperature = info->battery_temp;
 	thermal = &info->thermal;
 
-#ifdef MTK_BASE
 	if (info->enable_sw_jeita == true) {
 		do_sw_jeita_state_machine(info);
 		if (info->sw_jeita.charging == false) {
@@ -1328,15 +1308,10 @@ static void charger_check_status(struct mtk_charger *info)
 			}
 		}
 	}
-#endif
 
 	mtk_chg_get_tchg(info);
 
 	if (!mtk_chg_check_vbus(info)) {
-		charging = false;
-		goto stop_charging;
-	}
-	if (!charging_enable_flag) {
 		charging = false;
 		goto stop_charging;
 	}
@@ -1346,9 +1321,6 @@ static void charger_check_status(struct mtk_charger *info)
 	if (info->safety_timeout)
 		charging = false;
 	if (info->vbusov_stat)
-		charging = false;
-
-	if (info->mmi.pres_chrg_step == STEP_STOP)
 		charging = false;
 
 stop_charging:
@@ -1364,955 +1336,6 @@ stop_charging:
 		_mtk_enable_charging(info, charging);
 
 	info->can_charging = charging;
-}
-
-/*********************
- * MMI Functionality *
- *********************/
-
-static struct mtk_charger *mmi_info;
-
-static char *stepchg_str[] = {
-	[STEP_MAX]		= "MAX",
-	[STEP_NORM]		= "NORMAL",
-	[STEP_FULL]		= "FULL",
-	[STEP_FLOAT]		= "FLOAT",
-	[STEP_DEMO]		= "DEMO",
-	[STEP_STOP]		= "STOP",
-	[STEP_NONE]		= "NONE",
-};
-
-int mmi_get_prop_from_battery(struct mtk_charger *info,
-				enum power_supply_property psp,
-				union power_supply_propval *val)
-{
-	int rc;
-
-	if (!info->battery_psy) {
-		info->battery_psy = power_supply_get_by_name("battery");
-
-		if (!info->battery_psy) {
-			pr_err("[%s]Error getting battery power sypply\n", __func__);
-			return -EINVAL;
-		}
-	}
-
-	rc = power_supply_get_property(info->battery_psy, psp, val);
-
-	return rc;
-}
-
-int mmi_get_prop_from_charger(struct mtk_charger *info,
-				enum power_supply_property psp,
-				union power_supply_propval *val)
-{
-	int rc;
-
-	if (!info->charger_psy) {
-		info->charger_psy = power_supply_get_by_name("mtk-master-charger");
-
-		if (!info->charger_psy) {
-			pr_err("[%s]Error getting charger power sypply\n", __func__);
-			return -EINVAL;
-		}
-	}
-
-	rc = power_supply_get_property(info->charger_psy, psp, val);
-
-	return rc;
-}
-
-void update_charging_limit_modes(struct mtk_charger *info, int batt_soc)
-{
-	enum charging_limit_modes charging_limit_modes;
-
-	charging_limit_modes = info->mmi.charging_limit_modes;
-	if ((charging_limit_modes != CHARGING_LIMIT_RUN)
-	    && (batt_soc >= info->mmi.upper_limit_capacity))
-		charging_limit_modes = CHARGING_LIMIT_RUN;
-	else if ((charging_limit_modes != CHARGING_LIMIT_OFF)
-		   && (batt_soc <= info->mmi.lower_limit_capacity))
-		charging_limit_modes = CHARGING_LIMIT_OFF;
-
-	if (charging_limit_modes != info->mmi.charging_limit_modes)
-		info->mmi.charging_limit_modes = charging_limit_modes;
-}
-
-#define WEAK_CHRG_THRSH 450
-#define TURBO_CHRG_THRSH 2500
-int mmi_chrg_rate_check(void)
-{
-	int chg_rate, icl, icl_c, rc;
-	union power_supply_propval val;
-	char *charge_rate[] = {
-		"None", "Normal", "Weak", "Turbo"
-	};
-	static struct mtk_charger *pinfo;
-	struct power_supply *psy;
-
-	if (pinfo == NULL) {
-		psy = power_supply_get_by_name("mtk-master-charger");
-		if (psy == NULL) {
-			chr_err("[%s]psy is not rdy\n", __func__);
-			chg_rate = POWER_SUPPLY_CHARGE_RATE_NONE;
-		        goto end_rate_check;
-		}
-
-		pinfo = (struct mtk_charger *)power_supply_get_drvdata(psy);
-		if (pinfo == NULL) {
-			chr_err("[%s]mtk_gauge is not rdy\n", __func__);
-			chg_rate = POWER_SUPPLY_CHARGE_RATE_NONE;
-		        goto end_rate_check;
-		}
-	}
-
-
-	if (pinfo == NULL) {
-		chg_rate = POWER_SUPPLY_CHARGE_RATE_NONE;
-		goto end_rate_check;
-	}
-
-	icl = pinfo->chg_data[CHG1_SETTING].input_current_limit / 1000;
-	icl_c = pinfo->chg_data[CHG1_SETTING].typec_input_current_limit;
-
-	rc = mmi_get_prop_from_charger(pinfo,
-				POWER_SUPPLY_PROP_ONLINE, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error get chg online rc = %d\n", __func__, rc);
-		chg_rate = POWER_SUPPLY_CHARGE_RATE_NONE;
-		goto end_rate_check;
-	} else if (!val.intval) {
-		chg_rate = POWER_SUPPLY_CHARGE_RATE_NONE;
-		goto end_rate_check;
-	}
-
-	if (extern_is_typec_adapter(pinfo)
-		&& adapter_dev_get_property(pinfo->pd_adapter, TYPEC_RP_LEVEL)
-			== 3000) {
-			if (icl_c == -1 || icl_c > TURBO_CHRG_THRSH * 1000) {
-				chg_rate = POWER_SUPPLY_CHARGE_RATE_TURBO;
-				goto end_rate_check;
-			}
-	}
-
-	if (icl >= TURBO_CHRG_THRSH) {
-		chg_rate = POWER_SUPPLY_CHARGE_RATE_TURBO;
-		goto end_rate_check;
-	} else if (icl < WEAK_CHRG_THRSH) {
-		chg_rate = POWER_SUPPLY_CHARGE_RATE_WEAK;
-		goto end_rate_check;
-	}
-
-	chg_rate =  POWER_SUPPLY_CHARGE_RATE_NORMAL;
-
-end_rate_check:
-	pr_info("%s Charger Detected\n", charge_rate[chg_rate]);
-	return chg_rate;
-}
-
-
-int mmi_batt_health_check(void)
-{
-        static struct mtk_charger *pinfo;
-	struct power_supply *psy;
-
-	if (pinfo == NULL) {
-		psy = power_supply_get_by_name("mtk-master-charger");
-		if (psy == NULL) {
-			chr_err("[%s]psy is not rdy\n", __func__);
-		        return POWER_SUPPLY_HEALTH_GOOD;
-		}
-		pinfo = (struct mtk_charger *)power_supply_get_drvdata(psy);
-	}
-
-	if (pinfo == NULL) {
-		pr_err("[%s]called before charger_manager valid!\n", __func__);
-		return POWER_SUPPLY_HEALTH_GOOD;
-	}
-	return pinfo->mmi.batt_health;
-}
-
-#define MIN_TEMP_C -20
-#define MAX_TEMP_C 60
-#define MIN_MAX_TEMP_C 47
-#define HYSTERISIS_DEGC 2
-static bool mmi_find_temp_zone(struct mtk_charger *info, int temp_c)
-{
-	int prev_zone, num_zones;
-	struct mmi_temp_zone *zones;
-	int hotter_t, hotter_fcc;
-	int colder_t, colder_fcc;
-	int i;
-	int max_temp;
-
-	if (!info) {
-		pr_err("[%s]called before charger_manager valid!\n", __func__);
-		return false;
-	}
-
-	zones = info->mmi.temp_zones;
-	num_zones = info->mmi.num_temp_zones;
-	prev_zone = info->mmi.pres_temp_zone;
-
-	if (info->mmi.max_chrg_temp >= MIN_MAX_TEMP_C)
-		max_temp = info->mmi.max_chrg_temp;
-	else
-		max_temp = zones[num_zones - 1].temp_c;
-
-	if (prev_zone == ZONE_NONE) {
-		for (i = num_zones - 1; i >= 0; i--) {
-			if (temp_c >= zones[i].temp_c) {
-				if (i == num_zones - 1)
-					info->mmi.pres_temp_zone = ZONE_HOT;
-				else
-					info->mmi.pres_temp_zone = i + 1;
-				return true;
-			}
-		}
-		info->mmi.pres_temp_zone = ZONE_COLD;
-		return true;
-	}
-
-	if (prev_zone == ZONE_COLD) {
-		if (temp_c >= MIN_TEMP_C + HYSTERISIS_DEGC)
-			info->mmi.pres_temp_zone = ZONE_FIRST;
-	} else if (prev_zone == ZONE_HOT) {
-		if (temp_c <= max_temp - HYSTERISIS_DEGC)
-			info->mmi.pres_temp_zone = num_zones - 1;
-	} else {
-		if (prev_zone == ZONE_FIRST) {
-			hotter_fcc = zones[prev_zone + 1].fcc_max_ma;
-			colder_fcc = 0;
-			hotter_t = zones[prev_zone].temp_c;
-			colder_t = MIN_TEMP_C;
-		} else if (prev_zone == num_zones - 1) {
-			hotter_fcc = 0;
-			colder_fcc = zones[prev_zone - 1].fcc_max_ma;
-			hotter_t = zones[prev_zone].temp_c;
-			colder_t = zones[prev_zone - 1].temp_c;
-		} else {
-			hotter_fcc = zones[prev_zone + 1].fcc_max_ma;
-			colder_fcc = zones[prev_zone - 1].fcc_max_ma;
-			hotter_t = zones[prev_zone].temp_c;
-			colder_t = zones[prev_zone - 1].temp_c;
-		}
-
-		if (zones[prev_zone].fcc_max_ma < hotter_fcc)
-			hotter_t += HYSTERISIS_DEGC;
-
-		if (zones[prev_zone].fcc_max_ma < colder_fcc)
-			colder_t -= HYSTERISIS_DEGC;
-
-		if (temp_c < MIN_TEMP_C)
-			info->mmi.pres_temp_zone = ZONE_COLD;
-		else if (temp_c >= max_temp)
-			info->mmi.pres_temp_zone = ZONE_HOT;
-		else if (temp_c >= hotter_t)
-			info->mmi.pres_temp_zone++;
-		else if (temp_c < colder_t)
-			info->mmi.pres_temp_zone--;
-	}
-
-	if (prev_zone != info->mmi.pres_temp_zone) {
-		pr_info("[%s]Entered Temp Zone %d!\n", __func__,
-			   info->mmi.pres_temp_zone);
-		return true;
-	}
-
-	return false;
-}
-
-#define TAPER_COUNT 2
-#define TAPER_DROP_MA 100
-static bool mmi_has_current_tapered(struct mtk_charger *info,
-				    int batt_ma, int taper_ma)
-{
-	bool change_state = false;
-	int allowed_fcc, target_ma, rc;
-
-	if (!info) {
-		pr_err("[%s]called before info valid!\n", __func__);
-		return false;
-	}
-
-	rc = charger_dev_get_charging_current(info->chg1_dev, &allowed_fcc);
-	if (rc < 0) {
-		pr_err("[%s]can't get charging current!\n", __func__);
-	} else
-		allowed_fcc = allowed_fcc /1000;
-
-	if (allowed_fcc >= taper_ma)
-		target_ma = taper_ma;
-	else
-		target_ma = allowed_fcc - TAPER_DROP_MA;
-
-	if (batt_ma > 0) {
-		if (batt_ma <= target_ma)
-			if (info->mmi.chrg_taper_cnt >= TAPER_COUNT) {
-				change_state = true;
-				info->mmi.chrg_taper_cnt = 0;
-			} else
-				info->mmi.chrg_taper_cnt++;
-		else
-			info->mmi.chrg_taper_cnt = 0;
-	} else {
-		if (info->mmi.chrg_taper_cnt >= TAPER_COUNT) {
-			change_state = true;
-			info->mmi.chrg_taper_cnt = 0;
-		} else
-			info->mmi.chrg_taper_cnt++;
-	}
-
-	return change_state;
-}
-
-#define WARM_TEMP 45
-#define COOL_TEMP 0
-#define HYST_STEP_MV 50
-#define DEMO_MODE_HYS_SOC 5
-#define DEMO_MODE_VOLTAGE 4000
-static void mmi_charger_check_status(struct mtk_charger *info)
-{
-	int rc;
-	int batt_mv;
-	int batt_ma;
-	int batt_soc;
-	int batt_temp;
-	int usb_mv;
-	int charger_present = 0;
-	int stop_recharge_hyst;
-	int prev_step;
-
-	union power_supply_propval val;
-	struct mmi_params *mmi = &info->mmi;
-	struct mmi_temp_zone *zone;
-	int max_fv_mv = -EINVAL;
-	int target_fcc = -EINVAL;
-	int target_fv = -EINVAL;
-
-	/* Collect Current Information */
-
-	rc = mmi_get_prop_from_battery(info,
-				POWER_SUPPLY_PROP_VOLTAGE_NOW, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Voltage rc = %d\n", __func__, rc);
-		goto end_check;
-	} else
-		batt_mv = val.intval / 1000;
-
-	rc = mmi_get_prop_from_battery(info,
-				POWER_SUPPLY_PROP_CURRENT_NOW, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Current rc = %d\n", __func__, rc);
-		goto end_check;
-	} else
-		batt_ma = val.intval / 1000;
-
-	rc = mmi_get_prop_from_battery(info,
-				POWER_SUPPLY_PROP_CAPACITY, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Capacity rc = %d\n", __func__, rc);
-		goto end_check;
-	} else
-		batt_soc = val.intval;
-
-	rc = mmi_get_prop_from_battery(info,
-				POWER_SUPPLY_PROP_TEMP, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error getting Batt Temperature rc = %d\n", __func__, rc);
-		goto end_check;
-	} else
-		batt_temp = val.intval / 10;
-
-	rc = mmi_get_prop_from_charger(info,
-				POWER_SUPPLY_PROP_ONLINE, &val);
-	if (rc < 0) {
-		pr_err("[%s]Error getting charger online rc = %d\n", __func__, rc);
-		goto end_check;
-	} else
-		charger_present = val.intval;
-
-	usb_mv = get_vbus(info);
-
-	pr_info("[%s]batt=%d mV, %d mA, %d C, USB= %d mV\n", __func__,
-		batt_mv, batt_ma, batt_temp, usb_mv);
-
-	if (!mmi->temp_zones) {
-		pr_err("[%s]temp_zones is NULL\n", __func__);
-		pr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
-		"USBICL = %d, DEMO_DISCHARG = %d\n", __func__,
-		mmi->target_fv,
-		mmi->chg_disable,
-		mmi->target_fcc,
-		mmi->target_usb,
-		mmi->demo_discharging);
-
-		goto end_check;
-	}
-
-	if (mmi->enable_charging_limit && mmi->is_factory_image)
-		update_charging_limit_modes(info, batt_soc);
-
-	mmi_find_temp_zone(info, batt_temp);
-	if (mmi->pres_temp_zone >= info->mmi.num_temp_zones)
-		zone = &mmi->temp_zones[0];
-	else
-	        zone = &mmi->temp_zones[mmi->pres_temp_zone];
-
-	if (mmi->base_fv_mv == 0) {
-		mmi->base_fv_mv = info->data.battery_cv / 1000;
-	}
-	max_fv_mv = mmi->base_fv_mv;
-
-	/* Determine Next State */
-	prev_step = info->mmi.pres_chrg_step;
-
-	if (mmi->charging_limit_modes == CHARGING_LIMIT_RUN)
-		pr_warn("Factory Mode/Image so Limiting Charging!!!\n");
-
-	if (!charger_present) {
-		mmi->pres_chrg_step = STEP_NONE;
-	} else if ((mmi->pres_temp_zone == ZONE_HOT) ||
-		   (mmi->pres_temp_zone == ZONE_COLD) ||
-		   (mmi->charging_limit_modes == CHARGING_LIMIT_RUN)) {
-		info->mmi.pres_chrg_step = STEP_STOP;
-	} else if (mmi->demo_mode) {
-		bool voltage_full;
-		static int demo_full_soc = 100;
-                static int usb_suspend = 0;
-
-		mmi->pres_chrg_step = STEP_DEMO;
-		pr_info("[%s]Battery in Demo Mode charging Limited %dper\n",
-				__func__, mmi->demo_mode);
-
-		voltage_full = ((usb_suspend == 0) &&
-			((batt_mv + HYST_STEP_MV) >= DEMO_MODE_VOLTAGE) &&
-			mmi_has_current_tapered(info, batt_ma,
-						mmi->chrg_iterm));
-
-		if ((usb_suspend == 0) &&
-		    ((batt_soc >= mmi->demo_mode) ||
-		     voltage_full)) {
-			demo_full_soc = batt_soc;
-			mmi->demo_discharging = true;
-			usb_suspend = 1;
-		} else if (usb_suspend &&
-			   (batt_soc <=
-				(demo_full_soc - DEMO_MODE_HYS_SOC))) {
-			mmi->demo_discharging = false;
-			usb_suspend = 0;
-			mmi->chrg_taper_cnt = 0;
-		}
-		if (usb_suspend)
-			charger_dev_set_input_current(info->chg1_dev, 0);
-
-		pr_info("Charge Demo Mode:us = %d, vf = %d, dfs = %d,bs = %d\n",
-				usb_suspend, voltage_full, demo_full_soc, batt_soc);
-	} else if (mmi->pres_chrg_step == STEP_NONE) {
-		if (zone->norm_mv && ((batt_mv + HYST_STEP_MV) >= zone->norm_mv)) {
-			if (zone->fcc_norm_ma)
-				mmi->pres_chrg_step = STEP_NORM;
-			else
-				mmi->pres_chrg_step = STEP_STOP;
-		} else
-			mmi->pres_chrg_step = STEP_MAX;
-	} else if (mmi->pres_chrg_step == STEP_STOP) {
-		if (batt_temp > COOL_TEMP)
-			stop_recharge_hyst = 2 * HYST_STEP_MV;
-		else
-			stop_recharge_hyst = 5 * HYST_STEP_MV;
-		if (zone->norm_mv && ((batt_mv + stop_recharge_hyst) >= zone->norm_mv)) {
-			if (zone->fcc_norm_ma)
-				mmi->pres_chrg_step = STEP_NORM;
-			else
-				mmi->pres_chrg_step = STEP_STOP;
-		} else
-			mmi->pres_chrg_step = STEP_MAX;
-	} else if (mmi->pres_chrg_step == STEP_MAX) {
-		if (!zone->norm_mv) {
-			/* No Step in this Zone */
-			mmi->chrg_taper_cnt = 0;
-			if ((batt_mv + HYST_STEP_MV) >= max_fv_mv)
-				mmi->pres_chrg_step = STEP_NORM;
-			else
-				mmi->pres_chrg_step = STEP_MAX;
-		} else if ((batt_mv + HYST_STEP_MV) < zone->norm_mv) {
-			mmi->chrg_taper_cnt = 0;
-			mmi->pres_chrg_step = STEP_MAX;
-		} else if (!zone->fcc_norm_ma)
-			mmi->pres_chrg_step = STEP_FLOAT;
-		else if (mmi_has_current_tapered(info, batt_ma,
-						 zone->fcc_norm_ma)) {
-			mmi->chrg_taper_cnt = 0;
-			mmi->pres_chrg_step = STEP_NORM;
-		}
-	} else if (mmi->pres_chrg_step == STEP_NORM) {
-		if (!zone->fcc_norm_ma)
-			mmi->pres_chrg_step = STEP_FLOAT;
-		else if ((batt_mv + HYST_STEP_MV/2) < max_fv_mv) {
-			mmi->chrg_taper_cnt = 0;
-			mmi->pres_chrg_step = STEP_NORM;
-		} else if (mmi_has_current_tapered(info, batt_ma,
-						   mmi->chrg_iterm)) {
-			mmi->pres_chrg_step = STEP_FULL;
-		}
-	} else if (mmi->pres_chrg_step == STEP_FULL) {
-		if (batt_mv < (max_fv_mv - HYST_STEP_MV * 2)) {
-			mmi->chrg_taper_cnt = 0;
-			mmi->pres_chrg_step = STEP_NORM;
-		}
-	} else if (mmi->pres_chrg_step == STEP_FLOAT) {
-		if ((zone->fcc_norm_ma) ||
-		    ((batt_mv + HYST_STEP_MV) < zone->norm_mv))
-			mmi->pres_chrg_step = STEP_MAX;
-		else if (mmi_has_current_tapered(info, batt_ma,
-				   mmi->chrg_iterm))
-			mmi->pres_chrg_step = STEP_STOP;
-
-	}
-
-	/* Take State actions */
-	switch (mmi->pres_chrg_step) {
-	case STEP_FLOAT:
-	case STEP_MAX:
-		if (!zone->norm_mv)
-			target_fv = max_fv_mv + mmi->vfloat_comp_mv;
-		else
-			target_fv = zone->norm_mv + mmi->vfloat_comp_mv;
-		target_fcc = zone->fcc_max_ma;
-		break;
-	case STEP_FULL:
-		target_fv = max_fv_mv;
-		target_fcc = -EINVAL;
-		break;
-	case STEP_NORM:
-		target_fv = max_fv_mv + mmi->vfloat_comp_mv;
-		target_fcc = zone->fcc_norm_ma;
-		break;
-	case STEP_NONE:
-		target_fv = max_fv_mv;
-		target_fcc = zone->fcc_norm_ma;
-		break;
-	case STEP_STOP:
-		target_fv = max_fv_mv;
-		target_fcc = -EINVAL;
-		break;
-	case STEP_DEMO:
-		target_fv = DEMO_MODE_VOLTAGE;
-		target_fcc = zone->fcc_max_ma;
-		break;
-	default:
-		break;
-	}
-
-	mmi->target_fv = target_fv * 1000;
-
-	mmi->chg_disable = (target_fcc < 0);
-
-	mmi->target_fcc = ((target_fcc >= 0) ? (target_fcc * 1000) : 0);
-
-	if (info->mmi.pres_temp_zone == ZONE_HOT) {
-		info->mmi.batt_health = POWER_SUPPLY_HEALTH_OVERHEAT;
-	} else if (info->mmi.pres_temp_zone == ZONE_COLD) {
-		info->mmi.batt_health = POWER_SUPPLY_HEALTH_COLD;
-	} else if (batt_temp >= WARM_TEMP) {
-		if (info->mmi.pres_chrg_step == STEP_STOP)
-			info->mmi.batt_health = POWER_SUPPLY_HEALTH_OVERHEAT;
-		else
-			info->mmi.batt_health = POWER_SUPPLY_HEALTH_GOOD;
-	} else if (batt_temp <= COOL_TEMP) {
-		if (info->mmi.pres_chrg_step == STEP_STOP)
-			info->mmi.batt_health = POWER_SUPPLY_HEALTH_COLD;
-		else
-			info->mmi.batt_health = POWER_SUPPLY_HEALTH_GOOD;
-	} else
-		info->mmi.batt_health = POWER_SUPPLY_HEALTH_GOOD;
-
-	pr_info("[%s]FV %d mV, FCC %d mA\n",
-		 __func__, target_fv, target_fcc);
-	pr_info("[%s]Step State = %s\n", __func__,
-		stepchg_str[(int)mmi->pres_chrg_step]);
-	pr_info("[%s]EFFECTIVE: FV = %d, CDIS = %d, FCC = %d, "
-		"USBICL = %d, DEMO_DISCHARG = %d\n",
-		__func__,
-		mmi->target_fv,
-		mmi->chg_disable,
-		mmi->target_fcc,
-		mmi->target_usb,
-		mmi->demo_discharging);
-	pr_info("[%s]adaptive charging:disable_ibat = %d, "
-		"disable_ichg = %d\n",
-		__func__,
-		mmi->adaptive_charging_disable_ibat,
-		mmi->adaptive_charging_disable_ichg);
-end_check:
-
-	return;
-}
-
-static int parse_mmi_dt(struct mtk_charger *info, struct device *dev)
-{
-	struct device_node *node = dev->of_node;
-	int rc = 0;
-	int byte_len;
-	int i;
-
-	if (!node) {
-		pr_info("[%s]mmi dtree info. missing\n",__func__);
-		return -ENODEV;
-	}
-
-	if (of_find_property(node, "mmi,mmi-temp-zones", &byte_len)) {
-		if ((byte_len / sizeof(u32)) % 4) {
-			pr_err("[%s]DT error wrong mmi temp zones\n",__func__);
-			return -ENODEV;
-		}
-
-		info->mmi.temp_zones = (struct mmi_temp_zone *)
-			devm_kzalloc(dev, byte_len, GFP_KERNEL);
-
-		if (info->mmi.temp_zones == NULL)
-			return -ENOMEM;
-
-		info->mmi.num_temp_zones =
-			byte_len / sizeof(struct mmi_temp_zone);
-
-		rc = of_property_read_u32_array(node,
-				"mmi,mmi-temp-zones",
-				(u32 *)info->mmi.temp_zones,
-				byte_len / sizeof(u32));
-		if (rc < 0) {
-			pr_err("[%s]Couldn't read mmi temp zones rc = %d\n", __func__, rc);
-			return rc;
-		}
-		pr_info("[%s]"
-			"mmi temp zones: Num: %d\n", __func__, info->mmi.num_temp_zones);
-		for (i = 0; i < info->mmi.num_temp_zones; i++) {
-			pr_info("[%s]"
-				"mmi temp zones: Zone %d, Temp %d C, "
-				"Step Volt %d mV, Full Rate %d mA, "
-				"Taper Rate %d mA\n", __func__, i,
-				info->mmi.temp_zones[i].temp_c,
-				info->mmi.temp_zones[i].norm_mv,
-				info->mmi.temp_zones[i].fcc_max_ma,
-				info->mmi.temp_zones[i].fcc_norm_ma);
-		}
-		info->mmi.pres_temp_zone = ZONE_NONE;
-	} else {
-		info->mmi.temp_zones = NULL;
-		info->mmi.num_temp_zones = 0;
-		pr_err("[%s]mmi temp zones is not set\n", __func__);
-	}
-
-	rc = of_property_read_u32(node, "mmi,iterm-ma",
-				  &info->mmi.chrg_iterm);
-	if (rc)
-		info->mmi.chrg_iterm = 150;
-
-	info->mmi.enable_charging_limit =
-		of_property_read_bool(node, "mmi,enable-charging-limit");
-
-	rc = of_property_read_u32(node, "mmi,upper-limit-capacity",
-				  &info->mmi.upper_limit_capacity);
-	if (rc)
-		info->mmi.upper_limit_capacity = 100;
-
-	rc = of_property_read_u32(node, "mmi,lower-limit-capacity",
-				  &info->mmi.lower_limit_capacity);
-	if (rc)
-		info->mmi.lower_limit_capacity = 0;
-
-	rc = of_property_read_u32(node, "mmi,vfloat-comp-uv",
-				  &info->mmi.vfloat_comp_mv);
-	if (rc)
-		info->mmi.vfloat_comp_mv = 0;
-	info->mmi.vfloat_comp_mv /= 1000;
-
-	return rc;
-}
-
-static int chg_reboot(struct notifier_block *nb,
-			 unsigned long event, void *unused)
-{
-	struct mtk_charger *info = container_of(nb, struct mtk_charger,
-						mmi.chg_reboot);
-	union power_supply_propval val;
-	int rc;
-
-	pr_info("chg Reboot\n");
-	if (!info) {
-		pr_info("called before chip valid!\n");
-		return NOTIFY_DONE;
-	}
-
-	if (info->mmi.factory_mode) {
-		switch (event) {
-		case SYS_POWER_OFF:
-			aee_kernel_RT_Monitor_api_factory();
-			info->is_suspend = true;
-			/* Disable Factory Kill */
-			info->disable_charger = true;
-			/* Disable Charging */
-			charger_dev_enable(info->chg1_dev, false);
-			/* Suspend USB */
-			charger_dev_enable_hz(info->chg1_dev, true);
-
-			rc = mmi_get_prop_from_charger(info,
-				POWER_SUPPLY_PROP_ONLINE, &val);
-			while (rc >= 0 && val.intval) {
-				msleep(100);
-				rc = mmi_get_prop_from_charger(info,
-					POWER_SUPPLY_PROP_ONLINE, &val);
-				pr_info("Wait for VBUS to decay\n");
-			}
-
-			pr_info("VBUS UV wait 1 sec!\n");
-			/* Delay 1 sec to allow more VBUS decay */
-			msleep(1000);
-			break;
-		default:
-			break;
-		}
-	}
-
-	return NOTIFY_DONE;
-}
-
-
-#define CHG_SHOW_MAX_SIZE 50
-static ssize_t factory_image_mode_store(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	unsigned long r;
-	unsigned long mode;
-
-	r = kstrtoul(buf, 0, &mode);
-	if (r) {
-		pr_err("[%s]Invalid factory image mode value = %lu\n", __func__, mode);
-		return -EINVAL;
-	}
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	mmi_info->mmi.is_factory_image = (mode) ? true : false;
-
-	return r ? r : count;
-}
-
-static ssize_t factory_image_mode_show(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
-{
-	int state;
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	state = (mmi_info->mmi.is_factory_image) ? 1 : 0;
-
-	return scnprintf(buf, CHG_SHOW_MAX_SIZE, "%d\n", state);
-}
-
-static DEVICE_ATTR(factory_image_mode, 0644,
-		factory_image_mode_show,
-		factory_image_mode_store);
-
-static ssize_t factory_charge_upper_show(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
-{
-	int state;
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	state = mmi_info->mmi.upper_limit_capacity;
-
-	return scnprintf(buf, CHG_SHOW_MAX_SIZE, "%d\n", state);
-}
-
-static DEVICE_ATTR(factory_charge_upper, 0444,
-		factory_charge_upper_show,
-		NULL);
-
-static ssize_t force_demo_mode_store(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	unsigned long r;
-	unsigned long mode;
-
-	r = kstrtoul(buf, 0, &mode);
-	if (r) {
-		pr_err("[%s]Invalid demo  mode value = %lu\n", __func__, mode);
-		return -EINVAL;
-	}
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-	mmi_info->mmi.chrg_taper_cnt = 0;
-
-	if ((mode >= 35) && (mode <= 80))
-		mmi_info->mmi.demo_mode = mode;
-	else
-		mmi_info->mmi.demo_mode = 35;
-
-	return r ? r : count;
-}
-
-static ssize_t force_demo_mode_show(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
-{
-	int state;
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	state = mmi_info->mmi.demo_mode;
-
-	return scnprintf(buf, CHG_SHOW_MAX_SIZE, "%d\n", state);
-}
-
-static DEVICE_ATTR(force_demo_mode, 0644,
-		force_demo_mode_show,
-		force_demo_mode_store);
-
-static ssize_t force_max_chrg_temp_store(struct device *dev,
-				struct device_attribute *attr,
-				const char *buf, size_t count)
-{
-	unsigned long r;
-	unsigned long mode;
-
-	r = kstrtoul(buf, 0, &mode);
-	if (r) {
-		pr_err("[%s]Invalid max temp value = %lu\n", __func__, mode);
-		return -EINVAL;
-	}
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	if ((mode >= MIN_MAX_TEMP_C) && (mode <= MAX_TEMP_C))
-		mmi_info->mmi.max_chrg_temp = mode;
-	else
-		mmi_info->mmi.max_chrg_temp = MAX_TEMP_C;
-
-	return r ? r : count;
-}
-
-static ssize_t force_max_chrg_temp_show(struct device *dev,
-				    struct device_attribute *attr,
-				    char *buf)
-{
-	int state;
-
-	if (!mmi_info) {
-		pr_err("[%s]mmi_info not valid\n", __func__);
-		return -ENODEV;
-	}
-
-	state = mmi_info->mmi.max_chrg_temp;
-
-	return scnprintf(buf, CHG_SHOW_MAX_SIZE, "%d\n", state);
-}
-
-static DEVICE_ATTR(force_max_chrg_temp, 0644,
-		force_max_chrg_temp_show,
-		force_max_chrg_temp_store);
-
-void adaptive_charging_disable_ichg(bool on)
-{
-	struct mtk_charger *info = mmi_info;
-
-	if (info == NULL)
-		return;
-
-	info->mmi.adaptive_charging_disable_ichg = !!on;
-	pr_info("%s: adaptive charging disable ichg %d\n", __func__,
-		info->mmi.adaptive_charging_disable_ichg);
-	_wake_up_charger(info);
-}
-EXPORT_SYMBOL(adaptive_charging_disable_ichg);
-
-void adaptive_charging_disable_ibat(bool on)
-{
-	struct mtk_charger *info = mmi_info;
-
-	if (info == NULL)
-		return;
-
-	info->mmi.adaptive_charging_disable_ibat = !!on;
-	pr_info("%s: adaptive charging disable ibat %d\n", __func__,
-		info->mmi.adaptive_charging_disable_ibat);
-	_wake_up_charger(info);
-}
-EXPORT_SYMBOL(adaptive_charging_disable_ibat);
-
-void mmi_init(struct mtk_charger *info)
-{
-	int rc;
-
-	if (!info)
-		return;
-
-	info->mmi.factory_mode = !strcmp(atm_mode, "enable");
-
-	info->mmi.is_factory_image = false;
-	info->mmi.charging_limit_modes = CHARGING_LIMIT_UNKNOWN;
-	info->mmi.adaptive_charging_disable_ibat = false;
-	info->mmi.adaptive_charging_disable_ichg = false;
-
-	rc = parse_mmi_dt(info, &info->pdev->dev);
-	if (rc < 0)
-		pr_info("[%s]Error getting mmi dt items rc = %d\n",__func__, rc);
-
-	info->mmi.batt_health = POWER_SUPPLY_HEALTH_GOOD;
-	info->mmi.chg_reboot.notifier_call = chg_reboot;
-	info->mmi.chg_reboot.next = NULL;
-	info->mmi.chg_reboot.priority = 1;
-	rc = register_reboot_notifier(&info->mmi.chg_reboot);
-	if (rc)
-		pr_err("SMB register for reboot failed\n");
-
-	rc = device_create_file(&info->pdev->dev,
-				&dev_attr_force_demo_mode);
-	if (rc) {
-		pr_err("[%s]couldn't create force_demo_mode\n", __func__);
-	}
-
-	rc = device_create_file(&info->pdev->dev,
-				&dev_attr_force_max_chrg_temp);
-	if (rc) {
-		pr_err("[%s]couldn't create force_max_chrg_temp\n", __func__);
-	}
-
-	rc = device_create_file(&info->pdev->dev,
-				&dev_attr_factory_image_mode);
-	if (rc)
-		pr_err("[%s]couldn't create factory_image_mode\n", __func__);
-
-	rc = device_create_file(&info->pdev->dev,
-				&dev_attr_factory_charge_upper);
-	if (rc)
-		pr_err("[%s]couldn't create factory_charge_upper\n", __func__);
-
-	info->mmi.init_done = true;
 }
 
 static bool charger_init_algo(struct mtk_charger *info)
@@ -2422,7 +1445,6 @@ static int mtk_charger_plug_out(struct mtk_charger *info)
 		chg_alg_notifier_call(alg, &notify);
 	}
 
-	pdata1->input_current_limit = 500000;
 	charger_dev_set_input_current(info->chg1_dev, 100000);
 	charger_dev_set_mivr(info->chg1_dev, info->data.min_charger_voltage);
 	charger_dev_plug_out(info->chg1_dev);
@@ -2458,10 +1480,6 @@ static int mtk_charger_plug_in(struct mtk_charger *info,
 	}
 
 	charger_dev_plug_in(info->chg1_dev);
-
-	if (info->mmi.factory_mode) {
-		charger_dev_set_input_current(info->chg1_dev, 2000000);/*2A*/
-	}
 
 	return 0;
 }
@@ -2500,7 +1518,6 @@ static bool mtk_is_charger_on(struct mtk_charger *info)
 	return true;
 }
 
-#ifdef MTK_BASE
 static void kpoc_power_off_check(struct mtk_charger *info)
 {
 	unsigned int boot_mode = info->bootmode;
@@ -2516,7 +1533,6 @@ static void kpoc_power_off_check(struct mtk_charger *info)
 		}
 	}
 }
-#endif
 
 static char *dump_charger_type(int type)
 {
@@ -2582,11 +1598,8 @@ static int charger_routine_thread(void *arg)
 
 		check_battery_exist(info);
 		check_dynamic_mivr(info);
-                mmi_charger_check_status(info);
 		charger_check_status(info);
-#ifdef MTK_BASE
 		kpoc_power_off_check(info);
-#endif
 
 		if (is_disable_charger(info) == false &&
 			is_charger_on == true &&
@@ -2880,11 +1893,6 @@ int psy_charger_set_property(struct power_supply *psy,
 
 	chr_err("%s: prop:%d %d\n", __func__, psp, val->intval);
 
-	if (info->mmi.factory_mode) {
-                chr_err("%s factory mode, return\n", __func__);
-		return 0;
-        }//TODO
-
 	info = (struct mtk_charger *)power_supply_get_drvdata(psy);
 
 	if (info->psy1 != NULL &&
@@ -3034,6 +2042,7 @@ int chg_alg_event(struct notifier_block *notifier,
 	return NOTIFY_DONE;
 }
 
+
 static int mtk_charger_probe(struct platform_device *pdev)
 {
 	struct mtk_charger *info = NULL;
@@ -3120,10 +2129,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 		chr_err("register psy2 fail:%d\n",
 			PTR_ERR(info->psy2));
 
-	info->log_level = CHRLOG_ERROR_LEVEL;
-
-	mmi_info = info;
-	mmi_init(info);
+	info->log_level = CHRLOG_DEBUG_LEVEL;
 
 	info->pd_adapter = get_adapter_by_name("pd_adapter");
 	if (!info->pd_adapter)
@@ -3135,11 +2141,6 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	}
 
 	info->chg_alg_nb.notifier_call = chg_alg_event;
-
-	if (info->mmi.factory_mode) {
-		/* Disable charging when enter ATM mode(factory mode) */
-		charging_enable_flag = 0;
-	}
 
 	kthread_run(charger_routine_thread, info, "charger_thread");
 

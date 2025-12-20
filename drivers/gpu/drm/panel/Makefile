@@ -69,12 +69,4 @@ obj-$(CONFIG_DRM_PANEL_TRULY_NT35595_VDO) += panel-truly-nt35595-vdo.o
 obj-$(CONFIG_DRM_PANEL_TRULY_ILI9881H_VDO) += panel-truly-ili9881h-rt4801-vdo.o
 obj-$(CONFIG_DRM_PANEL_TRULY_ILI9882N_VDO_90HZ) += panel-truly-ili9882n-rt4801-vdo-90hz.o
 obj-$(CONFIG_DRM_PANEL_RAYDIUM_RM692H0) += panel-raydium-rm692h0-cmd-120hz.o
-obj-$(CONFIG_DRM_PANEL_TRULY_ICNL9911C_VDO) += dsi-panel-mot-truly-icnl9911c-hd-video.o
-obj-$(CONFIG_DRM_PANEL_BOE_NT36525C_VDO) += dsi-panel-mot-boe-nt36525c-hd-video.o
-obj-$(CONFIG_DRM_PANEL_DIJING_ILI9882Q_VDO) += dsi-panel-mot-dijing-ili9882q-hd-video.o
-obj-$(CONFIG_DRM_PANEL_TIANMA_ICNL9911C_VDO) += dsi-panel-mot-tianma-icnl9911c-hd-video.o
-obj-$(CONFIG_DRM_PANEL_BOE_ICNL9911C_VDO) += dsi-panel-mot-boe-icnl9911c-hd-video.o
-obj-$(CONFIG_DRM_PANEL_DONGSHAN_ICNL9911C_VDO) += dsi-panel-mot-dongshan-icnl9911c-hd-video.o
-obj-$(CONFIG_DRM_PANEL_DJN_ILI9882Q_VDO) += dsi-panel-mot-djn-ili9882q-hd-video.o
-obj-$(CONFIG_DRM_PANEL_BOE_NT37701A_655_FHD_VDO_144HZ) += dsi-panel-mot-boe-nt37701a-655-fhdp-video-144hz.o
-obj-$(CONFIG_DRM_PANEL_TM_VTDR6115_655_FHD_VDO_144HZ) += dsi-panel-mot-tm-vtdr6115-655-fhdp-video-144hz.o
+

@@ -2318,9 +2318,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		aed = <0x1a>;
 	};
 
-        usbpd_pm:usbpd_pm{
-        };
-
 	spi0:spi0@1100a000 {
 		compatible = "mediatek,mt6765-spi";
 		mediatek,pad-select = <0>;
@@ -2369,12 +2366,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 		compatible = "mediatek,mtboard-thermistor2";
 		io-channels = <&auxadc 1>;
 		io-channel-names = "thermistor-ch1";
-	};
-
-	tboard_thermistor3: thermal-sensor3 {
-		compatible = "mediatek,mtboard-thermistor3";
-		io-channels = <&auxadc 3>;
-		io-channel-names = "thermistor-ch3";
 	};
 
 	drcc: drcc {
@@ -3141,18 +3132,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			"TOP_ULPOSC1_D8";
 	};
 
-	/* modify by wt.longyili for swtp start */
-	swtp: swtp {
-		compatible = "mediatek, swtp-eint";
-	};
-	swtp_1: swtp_1 {
-		compatible = "mediatek, swtp1-eint";
-	};
-	swtp_2: swtp_2 {
-		compatible = "mediatek, swtp2-eint";
-	};
-	/* modify by wt.longyili for swtp end */
-
 	dsi_te: dsi_te {
 		compatible = "mediatek, dsi_te-eint";
 		status = "disabled";
@@ -3671,16 +3650,8 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			"CLK_SCP_SYS_CAM";
 	};
 
-        camera_af_hw_node: camera_af_hw_node {
-                compatible = "mediatek,camera_af_lens";
-        };
-
 	flashlight_core: flashlight_core {
 		compatible = "mediatek,flashlight_core";
-	};
-
-	flashlights_dummy_gpio: flashlights_dummy_gpio {
-		compatible = "mediatek,flashlights_dummy_gpio";
 	};
 
 	flashlights_mt6370: flashlights_mt6370 {
@@ -3696,20 +3667,6 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 			ct = <1>;
 			part = <0>;
 		};
-	};
-
-	flashlights_ocp8135: flashlights_ocp8135 {
-		compatible = "mediatek,flashlights_ocp8135";
-		decouple = <0>;
-		channel@1 {
-			type = <0>;
-			ct = <0>;
-			part = <0>;
-		};
-	};
-
-	evt_dvt_camera: evt_dvt_camera {
-		compatible = "mediatek,compatible_camera";
 	};
 
 	camsv1@1a050000 {
@@ -4230,5 +4187,3 @@ defined(CONFIG_MTK_CAM_SECURITY_SUPPORT)
 #ifdef CONFIG_MTK_ENABLE_GENIEZONE
 #include "mediatek/trusty.dtsi"
 #endif
-/* Motorola base dts override */
-#include "mediatek/mt6768-moto-base.dtsi"

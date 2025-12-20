@@ -335,7 +335,7 @@ void fg_custom_data_check(struct mtk_battery *gm)
 
 	p = &gm->fg_cust_data;
 	fg_table_cust_data = &gm->fg_table_cust_data;
-	gm->battery_id = fgauge_get_profile_id();
+	fgauge_get_profile_id();
 
 	bm_err("FGLOG MultiGauge0[%d] BATID[%d] pmic_min_vol[%d,%d,%d,%d,%d]\n",
 		p->multi_temp_gauge0, gm->battery_id,
@@ -3705,15 +3705,15 @@ unsigned int TempConverBattThermistor(struct mtk_battery *gm, int temp)
 	ptable = gm->tmp_table;
 
 
-	if (temp >= ptable[22].BatteryTemp) {
-		TBatt_R_Value = ptable[22].TemperatureR;
+	if (temp >= ptable[20].BatteryTemp) {
+		TBatt_R_Value = ptable[20].TemperatureR;
 	} else if (temp <= ptable[0].BatteryTemp) {
 		TBatt_R_Value = ptable[0].TemperatureR;
 	} else {
 		RES1 = ptable[0].TemperatureR;
 		TMP1 = ptable[0].BatteryTemp;
 
-		for (i = 0; i <= 22; i++) {
+		for (i = 0; i <= 20; i++) {
 			if (temp <= ptable[i].BatteryTemp) {
 				RES2 = ptable[i].TemperatureR;
 				TMP2 = ptable[i].BatteryTemp;

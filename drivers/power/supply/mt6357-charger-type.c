@@ -15,9 +15,6 @@
 #include <linux/power_supply.h>
 #include <mtk_musb.h>
 #include <linux/reboot.h>
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-#include <tcpm.h>  /* TYPE-C/PD */
-#endif //Introduce External PD & Type-C logic
 
 /* ============================================================ */
 /* pmic control start*/
@@ -94,13 +91,6 @@ struct mtk_charger_type {
 	int bc12_active;
 	u32 bootmode;
 	u32 boottype;
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	struct tcpc_device *tcpc;
-	struct notifier_block pd_nb;
-	struct mutex attach_lock;
-	bool attach;
-#endif //Introduce External PD & Type-C logic
-	bool otg_mode;
 };
 
 struct tag_bootmode {
@@ -491,22 +481,8 @@ static void dump_charger_name(int type)
 static int get_charger_type(struct mtk_charger_type *info)
 {
 	enum power_supply_usb_type type;
-	unsigned int chrdet = 0;
-	pr_err("%s: check start\n", __func__);
 
 	hw_bc11_init(info);
-
-	chrdet = bc11_get_register_value(info->regmap,
-		PMIC_RGS_CHRDET_ADDR,
-		PMIC_RGS_CHRDET_MASK,
-		PMIC_RGS_CHRDET_SHIFT);
-	pr_info("[%s] [%d] chrdet=%d\n", __func__, __LINE__, chrdet);
-	if (!chrdet) {
-		info->psy_desc.type = POWER_SUPPLY_TYPE_UNKNOWN;
-		type = POWER_SUPPLY_USB_TYPE_UNKNOWN;
-		return type;
-	}
-
 	if (hw_bc11_DCD(info)) {
 		info->psy_desc.type = POWER_SUPPLY_TYPE_USB;
 		type = POWER_SUPPLY_USB_TYPE_DCP;
@@ -531,7 +507,6 @@ static int get_charger_type(struct mtk_charger_type *info)
 		pr_info("charger type: skip bc11 release for BC12 DCP SPEC\n");
 
 	dump_charger_name(info->psy_desc.type);
-	pr_err("%s:check end\n", __func__);
 
 	return type;
 }
@@ -602,17 +577,9 @@ static void do_charger_detection_work(struct work_struct *data)
 		PMIC_RGS_CHRDET_SHIFT);
 
 	pr_notice("%s: chrdet:%d\n", __func__, chrdet);
-
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	mutex_lock(&info->attach_lock);
-	do_charger_detect(info, chrdet);
-	mutex_unlock(&info->attach_lock);
-#else
 	if (chrdet)
 		do_charger_detect(info, chrdet);
-#endif //Introduce External PD & Type-C logic
-	//else {
-	if (!chrdet) {
+	else {
 		hw_bc11_done(info);
 		/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
 		/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
@@ -628,6 +595,7 @@ static void do_charger_detection_work(struct work_struct *data)
 		}
 	}
 }
+
 
 irqreturn_t chrdet_int_handler(int irq, void *data)
 {
@@ -639,9 +607,7 @@ irqreturn_t chrdet_int_handler(int irq, void *data)
 		PMIC_RGS_CHRDET_MASK,
 		PMIC_RGS_CHRDET_SHIFT);
 	if (!chrdet) {
-#ifndef CONFIG_PD_HARDRESET_HND
-                hw_bc11_done(info);
-#endif
+		hw_bc11_done(info);
 		/* 8 = KERNEL_POWER_OFF_CHARGING_BOOT */
 		/* 9 = LOW_POWER_OFF_CHARGING_BOOT */
 		if (info->bootmode == 8 || info->bootmode == 9) {
@@ -653,22 +619,7 @@ irqreturn_t chrdet_int_handler(int irq, void *data)
 			if (system_state != SYSTEM_POWER_OFF)
 				kernel_power_off();
 #endif
-#ifdef CONFIG_PD_HARDRESET_HND
-                        pr_info("%s: attach: %d \n", __func__, info->attach);
-                        if (info->attach) {
-                                pr_err("[%s] power off charging mode, attach but !chrdet, pd hard reset maybe, ignore!\n", __func__);
-                                return IRQ_HANDLED;
-                        }
-#endif
 		}
-#ifdef CONFIG_PD_HARDRESET_HND
-		hw_bc11_done(info);
-#endif
-	}
-
-	if(info->otg_mode && chrdet) {
-		pr_err("otg occur, ignore chgdet\n");
-		return IRQ_HANDLED;
 	}
 	pr_notice("%s: chrdet:%d\n", __func__, chrdet);
 	do_charger_detect(info, chrdet);
@@ -676,68 +627,6 @@ irqreturn_t chrdet_int_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-static void hadle_typec_attach(struct mtk_charger_type *info, bool en)
-{
-	mutex_lock(&info->attach_lock);
-	info->attach = en;
-        pr_info("%s attach:%d\n", __func__, info->attach);
-//	schedule_work(&info->chr_work);
-	pr_err("do BC1.2 with vbus detect rather than type-c notify\n");
-	mutex_unlock(&info->attach_lock);
-}
-
-static int mt6357_tcp_notifier_call(struct notifier_block *pnb,
-					unsigned long event, void *data)
-{
-	struct tcp_notify *noti = data;
-	struct mtk_charger_type *info;
-	info = container_of(pnb, struct mtk_charger_type, pd_nb);
-	switch (event) {
-	case TCP_NOTIFY_TYPEC_STATE:
-		if (noti->typec_state.old_state == TYPEC_UNATTACHED &&
-		    (noti->typec_state.new_state == TYPEC_ATTACHED_SNK ||
-		    noti->typec_state.new_state == TYPEC_ATTACHED_CUSTOM_SRC ||
-		    noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
-			pr_info("%s USB Plug in, pol = %d\n", __func__,
-					noti->typec_state.polarity);
-			hadle_typec_attach(info, true);
-		} else if ((noti->typec_state.old_state == TYPEC_ATTACHED_SNK ||
-		    noti->typec_state.old_state == TYPEC_ATTACHED_CUSTOM_SRC ||
-			noti->typec_state.old_state == TYPEC_ATTACHED_NORP_SRC)
-			&& noti->typec_state.new_state == TYPEC_UNATTACHED) {
-			pr_info("%s USB Plug out\n", __func__);
-			hadle_typec_attach(info, false);
-#ifdef CONFIG_PD_HARDRESET_HND
-		        if (info->bootmode == 8 || info->bootmode == 9) {
-                             schedule_work(&info->chr_work);
-                             pr_info("%s re schedule chr work\n", __func__);
-                        }
-#endif
-		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
-			noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
-			pr_info("%s Source_to_Sink\n", __func__);
-			hadle_typec_attach(info, true);
-		}  else if (noti->typec_state.old_state == TYPEC_ATTACHED_SNK &&
-			noti->typec_state.new_state == TYPEC_ATTACHED_SRC) {
-			pr_info("%s Sink_to_Source\n", __func__);
-			hadle_typec_attach(info, false);
-		}
-
-		break;
-	case TCP_NOTIFY_SOURCE_VBUS:
-		pr_err("%s source vbus = %dmv\n", __func__, noti->vbus_state.mv);
-		if (noti->vbus_state.mv)
-			info->otg_mode = true;
-		else
-			info->otg_mode = false;
-		break;
-	default:
-		break;
-	};
-	return NOTIFY_OK;
-}
-#endif //Introduce External PD & Type-C logic
 
 static int psy_chr_type_get_property(struct power_supply *psy,
 	enum power_supply_property psp, union power_supply_propval *val)
@@ -832,10 +721,7 @@ static int mt_usb_get_property(struct power_supply *psy,
 			val->intval = 0;
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
-	        if (info->type == POWER_SUPPLY_USB_TYPE_SDP)
-			val->intval = 500000;
-		else
-			val->intval = 1500000;
+		val->intval = 500000;
 		break;
 	case POWER_SUPPLY_PROP_VOLTAGE_MAX:
 		val->intval = 5000000;
@@ -902,10 +788,6 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 	struct device_node *np = dev->of_node;
 	int ret = 0;
 
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	static bool is_deferred;
-#endif //Introduce External PD & Type-C logic
-
 	pr_notice("%s: starts\n", __func__);
 
 	chan_vbus = devm_iio_channel_get(
@@ -961,10 +843,7 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 	info->usb_desc.get_property = mt_usb_get_property;
 	info->usb_cfg.drv_data = info;
 
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	mutex_init(&info->attach_lock);
-#endif //Introduce External PD & Type-C logic
-	info->psy = devm_power_supply_register(&pdev->dev, &info->psy_desc,
+	info->psy = power_supply_register(&pdev->dev, &info->psy_desc,
 			&info->psy_cfg);
 
 	if (IS_ERR(info->psy)) {
@@ -986,10 +865,8 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 
 	pr_notice("%s: bc12_active:%d\n", __func__, info->bc12_active);
 
-#ifdef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
 	if (info->bc12_active) {
-#endif //Introduce External PD & Type-C logic
-		info->ac_psy = devm_power_supply_register(&pdev->dev,
+		info->ac_psy = power_supply_register(&pdev->dev,
 				&info->ac_desc, &info->ac_cfg);
 
 		if (IS_ERR(info->ac_psy)) {
@@ -998,7 +875,7 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 			return PTR_ERR(info->ac_psy);
 		}
 
-		info->usb_psy = devm_power_supply_register(&pdev->dev,
+		info->usb_psy = power_supply_register(&pdev->dev,
 				&info->usb_desc, &info->usb_cfg);
 
 		if (IS_ERR(info->usb_psy)) {
@@ -1015,44 +892,8 @@ static int mt6357_charger_type_probe(struct platform_device *pdev)
 			chrdet_int_handler, IRQF_TRIGGER_HIGH, "chrdet", info);
 		if (ret < 0)
 			pr_notice("%s request chrdet irq fail\n", __func__);
-#ifdef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	}
-#endif //Introduce External PD & Type-C logic
-
-#ifndef CONFIG_TCPC_MT6370 //Introduce External PD & Type-C logic
-	info->tcpc = tcpc_dev_get_by_name("type_c_port0");
-	pr_info("%s: tcpc device check if is ready, defer\n", __func__);
-	if (info->tcpc == NULL) {
-		if (is_deferred == false) {
-			pr_info("%s: tcpc device not ready, defer\n", __func__);
-			is_deferred = true;
-
-			schedule_work(&info->chr_work);
-
-			ret = devm_request_threaded_irq(&pdev->dev,
-				platform_get_irq_byname(pdev, "chrdet"), NULL,
-				chrdet_int_handler, IRQF_TRIGGER_HIGH, "chrdet", info);
-			if (ret < 0) {
-				pr_notice("%s request chrdet irq fail\n", __func__);
-				return ret;
-			}
-			goto out;
-		} else {
-			pr_info("%s: failed to get tcpc device\n", __func__);
-			ret = -EINVAL;
-		}
-		return ret;
 	}
 
-	info->pd_nb.notifier_call = mt6357_tcp_notifier_call;
-	ret = register_tcp_dev_notifier(info->tcpc, &info->pd_nb,
-						TCP_NOTIFY_TYPE_ALL);
-	if (ret < 0) {
-		pr_info("%s: register tcpc notifier fail(%d)\n", __func__, ret);
-		return -EINVAL;
-	}
-out:
-#endif //Introduce External PD & Type-C logic
 	info->first_connect = true;
 
 	pr_notice("%s: done\n", __func__);
@@ -1101,3 +942,4 @@ module_exit(mt6357_charger_type_exit);
 MODULE_AUTHOR("wy.chuang <wy.chuang@mediatek.com>");
 MODULE_DESCRIPTION("MTK Charger Type Detection Driver");
 MODULE_LICENSE("GPL");
+

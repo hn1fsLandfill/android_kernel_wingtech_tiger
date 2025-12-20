@@ -26,7 +26,7 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyS0,921600n1 vmalloc=500M \
+		bootargs = "console=tty0 console=ttyS0,921600n1 vmalloc=400M \
 slub_debug=OFZPU page_owner=on \
 swiotlb=noforce androidboot.hardware=mt6765 \
 maxcpus=8 loop.max_part=7 \
@@ -34,7 +34,7 @@ firmware_class.path=/vendor/firmware";
 		kaslr-seed = <0 0>;
 	};
 
-	regulator_vibrator: regulator_vibrator {
+	regulator_vibrator {
 		compatible = "regulator-vibrator";
 		min-volt = <2300000>;
 		max-volt = <3200000>;
@@ -528,7 +528,7 @@ firmware_class.path=/vendor/firmware";
 			reusable;
 			size = <0 0x10000000>;
 			alignment = <0 0x1000000>;
-			alloc-ranges = <0 0x40000000 0 0xc0000000>;
+			alloc-range = <0 0xc0000000 0 0x10000000>;
 		};
 
 		ion-carveout-heap {
@@ -3040,11 +3040,6 @@ firmware_class.path=/vendor/firmware";
 			"TOP_ULPOSC1_D2",
 			"TOP_ULPOSC1_D8";
 	};
-/* +EKTONG-20,longyili.wt,20210428,add SWTP bringup */
-	swtp:swtp {
-		compatible = "mediatek, swtp-eint";
-	};
-/* -EKTONG-20,longyili.wt,20210428, add SWTP */
 
 	dsi_te: dsi_te {
 		compatible = "mediatek, DSI_TE-eint";
@@ -3340,15 +3335,7 @@ firmware_class.path=/vendor/firmware";
 			part = <0>;
 		};
 	};
-	flashlights_ocp8132: flashlights_ocp8132{
-		compatible = "mediatek,flashlights_ocp8132";
-		decouple = <0>;
-		channel@1 {
-			type = <0>;
-			ct = <0>;
-			part = <0>;
-		};
-	};
+
 	gps {
 		compatible = "mediatek,gps";
 	};
@@ -3846,5 +3833,3 @@ firmware_class.path=/vendor/firmware";
 #include "mediatek/rt9471.dtsi"
 #endif
 #include "mediatek/trusty.dtsi"
-/* Motorola base dts override */
-#include "mediatek/mt6765-moto-base.dtsi"

@@ -414,7 +414,6 @@ done:
 	return ret;
 }
 
-extern int mtk_drm_bl_recovery(struct drm_crtc *crtc);
 static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -462,8 +461,6 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 #endif
 	mtk_ddp_comp_io_cmd(output_comp, NULL, CONNECTOR_PANEL_ENABLE, NULL);
 
-	mtk_drm_bl_recovery(crtc);
-
 	CRTC_MMP_MARK(drm_crtc_index(crtc), esd_recovery, 0, 4);
 
 	mtk_crtc_hw_block_ready(crtc);
@@ -479,6 +476,7 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 			mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
 		cmdq_pkt_set_event(cmdq_handle,
 			mtk_crtc->gce_obj.event[EVENT_ESD_EOF]);
+
 		cmdq_pkt_flush(cmdq_handle);
 		cmdq_pkt_destroy(cmdq_handle);
 	}
@@ -561,12 +559,12 @@ static int mtk_drm_esd_check_worker_kthread(void *data)
 
 		if (ret != 0) {
 			DDPPR_ERR(
-				"[ESD]after esd recovery %d times, still fail, enable esd check again\n",
+				"[ESD]after esd recovery %d times, still fail, disable esd check\n",
 				ESD_TRY_CNT);
-			mtk_disp_esd_check_switch(crtc, true);
+			mtk_disp_esd_check_switch(crtc, false);
 			DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
 			mutex_unlock(&private->commit.lock);
-			continue;
+			break;
 		} else if (recovery_flg) {
 			DDPINFO("[ESD] esd recovery success\n");
 			recovery_flg = 0;

@@ -7,7 +7,6 @@
 #define __MTK_PANEL_EXT_H__
 
 #include <drm/drm_panel.h>
-#include <drm/mediatek_drm.h>
 
 #define RT_MAX_NUM 10
 #define ESD_CHECK_NUM 3
@@ -16,9 +15,6 @@
 #define READ_DDIC_SLOT_NUM (4 * MAX_RX_CMD_NUM)
 #define MAX_DYN_CMD_NUM 20
 
-#define BRIGHTNESS_HBM_ON	0xFFFFFFFE
-#define BRIGHTNESS_HBM_OFF	(BRIGHTNESS_HBM_ON - 1)
-#define HBM_BRIGHTNESS(value) ((value) == 0 ? BRIGHTNESS_HBM_OFF : BRIGHTNESS_HBM_ON)
 
 struct mtk_dsi;
 struct cmdq_pkt;
@@ -222,13 +218,6 @@ struct dynamic_fps_params {
 	unsigned int vact_timing_fps;
 	unsigned int data_rate;
 	struct dfps_switch_cmd dfps_cmd_table[MAX_DYN_CMD_NUM];
-	struct mtk_panel_para_table dfps_cmd_grp_table[MAX_DYN_CMD_NUM];
-	unsigned int dfps_cmd_grp_size;
-};
-
-enum panel_hbm_type {
-	HBM_MODE_DCS_GPIO = 0,
-	HBM_MODE_DCS_ONLY,
 };
 
 struct mtk_panel_params {
@@ -271,16 +260,10 @@ struct mtk_panel_params {
 	unsigned int lcm_index;
 	unsigned int wait_sof_before_dec_vfp;
 	unsigned int doze_delay;
-	enum panel_hbm_type hbm_type;
-	int max_bl_level;
 
 	//Settings for LFR Function:
 	unsigned int lfr_enable;
 	unsigned int lfr_minimum_fps;
-
-	unsigned int change_fps_by_vfp_send_cmd;
-
-	unsigned int use_ext_panel_feature;
 };
 
 struct mtk_panel_ext {
@@ -369,15 +352,6 @@ struct mtk_panel_funcs {
 	void (*hbm_get_state)(struct drm_panel *panel, bool *state);
 	void (*hbm_get_wait_state)(struct drm_panel *panel, bool *wait);
 	bool (*hbm_set_wait_state)(struct drm_panel *panel, bool wait);
-
-	int (*cabc_set_cmdq)(struct drm_panel *panel, void *dsi_drv,
-			    dcs_write_gce cb, void *handle, unsigned int cabc_mode);
-	void (*cabc_get_state)(struct drm_panel *panel, unsigned int *state);
-	int (*notify_fps_chg)(void *dsi_drv, dcs_write_gce cb, void *handle, unsigned int mode);
-	int (*panel_feature_set)(struct drm_panel *panel, void *dsi_drv,
-			    dcs_write_gce cb, void *handle, struct panel_param_info param_info);
-	int (*panel_feature_get)(struct drm_panel *panel, paramId_t param_id);
-	int (*panel_hbm_waitfor_fps_valid)(struct drm_panel *panel, unsigned int timeout_ms);
 };
 
 void mtk_panel_init(struct mtk_panel_ctx *ctx);

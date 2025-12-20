@@ -323,13 +323,6 @@ int charger_dev_enable_powerpath(struct charger_device *chg_dev, bool en)
 	    chg_dev->ops->enable_powerpath)
 		return chg_dev->ops->enable_powerpath(chg_dev, en);
 
-	if (chg_dev == NULL)
-		pr_err("the chg_dev is null\n");
-	else if(chg_dev->ops == NULL)
-		pr_err("the chg_dev ops is null\n");
-	else if(chg_dev->ops->enable_powerpath == NULL)
-		pr_err("the chg_dev ops enable_powerpath is null\n");
-
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_enable_powerpath);
@@ -343,16 +336,6 @@ int charger_dev_is_powerpath_enabled(struct charger_device *chg_dev, bool *en)
 	return -ENOTSUPP;
 }
 EXPORT_SYMBOL(charger_dev_is_powerpath_enabled);
-
-int charger_dev_enable_hz(struct charger_device *chg_dev, bool en)
-{
-	if (chg_dev != NULL && chg_dev->ops != NULL &&
-	    chg_dev->ops->enable_hz)
-		return chg_dev->ops->enable_hz(chg_dev, en);
-
-	return -ENOTSUPP;
-}
-EXPORT_SYMBOL(charger_dev_enable_hz);
 
 int charger_dev_enable_safety_timer(struct charger_device *chg_dev, bool en)
 {

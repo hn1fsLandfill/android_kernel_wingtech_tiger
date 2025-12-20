@@ -4,22 +4,6 @@
 menu "MediaTek SoC drivers"
 	depends on ARCH_MEDIATEK || COMPILE_TEST
 
-config ELLIS_DTB
-    depends on ARCH_MEDIATEK
-    default n
-    bool "Ellis DTBs"
-    help
-      Only include Ellis specific DTBs to limit the number that
-      get built during kernel compilation
-
-config MAUI_DTB
-    depends on ARCH_MEDIATEK
-    default n
-    bool "Maui DTBs"
-    help
-      Only include maui specific DTBs to limit the number that
-      get built during kernel compilation
-
 config MTK_CMDQ
 	tristate "MediaTek CMDQ Support"
 	depends on ARCH_MEDIATEK || COMPILE_TEST

@@ -34,9 +34,6 @@ config: $(obj)/conf
 nconfig: $(obj)/nconf
 	$< $(silent) $(Kconfig)
 
-defoldconfig: $(obj)/conf
-	$< $(silent) --defconfig=.config $(Kconfig)
-
 build_menuconfig: $(obj)/mconf
 
 build_nconfig: $(obj)/nconf

@@ -21,8 +21,6 @@ config TOUCHSCREEN_MTK
 	  To compile this dirver as a module, choose M here: the
 	  module will be called.
 
-source "drivers/input/touchscreen/mediatek/FT3519/Kconfig"
-
 config TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
 	bool "MediaTek Touch Panel Rotation With LCM"
 	default y
@@ -182,8 +180,6 @@ config TOUCHSCREEN_MTK_GT9157
 	  module will be called
 
 source "drivers/input/touchscreen/mediatek/GT9157/Kconfig"
-source "drivers/input/touchscreen/mediatek/nova_tddi/Kconfig"
-source "drivers/input/touchscreen/mediatek/chipone_v2_tddi/Kconfig"
 
 config TOUCHSCREEN_HIMAX_CHIPSET
 	bool "Himax touchpanel CHIPSET"
@@ -205,66 +201,5 @@ config TOUCHSCREEN_GOODIX_BRL
 	  If build module, say M.
 	  If unsure, say N.
 source "drivers/input/touchscreen/mediatek/goodix_berlin_driver/Kconfig"
-
-config TOUCHSCREEN_MTK_ILITEK_V3_ILI7806S
-	bool "ILITEK_V3_ILI7806S for Mediatek package"
-	default n
-	help
-	  Say Y here if you have ilitek_touch touch panel.
-
-          If unsure, say N.
-	  To compile this dirver as a module, choose M here: the
-	  module will be called.
-source "drivers/input/touchscreen/mediatek/ilitek_v3/Kconfig"
-
-config TOUCHSCREEN_MTK_TP_SEQ_PRE
-	bool "TP seq config"
-	default n
-	help
-          Say Y here if you need set tp seq ahead of LCD
-
-          If unsure, say N.
-
-config TOUCHSCREEN_GOODIX_GTX8
-	bool "goodix for Mediatek package"
-	default n
-	help
-	  Say Y here if you have goodix touch panel.
-
-	  If unsure, say N.
-
-	  To compile this dirver as a module, choose M here: the
-	  module will be called.
-
-source "drivers/input/touchscreen/mediatek/goodix-ts-sunrise/Kconfig"
-
-config TOUCHSCREEN_CHIPONE
-	tristate "Chipone TDDI touchscreen for Mediatek package"
-	depends on SPI
-	default n
-	help
-	  Say y here if you have chipone TDDI touch panel.
-
-	  If unsure, say N.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called chipone-tddi.
-
-config TOUCHSCREEN_ILI9882Q_TDDI
-	bool "ILI9882Q host download SPI driver"
-	default n
-	help
-	  Say Y here if you have a Novatek ILI9882Q touchscreen connected
-	  to your system by SPI bus.
-
-	  If unsure, say N.
-
-config TOUCHSCREEN_MTK_TYPE
-	bool "use mediatek touch type"
-	default n
-	help
-	  Say y here if use mediatek touch type.
-
-	  If unsure, say N.
 
 endif

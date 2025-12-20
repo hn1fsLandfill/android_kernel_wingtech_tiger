@@ -26,14 +26,14 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=tty0 console=ttyS0,921600n1 vmalloc=500M \
+		bootargs = "console=tty0 console=ttyS0,921600n1 vmalloc=400M \
 				slub_debug=OFZPU page_owner=on \
 				swiotlb=noforce androidboot.hardware=mt6765 \
 				maxcpus=8 loop.max_part=7 \
 				firmware_class.path=/vendor/firmware";
 	};
 
-        regulator_vibrator: regulator_vibrator {
+	regulator_vibrator {
 		compatible = "regulator-vibrator";
 		min-volt = <2300000>;
 		max-volt = <3200000>;
@@ -2304,21 +2304,6 @@
 		io-channel-names = "thermistor-ch1";
 		interconnects = <&auxadc 1>;
 	};
-
-	tboard_thermistor3: thermal-sensor3 {
-		compatible = "mediatek,mtboard-thermistor3";
-		io-channels = <&auxadc 2>;
-		io-channel-names = "thermistor-ch2";
-		interconnects = <&auxadc 2>;
-        };
-
-        tboard_thermistor4: thermal-sensor4 {
-		compatible = "mediatek,mtboard-thermistor4";
-		io-channels = <&auxadc 3>;
-		io-channel-names = "thermistor-ch3";
-		interconnects = <&auxadc 3>;
-        };
-
 	btif@1100c000 {
 		compatible = "mediatek,btif";
 			/*btif base*/
@@ -3047,11 +3032,6 @@
 			"TOP_ULPOSC1_D2",
 			"TOP_ULPOSC1_D8";
 	};
-/* +EKELLIS-15,liangnengjie.wt,20210324,add SWTP bringup */
-	swtp:swtp {
-		compatible = "mediatek, swtp-eint";
-	};
-/* -EKELLIS-15, liangnengjie@wt.com, 20210324, add SWTP */
 
 	dsi_te: dsi_te {
 		compatible = "mediatek, DSI_TE-eint";
@@ -3347,15 +3327,7 @@
 			part = <0>;
 		};
 	};
-	flashlights_ocp8132: flashlights_ocp8132{
-		compatible = "mediatek,flashlights_ocp8132";
-		decouple = <0>;
-		channel@1 {
-			type = <0>;
-			ct = <0>;
-			part = <0>;
-		};
-	};
+
 	gps {
 		compatible = "mediatek,gps";
 	};
@@ -3847,14 +3819,6 @@
 #include "bat_setting/mt6765_battery_prop.dtsi"
 #include "mt6370.dtsi"
 #include "mt6370_pd.dtsi"
-/* Motorola base dts override */
-#if defined CONFIG_ELLIS_DTB
-#include "mt6765-moto-base-ellis.dtsi"
-#elif defined CONFIG_MAUI_DTB
-#include "mt6765-moto-base-maui.dtsi"
-#else
-#include "mt6765-moto-base.dtsi"
-#endif
 #ifdef CONFIG_CHARGER_RT9471
 #include "rt9471.dtsi"
 #endif

@@ -16,8 +16,6 @@
 #include <linux/wait.h>
 #include "mtk_gauge.h"
 
-#include <linux/power/moto_chg_tcmd.h>
-
 
 #define NETLINK_FGD 26
 #define UNIT_TRANS_10	10
@@ -735,13 +733,7 @@ struct simulator_log {
 #define SHUTDOWN_TIME 40
 #define AVGVBAT_ARRAY_SIZE 30
 #define INIT_VOLTAGE 3450
-#ifdef MTK_BASE
 #define BATTERY_SHUTDOWN_TEMPERATURE 60
-#elif defined(CONFIG_MTK_DISABLE_BAT_HIGH_TEMP_PROTECT)
-#define BATTERY_SHUTDOWN_TEMPERATURE 100
-#else
-#define BATTERY_SHUTDOWN_TEMPERATURE 70
-#endif
 
 struct shutdown_condition {
 	bool is_overheat;
@@ -959,8 +951,6 @@ struct mtk_battery {
 	int (*resume)(struct mtk_battery *gm);
 
 	int log_level;
-
-	struct moto_chg_tcmd_client bat_tcmd_client;
 };
 
 struct mtk_battery_sysfs_field_info {
@@ -1029,8 +1019,5 @@ extern void battery_algo_init(struct mtk_battery *gm);
 extern void do_fg_algo(struct mtk_battery *gm, unsigned int intr_num);
 extern void fg_bat_temp_int_internal(struct mtk_battery *gm);
 /* mtk_battery_algo.c end */
-
-extern int mmi_chrg_rate_check(void);
-extern int mmi_batt_health_check(void);
 
 #endif /* __MTK_BATTERY_INTF_H__ */

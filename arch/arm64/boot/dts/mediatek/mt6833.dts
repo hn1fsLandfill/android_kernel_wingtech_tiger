@@ -1241,6 +1241,7 @@
 		reg = <0 0x11d40000 0 0x1000>;
 	};
 
+
 	mmc0: mmc@11230000 {
 		compatible = "mediatek,mt6833-mmc";
 		reg = <0 0x11230000 0 0x10000>,
@@ -1875,11 +1876,7 @@
 	};
 
 	touch:touch {
-#ifdef CONFIG_TOUCHSCREEN_MTK_TYPE
-		compatible = "mediatek,touch";
-#else
 		compatible = "goodix,touch";
-#endif
 	};
 
 	ap_ccif0@10209000 {
@@ -1890,14 +1887,6 @@
 
 	goodix_fp: fingerprint {
 		compatible = "mediatek,goodix-fp";
-	};
-
-	chipone_fp: chipone_fp {
-		compatible = "mediatek,chipone-fingerprint";
-	};
-
-	fp_egistec: fp_egistec {
-		compatible = "fp-egistec";
 	};
 
 	accdet: accdet {
@@ -3031,25 +3020,6 @@
 		io-channels = <&auxadc 2>;
 		io-channel-names = "thermistor-ch2";
 	};
-
-	tboard_thermistor4: thermal-sensor4 {
-		compatible = "mediatek,mtboard-thermistor4";
-		io-channels = <&auxadc 3>;
-		io-channel-names = "thermistor-ch3";
-	};
-
-	tboard_thermistor5: thermal-sensor5 {
-		compatible = "mediatek,mtboard-thermistor5";
-		io-channels = <&auxadc 4>;
-		io-channel-names = "thermistor-ch4";
-	};
-
-	tboard_thermistor7: thermal-sensor7 {
-		compatible = "mediatek,mtboard-thermistor7";
-		io-channels = <&auxadc 6>;
-		io-channel-names = "thermistor-ch6";
-	};
-
 	usb: usb0@11200000 {
 		compatible = "mediatek,mt6833-usb20";
 		reg = <0 0x11200000 0 0x10000>,
@@ -4110,11 +4080,7 @@
 			<0>, /*MTK_DRM_OPT_DYNAMIC_RDMA_GOLDEN_SETTING*/
 			<1>, /*MTK_DRM_OPT_IDLEMGR_DISABLE_ROUTINE_IRQ*/
 			<0>, /*MTK_DRM_OPT_MET_LOG*/
-#ifdef CONFIG_MTK_DISABLE_PQ
-			<0>, /*MTK_DRM_OPT_USE_PQ*/
-#else
 			<1>, /*MTK_DRM_OPT_USE_PQ*/
-#endif
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_RECOVERY*/
 			<1>, /*MTK_DRM_OPT_ESD_CHECK_SWITCH*/
 			<1>, /*MTK_DRM_OPT_PRESENT_FENCE*/
@@ -4125,11 +4091,7 @@
 			<0>, /*MTK_DRM_OPT_DELAYED_TRIGGER*/
 			<1>, /*MTK_DRM_OPT_OVL_EXT_LAYER*/
 			<0>, /*MTK_DRM_OPT_AOD*/
-#ifdef CONFIG_MTK_DISABLE_RPO
-			<0>, /*MTK_DRM_OPT_RPO*/
-#else
 			<1>, /*MTK_DRM_OPT_RPO*/
-#endif
 			<0>, /*MTK_DRM_OPT_DUAL_PIPE*/
 			<0>, /*MTK_DRM_OPT_DC_BY_HRT*/
 			<0>, /*MTK_DRM_OPT_OVL_WCG*/
@@ -4334,20 +4296,6 @@
 		phys = <&mipi_tx_config0>;
 		phy-names = "dphy";
 	};
-/*ExtB EKSAIPAN-82 yangchanghui.wt 20210129 modify for swtp start*/
-    swtp: swtp {
-        compatible = "mediatek, swtp-eint";
-    };
-    swtp_1: swtp_1 {
-        compatible = "mediatek, swtp1-eint";
-    };
-    swtp_2: swtp_2 {
-        compatible = "mediatek, swtp2-eint";
-    };
-    swtp_3: swtp_3 {
-        compatible = "mediatek, swtp3-eint";
-    };
-/*ExtB EKSAIPAN-82 yangchanghui.wt 20210129 modify for swtp end*/
 
 	dsi_te: dsi_te {
 		compatible = "mediatek, dsi_te-eint";
@@ -6093,7 +6041,7 @@
 		/* enable_pe_4; */
 		enable_type_c;
 		power_path_support;
-		/* enable_dynamic_mivr; */
+		enable_dynamic_mivr;
 		bootmode = <&chosen>;
 
 		/* common */
@@ -6316,7 +6264,7 @@
 		compatible = "mediatek,speaker_amp";
 		#sound-dai-cells = <0>;
 		reg = <0x34>;
-		status = "disabled";
+		status = "okay";
 	};
 };
 
@@ -6526,5 +6474,3 @@
 &mt6360_typec {
 	charger = <&mt_charger>;
 };
-/* Motorola base dts override */
-#include "mediatek/mt6833-moto-base.dtsi"

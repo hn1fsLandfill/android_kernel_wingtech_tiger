@@ -136,6 +136,3 @@ obj-$(CONFIG_AXP288_CHARGER)	+= axp288_charger.o
 ifeq ($(CONFIG_CUSTOM_BATTERY_EXTERNAL_CHANNEL),y)
 	obj-y += k6885v1_64_alpha/
 endif
-
-obj-$(CONFIG_MTK_BQ2560x_SUPPORT) += bq2560x_charger.o
-

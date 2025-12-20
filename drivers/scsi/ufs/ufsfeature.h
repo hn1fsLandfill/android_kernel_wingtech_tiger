@@ -18,10 +18,6 @@
 #include "ufstw.h"
 #endif
 
-#if defined(CONFIG_UFSHID)
-#include "ufshid.h"
-#endif
-
 /* Constant value*/
 #define SECTOR					512
 #define BLOCK					4096
@@ -101,18 +97,6 @@ struct ufsf_lu_desc {
 #endif
 };
 
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-struct ufshpb_dev_info {
-	bool hpb_device;
-	int hpb_number_lu;
-	int hpb_ver;
-	int hpb_rgn_size;
-	int hpb_srgn_size;
-	int hpb_device_max_active_rgns;
-	u8  hpb_control_mode;
-};
-#endif
-
 struct ufsf_feature {
 	struct ufs_hba *hba;
 	int num_lu;
@@ -146,16 +130,12 @@ struct ufsf_feature {
 	int tw_debug_no;
 	atomic64_t tw_debug_ee_count;
 #endif
-#if defined(CONFIG_UFSHID)
-	atomic_t hid_state;
-	struct ufshid_dev *hid_dev;
-#endif
 };
 
 struct ufs_hba;
 struct ufshcd_lrb;
 
-int ufsf_device_check(struct ufs_hba *hba);
+void ufsf_device_check(struct ufs_hba *hba);
 int ufsf_check_query(__u32 opcode);
 int ufsf_query_ioctl(struct ufsf_feature *ufsf, unsigned int lun,
 		     void __user *buffer,
@@ -169,14 +149,12 @@ bool ufsf_is_valid_lun(int lun);
 int ufsf_get_ee_status(struct ufs_hba *hba, u32 *status);
 
 /* for hpb */
-#if defined(CONFIG_SCSI_UFS_FEATURE)
 int ufsf_hpb_prepare_pre_req(struct ufsf_feature *ufsf, struct scsi_cmnd *cmd,
 			     int lun);
 int ufsf_hpb_prepare_add_lrbp(struct ufsf_feature *ufsf, int add_tag);
 void ufsf_hpb_end_pre_req(struct ufsf_feature *ufsf, struct request *req);
 void ufsf_hpb_change_lun(struct ufsf_feature *ufsf, struct ufshcd_lrb *lrbp);
 void ufsf_hpb_prep_fn(struct ufsf_feature *ufsf, struct ufshcd_lrb *lrbp);
-void ufsf_hpb_wakeup_worker_on_idle(struct ufsf_feature *ufsf);
 void ufsf_hpb_noti_rb(struct ufsf_feature *ufsf, struct ufshcd_lrb *lrbp);
 void ufsf_hpb_reset_lu(struct ufsf_feature *ufsf);
 void ufsf_hpb_reset_host(struct ufsf_feature *ufsf);
@@ -186,7 +164,6 @@ void ufsf_hpb_suspend(struct ufsf_feature *ufsf);
 void ufsf_hpb_resume(struct ufsf_feature *ufsf);
 void ufsf_hpb_release(struct ufsf_feature *ufsf);
 void ufsf_hpb_set_init_state(struct ufsf_feature *ufsf);
-#endif
 
 /* for tw*/
 void ufsf_tw_prep_fn(struct ufsf_feature *ufsf, struct ufshcd_lrb *lrbp);
@@ -200,19 +177,4 @@ void ufsf_tw_set_init_state(struct ufsf_feature *ufsf);
 void ufsf_tw_reset_lu(struct ufsf_feature *ufsf);
 void ufsf_tw_reset_host(struct ufsf_feature *ufsf);
 void ufsf_tw_ee_handler(struct ufsf_feature *ufsf);
-
-/* for hid*/
-#if defined(CONFIG_UFSHID)
-int ufsf_hid_get_state(struct ufsf_feature *ufsf);
-void ufsf_hid_set_state(struct ufsf_feature *ufsf, int state);
-void ufsf_hid_get_dev_info(struct ufsf_feature *ufsf, u8 *desc_buf);
-void ufsf_hid_set_init_state(struct ufsf_feature *ufsf);
-void ufsf_hid_init(struct ufsf_feature *ufsf);
-void ufsf_hid_reset(struct ufsf_feature *ufsf);
-void ufsf_hid_reset_host(struct ufsf_feature *ufsf);
-void ufsf_hid_remove(struct ufsf_feature *ufsf);
-void ufsf_hid_suspend(struct ufsf_feature *ufsf);
-void ufsf_hid_resume(struct ufsf_feature *ufsf);
-void ufsf_hid_on_idle(struct ufsf_feature *ufsf);
-#endif
 #endif /* End of Header */

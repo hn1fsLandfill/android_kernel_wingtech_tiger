@@ -443,14 +443,10 @@ static loff_t f2fs_seek_block(struct file *file, loff_t offset, int whence)
 		goto fail;
 
 	/* handle inline data case */
-	if (f2fs_has_inline_data(inode)) {
-		if (whence == SEEK_HOLE) {
+	if (f2fs_has_inline_data(inode) || f2fs_has_inline_dentry(inode)) {
+		if (whence == SEEK_HOLE)
 			data_ofs = isize;
-			goto found;
-		} else if (whence == SEEK_DATA) {
-			data_ofs = offset;
-			goto found;
-		}
+		goto found;
 	}
 
 	pgofs = (pgoff_t)(offset >> PAGE_SHIFT);
@@ -2926,6 +2922,12 @@ static int f2fs_ioc_move_range(struct file *filp, unsigned long arg)
 					range.pos_out, range.len);
 
 	mnt_drop_write_file(filp);
+	if (err)
+		goto err_out;
+
+	if (copy_to_user((struct f2fs_move_range __user *)arg,
+						&range, sizeof(range)))
+		err = -EFAULT;
 err_out:
 	fdput(dst);
 	return err;
@@ -3402,7 +3404,7 @@ static int f2fs_get_volume_name(struct file *filp, unsigned long arg)
 				min(FSLABEL_MAX, count)))
 		err = -EFAULT;
 
-	kfree(vbuf);
+	kvfree(vbuf);
 	return err;
 }
 
@@ -3968,13 +3970,8 @@ write:
 		clear_inode_flag(inode, FI_NO_PREALLOC);
 
 		/* if we couldn't write data, we should deallocate blocks. */
-		if (preallocated && i_size_read(inode) < target_size) {
-			down_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
-			down_write(&F2FS_I(inode)->i_mmap_sem);
+		if (preallocated && i_size_read(inode) < target_size)
 			f2fs_truncate(inode);
-			up_write(&F2FS_I(inode)->i_mmap_sem);
-			up_write(&F2FS_I(inode)->i_gc_rwsem[WRITE]);
-		}
 
 		if (ret > 0)
 			f2fs_update_iostat(F2FS_I_SB(inode), APP_WRITE_IO, ret);

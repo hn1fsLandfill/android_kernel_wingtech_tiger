@@ -40,70 +40,21 @@ struct tpd_dts_info tpd_dts_data;
 struct pinctrl *pinctrl1;
 struct pinctrl_state *pins_default;
 struct pinctrl_state *eint_as_int, *eint_output0,
-		*eint_output1, *rst_output0, *rst_output1, *pin_spi_mode_default;
+		*eint_output1, *rst_output0, *rst_output1;
 const struct of_device_id touch_of_match[] = {
 	{ .compatible = "mediatek,touch", },
+	{ .compatible = "mediatek,mt8167-touch", },
 	{ .compatible = "mediatek,touch-himax", },
 	{ .compatible = "goodix,touch", },
 	{},
 };
-
-char active_panel_name[50] = {0};
-
-int tpd_get_panel(void)
-{
-	if (strlen(active_panel_name)) {
-		TPD_DMESG("got active_panel_name=%s\n", active_panel_name);
-		return 0;
-	}
-
-	//bringup, parse panel name from cmdline
-	TPD_DMESG("enter\n");
-	if (saved_command_line) {
-		char *sub;
-		char key_prefix[] = "mipi_mot_vid_";
-
-		TPD_DMESG("saved_command_line is %s\n", saved_command_line);
-		sub = strstr(saved_command_line, key_prefix);
-		if (sub) {
-			char *d;
-			int n, len, len_max = 50;
-
-			d = strstr(sub, " ");
-			if (d) {
-				n = strlen(sub) - strlen(d);
-			} else {
-				n = strlen(sub);
-			}
-
-			if (n > len_max)
-				len = len_max;
-			else
-				len = n;
-
-			strncpy(active_panel_name, sub, len);
-			TPD_DMESG("active_panel_name=%s\n", active_panel_name);
-
-		} else {
-			TPD_DMESG("active panel not found!");
-			return -1;
-		}
-	} else {
-		TPD_DMESG("saved_command_line null!");
-		return -1;
-	}
-
-	return 0;
-}
 
 void tpd_get_dts_info(void)
 {
 	struct device_node *node1 = NULL;
 	int key_dim_local[16] = {0}, i = 0;
 
-	TPD_DMESG("enter\n");
 	node1 = of_find_matching_node(node1, touch_of_match);
-    TPD_DMESG("node1\n");
 	if (node1) {
 		of_property_read_u32(node1,
 			"tpd-max-touch-num", &tpd_dts_data.touch_max_num);
@@ -183,8 +134,6 @@ void tpd_get_dts_info(void)
 			"tpd-rst-ext-gpio-num",
 			&tpd_dts_data.rst_ext_gpio_num);
 
-		tpd_dts_data.tpd_panel_match =
-			of_property_read_bool(node1, "tpd-panel-match");
 	} else {
 		TPD_DMESG("can't find touch compatible custom node\n");
 	}
@@ -229,7 +178,6 @@ void tpd_gpio_output(int pin, int level)
 int tpd_get_gpio_info(struct platform_device *pdev)
 {
 	int ret;
-    int r;
 
 	TPD_DEBUG("[tpd %d] mt_tpd_pinctrl+++++++++++++++++\n", pdev->id);
 	pinctrl1 = devm_pinctrl_get(&pdev->dev);
@@ -279,19 +227,6 @@ int tpd_get_gpio_info(struct platform_device *pdev)
 			return ret;
 		}
 	}
-
-    //+EKSAIPAN-15,lilianxu.wt,ADD,20210107,TP bringup
-    pin_spi_mode_default = pinctrl_lookup_state(pinctrl1, "state_spi_mode");
-	if (IS_ERR(pin_spi_mode_default)) {
-		ret = PTR_ERR(pin_spi_mode_default);
-		TPD_DMESG("Cannot find pinctrl pin_spi_mode_default!\n");
-		return ret;
-	}
-	r = pinctrl_select_state(pinctrl1,pin_spi_mode_default);
-    if (r < 0)
-	    TPD_DMESG("Failed to select default pinstate, r:%d", r);
-    //-EKSAIPAN-15,lilianxu.wt,ADD,20210107,TP bringup
-
 	TPD_DEBUG("[tpd%d] mt_tpd_pinctrl----------\n", pdev->id);
 	return 0;
 }
@@ -491,42 +426,6 @@ static int tpd_fb_notifier_callback(
 
 	evdata = data;
 	/* If we aren't interested in this event, skip it immediately ... */
-#if defined(CONFIG_TOUCHSCREEN_MTK_TP_SEQ_PRE)
-	if ((event != FB_EVENT_BLANK) && event != FB_EARLY_EVENT_BLANK)
-		return 0;
-
-	blank = *(int *)evdata->data;
-	TPD_DMESG("TP_SEQ_PRE fb_notify(blank=%d)\n", blank);
-	switch (blank) {
-	case FB_BLANK_UNBLANK:
-		if (event == FB_EVENT_BLANK){
-			TPD_DMESG("LCD ON Notify\n");
-			if (g_tpd_drv && tpd_suspend_flag) {
-				err = queue_work(touch_resume_workqueue,
-							&touch_resume_work);
-				if (!err) {
-					TPD_DMESG("start resume_workqueue failed\n");
-					return err;
-				}
-			}
-		}
-		break;
-	case FB_BLANK_POWERDOWN:
-		if (event == FB_EARLY_EVENT_BLANK){
-			TPD_DMESG("LCD OFF Notify\n");
-			if (g_tpd_drv && !tpd_suspend_flag) {
-				err = cancel_work_sync(&touch_resume_work);
-				if (!err)
-					TPD_DMESG("cancel resume_workqueue failed\n");
-				g_tpd_drv->suspend(NULL);
-			}
-			tpd_suspend_flag = 1;
-		}
-		break;
-	default:
-		break;
-	}
-#else
 	if (event != FB_EVENT_BLANK)
 		return 0;
 
@@ -557,8 +456,6 @@ static int tpd_fb_notifier_callback(
 	default:
 		break;
 	}
-#endif
-
 	return 0;
 }
 /* Add driver: if find TPD_TYPE_CAPACITIVE driver successfully, loading it */
@@ -588,8 +485,6 @@ int tpd_driver_add(struct tpd_driver_t *tpd_drv)
 		if (tpd_driver_list[i].tpd_device_name == NULL) {
 			tpd_driver_list[i].tpd_device_name =
 				tpd_drv->tpd_device_name;
-			tpd_driver_list[i].tpd_panel_supplier =
-				tpd_drv->tpd_panel_supplier;
 			tpd_driver_list[i].tpd_local_init =
 				tpd_drv->tpd_local_init;
 			tpd_driver_list[i].suspend = tpd_drv->suspend;
@@ -667,7 +562,7 @@ static int tpd_probe(struct platform_device *pdev)
 	/* TPD_RES_X = simple_strtoul(LCM_WIDTH, NULL, 0); */
 	/* TPD_RES_Y = simple_strtoul(LCM_HEIGHT, NULL, 0); */
 
-#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION
+	#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION
 	if (strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "90", 2) == 0
 		|| strncmp(CONFIG_MTK_LCM_PHYSICAL_ROTATION, "270", 3) == 0) {
 #ifdef CONFIG_MTK_FB
@@ -711,7 +606,7 @@ static int tpd_probe(struct platform_device *pdev)
 	if (2560 == TPD_RES_X)
 		TPD_RES_X = 2048;
 	if (1600 == TPD_RES_Y)
-		TPD_RES_Y = 1600;
+		TPD_RES_Y = 1536;
 	pr_debug("mtk_tpd: TPD_RES_X = %lu, TPD_RES_Y = %lu\n",
 		TPD_RES_X, TPD_RES_Y);
 

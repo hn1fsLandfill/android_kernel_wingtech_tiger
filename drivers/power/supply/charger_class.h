@@ -19,17 +19,8 @@ enum adc_channel {
 	ADC_CHANNEL_TEMP_JC,
 	ADC_CHANNEL_USBID,
 	ADC_CHANNEL_TS,
-	ADC_CHANNEL_TBAT,
-	ADC_CHANNEL_VOUT,
 };
-enum mmi_dvchg_mux_channel {
-	MMI_DVCHG_MUX_NONE,
-	MMI_DVCHG_MUX_CHG_OPEN,
-	MMI_DVCHG_MUX_OTG_OPEN,
-	MMI_DVCHG_MUX_CLOSE,
-	MMI_DVCHG_MUX_MANUAL_OPEN,
-	MMI_DVCHG_MUX_DISABLE,
-};
+
 struct charger_properties {
 	const char *alias_name;
 };
@@ -165,14 +156,6 @@ struct charger_ops {
 	int (*enable_force_typec_otp)(struct charger_device *dev, bool en);
 	int (*enable_hidden_mode)(struct charger_device *dev, bool en);
 	int (*get_ctd_dischg_status)(struct charger_device *dev, u8 *status);
-	int (*enable_hz)(struct charger_device *dev, bool en);
-	/* mux*/
-	int (*config_mux)(struct charger_device *dev,
-			enum mmi_dvchg_mux_channel typec_mos,
-			enum mmi_dvchg_mux_channel wls_mos);
-
-	/* enable adc*/
-	int (*enable_adc)(struct charger_device *dev, bool en);
 };
 
 static inline void *charger_dev_get_drvdata(
@@ -270,8 +253,6 @@ extern int charger_dev_reset_eoc_state(
 	struct charger_device *charger_dev);
 extern int charger_dev_safety_check(
 	struct charger_device *charger_dev, u32 polling_ieoc);
-extern int charger_dev_enable_hz(
-	struct charger_device *charger_dev, bool en);
 
 /* PE+/PE+2.0 */
 extern int charger_dev_send_ta_current_pattern(
@@ -335,8 +316,5 @@ extern int unregister_charger_device_notifier(
 extern int charger_dev_notify(
 	struct charger_device *charger_dev, int event);
 
-extern int charger_dev_config_mux(struct charger_device *chg_dev,
-	enum mmi_dvchg_mux_channel typec_mos, enum mmi_dvchg_mux_channel wls_mos);
 
-extern int charger_dev_enable_adc(struct charger_device *chg_dev, bool en);
 #endif /*LINUX_POWER_CHARGER_CLASS_H*/

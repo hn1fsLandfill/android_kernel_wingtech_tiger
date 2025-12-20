@@ -1383,7 +1383,6 @@ page_hit:
 			  nid, nid_of_node(page), ino_of_node(page),
 			  ofs_of_node(page), cpver_of_node(page),
 			  next_blkaddr_of_node(page));
-		set_sbi_flag(sbi, SBI_NEED_FSCK);
 		err = -EINVAL;
 out_err:
 		ClearPageUptodate(page);
@@ -3259,7 +3258,7 @@ void f2fs_destroy_node_manager(struct f2fs_sb_info *sbi)
 	kvfree(nm_i->nat_bitmap_mir);
 #endif
 	sbi->nm_info = NULL;
-	kfree(nm_i);
+	kvfree(nm_i);
 }
 
 int __init f2fs_create_node_manager_caches(void)

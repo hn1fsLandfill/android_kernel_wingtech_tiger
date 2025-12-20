@@ -146,7 +146,6 @@
 
 #define DSI_CMDQ_SIZE 0x60
 #define CMDQ_SIZE 0x3f
-#define CMDQ_SIZE_SEL BIT(15)
 
 #define DSI_HSTX_CKL_WC 0x64
 
@@ -4568,17 +4567,14 @@ static void mtk_dsi_cmdq_grp_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 {
 	struct mipi_dsi_msg msg;
 	const char *tx_buf;
-	u32 config, cmdq_off, type;
-	u32 cmdq_size, total_cmdq_size = 0;
-	u32 start_off = 0;
+	u8 config, cmdq_off, type;
+	u8 cmdq_size, total_cmdq_size = 0;
+	u8 start_off = 0;
 	u32 reg_val, cmdq_val;
 	u32 cmdq_mask, i, j;
 	unsigned int base_addr;
 	struct mtk_ddp_comp *comp = &dsi->ddp_comp;
 	const u32 reg_cmdq_ofs = dsi->driver_data->reg_cmdq_ofs;
-
-	mtk_dsi_poll_for_idle(dsi, handle);
-	mtk_ddp_write_mask(comp, DIS_EOT, DSI_TXRX_CTRL, DIS_EOT, handle);
 
 	for (j = 0; j < para_size; j++) {
 		msg.tx_buf = para_table[j].para_list,
@@ -4608,8 +4604,6 @@ static void mtk_dsi_cmdq_grp_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 			config = BTA;
 		else
 			config = (msg.tx_len > 2) ? LONG_PACKET : SHORT_PACKET;
-
-		config |= HSTX;
 
 		if (msg.tx_len > 2) {
 			cmdq_off = 4;
@@ -4645,19 +4639,29 @@ static void mtk_dsi_cmdq_grp_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 				}
 			}
 		} else {
+			cmdq_off = 2;
+			cmdq_mask = CONFIG | DATA_ID;
+			reg_val = (type << 8) | config;
 
-			reg_val = (tx_buf[1] << 24) | (tx_buf[0] << 16) | (type << 8) | config;
-			base_addr = reg_cmdq_ofs + start_off;
-			mtk_ddp_write_relaxed(comp,
-				reg_val,
-				base_addr,
-				handle);
+			for (i = 0; i < msg.tx_len; i++) {
+				cmdq_val = tx_buf[i] << ((i & 0x3u) * 8);
+				cmdq_mask = (0xFFu << ((i & 0x3u) * 8));
+				reg_val = reg_val | (cmdq_val & cmdq_mask);
 
-			DDPINFO("set cmdq addr %x, val:%x\n",
-				base_addr,
-				reg_val);
-			reg_val = 0;
+				if (i == (msg.tx_len - 1)) {
+					base_addr = reg_cmdq_ofs + start_off +
+						cmdq_off + (i / 4) * 4;
+					mtk_ddp_write_relaxed(comp,
+						reg_val,
+						base_addr,
+						handle);
 
+					DDPINFO("set cmdq addr %x, val:%x\n",
+						base_addr,
+						reg_val);
+					reg_val = 0;
+				}
+			}
 		}
 
 		if (msg.tx_len > 2)
@@ -4672,26 +4676,13 @@ static void mtk_dsi_cmdq_grp_gce(struct mtk_dsi *dsi, struct cmdq_pkt *handle,
 
 	mtk_ddp_write_mask(comp, total_cmdq_size,
 				DSI_CMDQ_SIZE, CMDQ_SIZE, handle);
-	mtk_ddp_write_mask(comp, CMDQ_SIZE_SEL,
-					DSI_CMDQ_SIZE, CMDQ_SIZE_SEL, handle);
 
 	mtk_ddp_write_relaxed(comp, 0x0, DSI_START, handle);
 	mtk_ddp_write_relaxed(comp, 0x1, DSI_START, handle);
-	/*
-	 *ToDo: polling cmd done has something wrong
-	 *sometimes CMD_DONE can't change to 1,
-	 *sometimes CMD_DONE change to 1 before sending done cmds
-	 *maybe we should clear CMD_DONE before waiting
-	 */
-	/*mtk_dsi_cmdq_poll(comp, handle, comp->regs_pa + DSI_INTSTA,
+	mtk_dsi_cmdq_poll(comp, handle, comp->regs_pa + DSI_INTSTA,
 			CMD_DONE_INT_FLAG, CMD_DONE_INT_FLAG);
-	*/
-	/*add poll idle*/
-	mtk_dsi_poll_for_idle(dsi, handle);
-	/*mtk_ddp_write_mask(comp, 0x0, DSI_INTSTA, CMD_DONE_INT_FLAG,
+	mtk_ddp_write_mask(comp, 0x0, DSI_INTSTA, CMD_DONE_INT_FLAG,
 			handle);
-	*/
-	mtk_ddp_write_mask(comp, 0, DSI_TXRX_CTRL, DIS_EOT, handle);
 
 	DDPINFO("set cmdqaddr %x, val:%d, mask %x\n", DSI_CMDQ_SIZE,
 			total_cmdq_size,
@@ -5732,20 +5723,15 @@ void mtk_dsi_send_switch_cmd(struct mtk_dsi *dsi,
 	if (dsi->slave_dsi)
 		mtk_dsi_leave_idle(dsi->slave_dsi);
 
-	if(params->dyn_fps.dfps_cmd_grp_size) {
-		mtk_dsi_cmdq_grp_gce(dsi, handle, params->dyn_fps.dfps_cmd_grp_table, params->dyn_fps.dfps_cmd_grp_size);
-	} else {
-		for (i = 0; i < MAX_DYN_CMD_NUM; i++) {
-			dfps_cmd = &params->dyn_fps.dfps_cmd_table[i];
-			if (dfps_cmd->cmd_num == 0)
-				break;
-			if (dfps_cmd->src_fps == 0 || old_mode->vrefresh == dfps_cmd->src_fps)
-				mipi_dsi_dcs_write_gce_dyn(dsi, handle, dfps_cmd->para_list,
-					dfps_cmd->cmd_num);
+	for (i = 0; i < MAX_DYN_CMD_NUM; i++) {
+		dfps_cmd = &params->dyn_fps.dfps_cmd_table[i];
+		if (dfps_cmd->cmd_num == 0)
+			break;
 
-		}
+		if (dfps_cmd->src_fps == 0 || old_mode->vrefresh == dfps_cmd->src_fps)
+			mipi_dsi_dcs_write_gce_dyn(dsi, handle, dfps_cmd->para_list,
+				dfps_cmd->cmd_num);
 	}
-
 }
 
 unsigned int mtk_dsi_get_dsc_compress_rate(struct mtk_dsi *dsi)
@@ -6177,23 +6163,6 @@ static void mtk_dsi_vdo_timing_change(struct mtk_dsi *dsi,
 			kfree(cb_data);
 			return;
 		}
-
-		if (dsi && dsi->ext && dsi->ext->params
-			&& dsi->ext->params->change_fps_by_vfp_send_cmd) {
-			cmdq_pkt_wfe(handle,
-				     mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
-			/*1.1 send cmd: stop vdo mode*/
-			mtk_dsi_stop_vdo_mode(dsi, handle);
-			/* for crtc first enable,dyn fps fail*/
-			if (dsi->data_rate == 0) {
-				dsi->data_rate = mtk_dsi_default_rate(dsi);
-				mtk_mipi_tx_pll_rate_set_adpt(dsi->phy, dsi->data_rate);
-
-				if (dsi->data_rate)
-					mtk_dsi_phy_timconfig(dsi, NULL);
-			}
-		}
-
 		if (dsi->mipi_hopping_sta && dsi->ext->params->dyn.vfp) {
 			DDPINFO("%s,mipi_clk_change_sta\n", __func__);
 			vfp = dsi->ext->params->dyn.vfp;
@@ -6202,28 +6171,6 @@ static void mtk_dsi_vdo_timing_change(struct mtk_dsi *dsi,
 				adjusted_mode.vdisplay;
 
 		dsi->vm.vfront_porch = vfp;
-
-		if (dsi && dsi->ext && dsi->ext->params
-					&& dsi->ext->params->change_fps_by_vfp_send_cmd)
-			mtk_dsi_calc_vdo_timing(dsi);
-
-		mtk_dsi_porch_setting(comp, handle, DSI_VFP, vfp);
-		if (dsi && dsi->ext && dsi->ext->params
-			&& dsi->ext->params->change_fps_by_vfp_send_cmd) {
-			/*1.2 send cmd: send cmd*/
-			mtk_dsi_send_switch_cmd(dsi, handle, mtk_crtc, src_mode,
-						drm_mode_vrefresh(&adjusted_mode));
-			/*1.3 send cmd: start vdo mode*/
-			mtk_dsi_start_vdo_mode(comp, handle);
-			/*clear EOF
-			 * avoid config continue after we trigger vdo mode
-			 */
-			cmdq_pkt_clear_event(handle,
-				     mtk_crtc->gce_obj.event[EVENT_CMD_EOF]);
-			/*1.3 send cmd: trigger*/
-			mtk_disp_mutex_trigger(comp->mtk_crtc->mutex[0], handle);
-			mtk_dsi_trigger(comp, handle);
-		}
 
 		mtk_dsi_porch_setting(comp, handle, DSI_VFP, vfp);
 
@@ -6754,62 +6701,7 @@ static int mtk_dsi_io_cmd(struct mtk_ddp_comp *comp, struct cmdq_pkt *handle,
 		mtk_dsi_LFR_status_check(dsi);
 	}
 		break;
-	case DSI_CABC_SET:
-	{
-		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (!(panel_ext && panel_ext->funcs &&
-		      panel_ext->funcs->cabc_set_cmdq))
-			break;
 
-		panel_ext->funcs->cabc_set_cmdq(dsi->panel, dsi,
-					       mipi_dsi_dcs_write_gce, handle,
-					       *(unsigned int *)params);
-		break;
-	}
-	case DSI_CABC_GET_STATE:
-	{
-		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (!(panel_ext && panel_ext->funcs &&
-		      panel_ext->funcs->cabc_get_state))
-			break;
-
-		panel_ext->funcs->cabc_get_state(dsi->panel, (unsigned int *)params);
-		break;
-	}
-	case DSI_NOTIFY_FPS_CHG:
-	{
-		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (!(panel_ext && panel_ext->funcs &&
-		      panel_ext->funcs->notify_fps_chg))
-			break;
-
-		panel_ext->funcs->notify_fps_chg(dsi,
-					mipi_dsi_dcs_write_gce, handle,
-					*(unsigned int *)params);
-		break;
-	}
-	case DSI_PANEL_FEATURE_SET:
-	{
-		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (!(panel_ext && panel_ext->funcs &&
-		      panel_ext->funcs->panel_feature_set))
-			break;
-
-		panel_ext->funcs->panel_feature_set(dsi->panel, dsi,
-					       mipi_dsi_dcs_write_gce, handle,
-					       *(struct panel_param_info*) params);
-		break;
-	}
-	case PANEL_HBM_WAITFOR_FPS_VALID:
-	{
-		panel_ext = mtk_dsi_get_panel_ext(comp);
-		if (!(panel_ext && panel_ext->funcs &&
-		      panel_ext->funcs->panel_hbm_waitfor_fps_valid))
-			break;
-
-		panel_ext->funcs->panel_hbm_waitfor_fps_valid(dsi->panel, *(unsigned int *)params);
-	}
-		break;
 	default:
 		break;
 	}

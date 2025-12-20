@@ -13,9 +13,6 @@
  * ============================================================
  */
 
-/* Default use moto serial number feature */
-#define MTK_GET_BATTERY_ID_BY_SERIALNUMBER
-
 /* customize */
 #define DIFFERENCE_FULLOCV_ITH	200	/* mA */
 #define MTK_CHR_EXIST			1
@@ -429,15 +426,12 @@ int g_temperature[MAX_TABLE] = {
 	-45/*TEMPERATURE_T9*/
 };
 
+
 #define BAT_NTC_10 1
 #define BAT_NTC_47 0
 
 #if (BAT_NTC_10 == 1)
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-#define RBAT_PULL_UP_R             16900
-#else
 #define RBAT_PULL_UP_R             24000
-#endif
 #endif
 
 #if (BAT_NTC_47 == 1)
@@ -449,34 +443,7 @@ int g_temperature[MAX_TABLE] = {
 #define BIF_NTC_R 16000
 
 #if (BAT_NTC_10 == 1)
-#ifdef CONFIG_MTK_BQ2560x_SUPPORT
-struct fuelgauge_temperature Fg_Temperature_Table[23] = {
-		{-40, 202700},
-		{-35, 153500},
-		{-30, 117200},
-		{-25, 89270},
-		{-20, 69590},
-		{-15, 54620},
-		{-10, 43210},
-		{-5, 34430},
-		{0, 27570},
-		{5, 22240},
-		{10, 18060},
-		{15, 14740},
-		{20, 12110},
-		{25, 10000},
-		{30, 8313},
-		{35, 6943},
-		{40, 5820},
-		{45, 4910},
-		{50, 4160},
-		{55, 3540},
-		{60, 3019},
-		{65, 2580},
-		{70, 2221}
-};
-#else
-struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[23] = {
+struct fuelgauge_temperature Fg_Temperature_Table[21] = {
 		{-40, 195652},
 		{-35, 148171},
 		{-30, 113347},
@@ -497,11 +464,8 @@ struct FUELGAUGE_TEMPERATURE Fg_Temperature_Table[23] = {
 		{45, 4917},
 		{50, 4161},
 		{55, 3535},
- 		{60, 3014},
- 		{65, 2588},
-   		{70, 2227}
+		{60, 3014}
 };
-#endif
 #endif
 
 #if (BAT_NTC_47 == 1)
@@ -529,6 +493,8 @@ struct fuelgauge_temperature Fg_Temperature_Table[21] = {
 		{60, 11210}
 };
 #endif
+
+
 
 /* ============================================================
  * <DOD, Battery_Voltage> Table

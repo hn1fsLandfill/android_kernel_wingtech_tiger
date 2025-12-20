@@ -57,29 +57,6 @@
 #include "ufs-mediatek-dbg.h"
 #include "ufs-mtk-block.h"
 
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-#include <linux/of_platform.h>
-
-struct mmi_storage_info {
-        char type[16];  /* UFS or eMMC */
-        char size[16];  /* size in GB */
-        char card_manufacturer[32];
-        char product_name[32];  /* model ID */
-        char firmware_version[32];
-};
-
-struct mmi_ddr_info{
-        unsigned int mr5;
-        unsigned int mr6;
-        unsigned int mr7;
-        unsigned int mr8;
-        unsigned int type;
-        unsigned int ramsize;
-};
-unsigned int ram_size;
-unsigned int storage_mfrid;
-#endif
-
 #define UFSHCD_ENABLE_INTRS	(UTP_TRANSFER_REQ_COMPL |\
 				 UTP_TASK_REQ_COMPL |\
 				 UFSHCD_ERROR_MASK)
@@ -122,11 +99,6 @@ unsigned int storage_mfrid;
 
 /* Default value of wait time before gating device ref clock */
 #define UFSHCD_REF_CLK_GATING_WAIT_US 0xFF /* microsecs */
-
-#if defined(CONFIG_SCSI_SKHID)
-/* for manual gc */
-#define UFSHCD_MANUAL_GC_HOLD_HIBERN8		2000	/* 2 seconds */
-#endif
 
 #define ufshcd_toggle_vreg(_dev, _vreg, _on)				\
 	({                                                              \
@@ -314,13 +286,6 @@ static struct ufs_dev_fix ufs_fixups[] = {
 };
 
 static irqreturn_t ufshcd_tmc_handler(struct ufs_hba *hba);
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-static int get_dram_info(struct ufs_hba *hba);
-static int get_storage_info(struct ufs_hba *hba);
-#endif
-#if defined(CONFIG_SCSI_SKHID)
-static void ufshcd_add_hid_info_sysfs_node(struct ufs_hba *hba);
-#endif
 static void ufshcd_async_scan(void *data, async_cookie_t cookie);
 static int ufshcd_reset_and_restore(struct ufs_hba *hba);
 static int ufshcd_eh_host_reset_handler(struct scsi_cmnd *cmd);
@@ -360,21 +325,13 @@ static inline void ufshcd_disable_irq(struct ufs_hba *hba)
 	}
 }
 
-#if defined(CONFIG_UFSHID)
-void ufshcd_scsi_unblock_requests(struct ufs_hba *hba)
-#else
 static void ufshcd_scsi_unblock_requests(struct ufs_hba *hba)
-#endif
 {
 	if (atomic_dec_and_test(&hba->scsi_block_reqs_cnt))
 		scsi_unblock_requests(hba->host);
 }
 
-#if defined(CONFIG_UFSHID)
-void ufshcd_scsi_block_requests(struct ufs_hba *hba)
-#else
 static void ufshcd_scsi_block_requests(struct ufs_hba *hba)
-#endif
 {
 	if (atomic_inc_return(&hba->scsi_block_reqs_cnt) == 1)
 		scsi_block_requests(hba->host);
@@ -1188,19 +1145,11 @@ static bool ufshcd_is_devfreq_scaling_required(struct ufs_hba *hba,
 	return false;
 }
 
-#if defined(CONFIG_UFSHID)
-int ufshcd_wait_for_doorbell_clr(struct ufs_hba *hba,
-					u64 wait_timeout_us,
-					bool ignore_state,
-					int tr_allowed,
-					int tm_allowed)
-#else
 static int ufshcd_wait_for_doorbell_clr(struct ufs_hba *hba,
 					u64 wait_timeout_us,
 					bool ignore_state,
 					int tr_allowed,
 					int tm_allowed)
-#endif
 {
 	unsigned long flags;
 	int ret = 0;
@@ -1647,105 +1596,6 @@ static void ufshcd_resume_clkscaling(struct ufs_hba *hba)
 		devfreq_resume_device(hba->devfreq);
 }
 
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-static ssize_t SEC_UFS_HPB_info_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct Scsi_Host *Shost = container_of(dev, struct Scsi_Host, shost_dev);
-	struct ufs_hba *hba = shost_priv(Shost);
-	struct ufsf_feature *ufsf = &hba->ufsf;
-	struct ufshpb_lu *hpb = ufsf->ufshpb_lup[0];
-	struct SEC_UFS_HPB_info *hpb_info = &(hba->SEC_hpb_info);
-
-	long long hit_cnt;
-	long long miss_cnt;
-	long long set_rt_cnt, unset_rt_cnt;
-
-	int rt_pin_cnt = 0, act_cnt = 0;
-	int rgn_idx;
-	enum HPBREGION_STATE state;
-
-	long long pinned_rb_cnt, active_rb_cnt;
-	long long hpb_amount_R_kb_diff;
-	long hours = 0;
-
-	if (!hpb || !(ufsf->hpb_dev_info.hpb_device))
-		return 0;
-
-	if (ufsf->ufshpb_state == HPB_FAILED)
-		return 0;
-
-	hit_cnt = atomic64_read(&hpb->hit);
-	miss_cnt = atomic64_read(&hpb->miss);
-	set_rt_cnt = atomic64_read(&hpb->set_rt_req_cnt);
-	unset_rt_cnt = atomic64_read(&hpb->unset_rt_req_cnt);
-
-	for (rgn_idx = 0; rgn_idx < hpb->rgns_per_lu; rgn_idx++) {
-		state = hpb->rgn_tbl[rgn_idx].rgn_state;
-		if (state == HPBREGION_RT_PINNED)
-			rt_pin_cnt++;
-		else if (state == HPBREGION_ACTIVE)
-			act_cnt++;
-	}
-
-	pinned_rb_cnt = atomic64_read(&(hpb_info->hpb_pinned_rb_cnt));
-	active_rb_cnt = atomic64_read(&(hpb_info->hpb_active_rb_cnt));
-
-	hpb_amount_R_kb_diff = hpb_info->hpb_amount_R_kb - hpb_info->hpb_amount_R_kb_old;
-	hpb_info->hpb_amount_R_kb_old = hpb_info->hpb_amount_R_kb;
-
-	get_monotonic_boottime(&(hpb_info->timestamp_new));
-	hours = (hpb_info->timestamp_new.tv_sec - hpb_info->timestamp_old.tv_sec) / 60;	/* min */
-	hours = (hours + 30) / 60;	/* round up to hours */
-	get_monotonic_boottime(&(hpb_info->timestamp_old));	/* update timestamp */
-
-	return sprintf(buf, "\"HCNT\":\"%llu\","
-			"\"MCNT\":\"%llu\","
-			"\"SRTCNT\":\"%llu\","
-			"\"USRTCNT\":\"%llu\","
-			"\"RTPCNT\":\"%d\","
-			"\"ACTCNT\":\"%d\","
-			"\"PINRBCNT\":\"%llu\","
-			"\"ACTRBCNT\":\"%llu\","
-			"\"HPBDAYMB\":\"%llu\","
-			"\"HPBhours\":\"%ld\"\n",
-			hit_cnt,
-			miss_cnt,
-			set_rt_cnt,
-			unset_rt_cnt,
-			rt_pin_cnt,
-			act_cnt,
-			pinned_rb_cnt,
-			active_rb_cnt,
-			(hpb_amount_R_kb_diff >> 10),
-			hours);
-}
-static DEVICE_ATTR(SEC_UFS_HPB_info, 0444, SEC_UFS_HPB_info_show, NULL);
-
-static ssize_t SEC_UFS_HPB_error_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	struct Scsi_Host *Shost = container_of(dev, struct Scsi_Host, shost_dev);
-	struct ufs_hba *hba = shost_priv(Shost);
-	struct SEC_UFS_HPB_info *hpb_info = &(hba->SEC_hpb_info);
-
-	if (!(hba->ufsf.hpb_dev_info.hpb_device))
-		return 0;
-
-	return sprintf(buf, "\"HPBRERR\":\"%u\","
-			"\"RBRERR\":\"%u\","
-			"\"RBSRTERR\":\"%u\","
-			"\"WBPFERR\":\"%u\","
-			"\"WBUSRTERR\":\"%u\","
-			"\"WBUSRTAERR\":\"%u\"\n",
-			hpb_info->hpb_read_err_count,
-			hpb_info->hpb_RB_ID_READ_err_count,
-			hpb_info->hpb_RB_ID_SET_RT_err_count,
-			hpb_info->hpb_WB_ID_PREFETCH_err_count,
-			hpb_info->hpb_WB_ID_UNSET_RT_err_count,
-			hpb_info->hpb_WB_ID_UNSET_RT_ALL_err_count);
-}
-static DEVICE_ATTR(SEC_UFS_HPB_err_info, 0444, SEC_UFS_HPB_error_show, NULL);
-#endif
-
 static ssize_t ufshcd_clkscale_enable_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
@@ -1802,51 +1652,6 @@ static void ufshcd_clkscaling_init_sysfs(struct ufs_hba *hba)
 	if (device_create_file(hba->dev, &hba->clk_scaling.enable_attr))
 		dev_err(hba->dev, "Failed to create sysfs for clkscale_enable\n");
 }
-
-#if defined(CONFIG_SCSI_SKHID)
-static enum hrtimer_restart ufshcd_mgc_hrtimer_handler(struct hrtimer *timer)
-{
-	struct ufs_hba *hba = container_of(timer, struct ufs_hba,
-					manual_gc.hrtimer);
-
-	queue_work(hba->manual_gc.mgc_workq, &hba->manual_gc.hibern8_work);
-	return HRTIMER_NORESTART;
-}
-
-static void ufshcd_mgc_hibern8_work(struct work_struct *work)
-{
-	struct ufs_hba *hba = container_of(work, struct ufs_hba,
-						manual_gc.hibern8_work);
-	pm_runtime_mark_last_busy(hba->dev);
-	pm_runtime_put_noidle(hba->dev);
-	/* bkops will be disabled when power down */
-}
-
-static void ufshcd_init_manual_gc(struct ufs_hba *hba)
-{
-	struct ufs_manual_gc *mgc = &hba->manual_gc;
-	char wq_name[sizeof("ufs_mgc_hibern8_work")];
-
-	mgc->state = MANUAL_GC_ENABLE;
-	mgc->hagc_support = true;
-	mgc->delay_ms = UFSHCD_MANUAL_GC_HOLD_HIBERN8;
-
-	hrtimer_init(&mgc->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	mgc->hrtimer.function = ufshcd_mgc_hrtimer_handler;
-
-	INIT_WORK(&mgc->hibern8_work, ufshcd_mgc_hibern8_work);
-	snprintf(wq_name, ARRAY_SIZE(wq_name), "ufs_mgc_hibern8_work_%d",
-			hba->host->host_no);
-	hba->manual_gc.mgc_workq = create_singlethread_workqueue(wq_name);
-}
-
-static void ufshcd_exit_manual_gc(struct ufs_hba *hba)
-{
-	hrtimer_cancel(&hba->manual_gc.hrtimer);
-	cancel_work_sync(&hba->manual_gc.hibern8_work);
-	destroy_workqueue(hba->manual_gc.mgc_workq);
-}
-#endif
 
 static void ufshcd_ungate_work(struct work_struct *work)
 {
@@ -2813,21 +2618,15 @@ static int ufshcd_comp_devman_upiu(struct ufs_hba *hba, struct ufshcd_lrb *lrbp)
 
 	if (likely(lrbp->cmd)) {
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-    #if defined(CONFIG_SCSI_UFS_HPB)
-    	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			if (hba->dev_info.wmanufacturerid != UFS_VENDOR_SKHYNIX)
-				ufsf_hpb_change_lun(&hba->ufsf, lrbp);
-	#endif
+		if (hba->dev_info.wmanufacturerid != UFS_VENDOR_SKHYNIX)
+			ufsf_hpb_change_lun(&hba->ufsf, lrbp);
 		ufsf_tw_prep_fn(&hba->ufsf, lrbp);
-	#if defined(CONFIG_SCSI_UFS_HPB)
-    	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			if (hba->dev_info.wmanufacturerid != UFS_VENDOR_SKHYNIX)
-				ufsf_hpb_prep_fn(&hba->ufsf, lrbp);
-	#endif
+		if (hba->dev_info.wmanufacturerid != UFS_VENDOR_SKHYNIX)
+			ufsf_hpb_prep_fn(&hba->ufsf, lrbp);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX) {
-		if (hba->skhpb_state == SKHPB_PRESENT && hba->issue_ioctl == false && IS_RAM_SIZE_GREATER_THAN_4G(ram_size)) {
+		if (hba->skhpb_state == SKHPB_PRESENT && hba->issue_ioctl == false) {
 			skhpb_prep_fn(hba, lrbp);
 		}
 	}
@@ -2955,10 +2754,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 
 #if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-	 /* the RAM size smaller than 4G not support HPB. just skip the following logic*/
-	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-		goto send_orig_cmd;
-
 	/* Micron version 2.0 not support write buffer id 2 */
 	if (hba->dev_info.wmanufacturerid != UFS_VENDOR_SAMSUNG)
 		goto send_orig_cmd;
@@ -3060,7 +2855,7 @@ out_unlock:
 	spin_unlock_irqrestore(hba->host->host_lock, flags);
 out:
 #if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-	if (!pre_req_err && IS_RAM_SIZE_GREATER_THAN_4G(ram_size)) {
+	if (!pre_req_err) {
 		pre_cmd = add_lrbp->cmd;
 		scsi_dma_unmap(pre_cmd);
 		add_lrbp->cmd = NULL;
@@ -3328,7 +3123,7 @@ static inline void ufshcd_init_query(struct ufs_hba *hba,
 	(*request)->upiu_req.selector = selector;
 }
 
-#if defined(CONFIG_SCSI_SKHPB) || defined(CONFIG_SCSI_SKHID)
+#if defined(CONFIG_SCSI_SKHPB)
 int ufshcd_query_flag_retry(struct ufs_hba *hba,
 	enum query_opcode opcode, enum flag_idn idn, bool *flag_res)
 #else
@@ -3502,20 +3297,14 @@ EXPORT_SYMBOL_GPL(ufshcd_query_attr);
  *
  * Returns 0 for success, non-zero in case of failure
 */
-#if defined(CONFIG_SCSI_SKHID)
-int ufshcd_query_attr_retry(struct ufs_hba *hba,
-	enum query_opcode opcode, enum attr_idn idn, u8 index, u8 selector,
-	u32 *attr_val)
-#else
 static int ufshcd_query_attr_retry(struct ufs_hba *hba,
 	enum query_opcode opcode, enum attr_idn idn, u8 index, u8 selector,
 	u32 *attr_val)
-#endif
 {
 	int ret = 0;
 	u32 retries;
 
-	for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
+	 for (retries = QUERY_REQ_RETRIES; retries > 0; retries--) {
 		ret = ufshcd_query_attr(hba, opcode, idn, index,
 						selector, attr_val);
 		if (ret)
@@ -5454,15 +5243,14 @@ ufshcd_transfer_rsp_status(struct ufs_hba *hba, struct ufshcd_lrb *lrbp,
 				if (schedule_work(&hba->eeh_work))
 					pm_runtime_get_noresume(hba->dev);
 			}
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-				if ((scsi_status == SAM_STAT_GOOD) && IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
+#if defined(CONFIG_SCSI_UFS_FEATURE)
+				if (scsi_status == SAM_STAT_GOOD)
 					ufsf_hpb_noti_rb(&hba->ufsf, lrbp);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
 				if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX) {
 					if (hba->skhpb_state == SKHPB_PRESENT &&
-							scsi_status == SAM_STAT_GOOD &&
-							IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
+							scsi_status == SAM_STAT_GOOD)
 							skhpb_rsp_upiu(hba, lrbp);
 				}
 #endif
@@ -5666,11 +5454,7 @@ static irqreturn_t ufshcd_transfer_req_compl(struct ufs_hba *hba, int *ret)
 	if (completed_reqs) {
 		if (ret)
 			*ret = __ufshcd_transfer_req_compl(hba, completed_reqs);
-			
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-		ufsf_hpb_wakeup_worker_on_idle(&hba->ufsf);
-#endif
+
 		return IRQ_HANDLED;
 	} else {
 		return IRQ_NONE;
@@ -5862,11 +5646,8 @@ static inline int ufshcd_get_bkops_status(struct ufs_hba *hba, u32 *status)
  * to know whether auto bkops is enabled or disabled after this function
  * returns control to it.
  */
-#if defined(CONFIG_SCSI_SKHID)
-int ufshcd_bkops_ctrl(struct ufs_hba *hba, enum bkops_status status)
-#else
-static int ufshcd_bkops_ctrl(struct ufs_hba *hba,enum bkops_status status)
-#endif
+static int ufshcd_bkops_ctrl(struct ufs_hba *hba,
+			     enum bkops_status status)
 {
 	int err;
 	u32 curr_status = 0;
@@ -6297,83 +6078,6 @@ out:
 	pm_runtime_put_sync(hba->dev);
 	up(&hba->eh_sem);
 }
-
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-static void ufshcd_add_hpb_info_sysfs_node(struct ufs_hba *hba);
-
-static void SEC_ufs_update_hpb_info(struct ufs_hba *hba, int read_transfer_len)
-{
-	struct SEC_UFS_HPB_info *hpb_info = &(hba->SEC_hpb_info);
-
-	if (hpb_info->hpb_info_disable)
-		return;
-
-	/*
-	 * read_transfer_len : Byte
-	 * hpb_info->hpb_amount_R_kb : KB
-	 */
-	hpb_info->hpb_amount_R_kb += (unsigned long)(read_transfer_len >> 10);
-	if (unlikely((s64)hpb_info->hpb_amount_R_kb < 0))
-		goto disable_hpb_info;
-	return;
-
-disable_hpb_info:
-	hpb_info->hpb_info_disable = true;
-	return;
-}
-
-#define SEC_UFS_HPB_ERR_check(hpb_info, member) ({		\
-		(hpb_info)->member++;				\
-		if ((hpb_info)->member == UINT_MAX) 		\
-			(hpb_info)->hpb_err_count_disable = true; })
-
-static void SEC_ufs_hpb_error_check(struct ufs_hba *hba, struct scsi_cmnd *cmd)
-{
-	struct SEC_UFS_HPB_info *hpb_info = &(hba->SEC_hpb_info);
-
-	u8 cmd_opcode = cmd->cmnd[0];
-	u8 cmd_id = cmd->cmnd[1];
-
-	if (hpb_info->hpb_err_count_disable)
-		return;
-
-	switch (cmd_opcode) {
-	case READ_16:
-		SEC_UFS_HPB_ERR_check(hpb_info, hpb_read_err_count);
-		break;
-	case UFSHPB_READ_BUFFER:
-		if (cmd_id == UFSHPB_RB_ID_READ)
-			SEC_UFS_HPB_ERR_check(hpb_info, hpb_RB_ID_READ_err_count);
-		else if (cmd_id == UFSHPB_RB_ID_SET_RT)
-			SEC_UFS_HPB_ERR_check(hpb_info, hpb_RB_ID_SET_RT_err_count);
-		break;
-	case UFSHPB_WRITE_BUFFER:
-		if (cmd_id == UFSHPB_WB_ID_PREFETCH)
-			SEC_UFS_HPB_ERR_check(hpb_info, hpb_WB_ID_PREFETCH_err_count);
-		else if (cmd_id == UFSHPB_WB_ID_UNSET_RT)
-			SEC_UFS_HPB_ERR_check(hpb_info, hpb_WB_ID_UNSET_RT_err_count);
-		else if (cmd_id == UFSHPB_WB_ID_UNSET_RT_ALL)
-			SEC_UFS_HPB_ERR_check(hpb_info, hpb_WB_ID_UNSET_RT_ALL_err_count);
-		break;
-	default:
-		break;
-	}
-
-	return;
-}
-
-void SEC_ufs_hpb_rb_count(struct ufs_hba *hba, struct ufshpb_region *rgn)
-{
-       if (rgn->rgn_state == HPBREGION_PINNED ||
-	   rgn->rgn_state == HPBREGION_RT_PINNED) {
-	       atomic64_inc(&(hba->SEC_hpb_info.hpb_pinned_rb_cnt));
-       } else if (rgn->rgn_state == HPBREGION_ACTIVE) {
-	       atomic64_inc(&(hba->SEC_hpb_info.hpb_active_rb_cnt));
-       }
-
-       return;
-}
-#endif
 
 /**
  * ufshcd_update_uic_error - check and set fatal UIC error flags.
@@ -7032,10 +6736,7 @@ out:
 	ufshcd_update_evt_hist(hba, UFS_EVT_DEV_RESET, (u32)err);
 	if (!err) {
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_reset_lu(&hba->ufsf);
-	#endif
+		ufsf_hpb_reset_lu(&hba->ufsf);
 		ufsf_tw_reset_lu(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
@@ -7269,14 +6970,8 @@ static int ufshcd_host_reset_and_restore(struct ufs_hba *hba)
 	spin_lock_irqsave(hba->host->host_lock, flags);
 	ufshcd_hba_stop(hba, false);
 #if defined(CONFIG_SCSI_UFS_FEATURE)
+	ufsf_hpb_reset_host(&hba->ufsf);
 	ufsf_tw_reset_host(&hba->ufsf);
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_reset_host(&hba->ufsf);
-	#endif
-    #if defined(CONFIG_USFHID)
-	ufsf_hid_reset_host(&hba->ufsf);
-	#endif
 #endif
 	hba->silence_err_logs = true;
 	ufshcd_complete_requests(hba);
@@ -7615,9 +7310,7 @@ static int ufs_get_device_desc(struct ufs_hba *hba)
 
 	/* getting Specification Version in big endian format */
 	dev_info->wspecversion = desc_buf[DEVICE_DESC_PARAM_SPEC_VER] << 8 |
-                      desc_buf[DEVICE_DESC_PARAM_SPEC_VER + 1];
-
-	dev_info->b_wb_buffer_type = desc_buf[DEVICE_DESC_PARAM_WB_TYPE];
+				      desc_buf[DEVICE_DESC_PARAM_SPEC_VER + 1];
 
 	model_index = desc_buf[DEVICE_DESC_PARAM_PRDCT_NAME];
 	err = ufshcd_read_string_desc(hba, model_index,
@@ -8122,33 +7815,13 @@ static int ufshcd_probe_hba(struct ufs_hba *hba, bool async)
 		ufshcd_print_info(hba, UFS_INFO_PWR);
 	}
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	if (ufsf_device_check(hba))
-		goto out;
+	ufsf_device_check(hba);
 	ufsf_tw_init(&hba->ufsf);
-#if defined(CONFIG_SCSI_UFS_HPB)
-	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size)) {
-		ufsf_hpb_init(&hba->ufsf);
-		if (hba->ufsf.hpb_dev_info.hpb_device) {
-			ufshcd_add_hpb_info_sysfs_node(hba);
-			get_monotonic_boottime(&(hba->SEC_hpb_info.timestamp_old));
-		}
-	}
-#endif
+	ufsf_hpb_init(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX)
 		schedule_delayed_work(&hba->skhpb_init_work, 0);
-#endif
-
-#if  defined(CONFIG_UFSHID)
-		if (ufshid_get_state(&hba->ufsf) == HID_NEED_INIT  && (hba->card->wmanufacturerid != UFS_VENDOR_SKHYNIX)) {
-		   dev_err(hba->dev, "Chris: Samsung & Micron memory, Hynix use self driver not go here!\n");
-             ufsf_hid_init(&hba->ufsf);
-		}
-#endif
-
-#if defined(CONFIG_SCSI_SKHID)
-		ufshcd_add_hid_info_sysfs_node(hba);
 #endif
 
 	/*
@@ -8168,14 +7841,7 @@ static int ufshcd_probe_hba(struct ufs_hba *hba, bool async)
 out:
 
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if(IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_reset(&hba->ufsf);
-	#endif
-
-	#if defined(CONFIG_UFSHID)
-	ufsf_hid_reset(&hba->ufsf);
-	#endif
+		ufsf_hpb_reset(&hba->ufsf);
 		ufsf_tw_reset(&hba->ufsf);
 #endif
 
@@ -9270,19 +8936,11 @@ static int ufshcd_suspend(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		req_link_state = UIC_LINK_OFF_STATE;
 	}
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_suspend(&hba->ufsf);
-	#endif
-		#if defined(CONFIG_UFSHID)
-		ufsf_hid_suspend(&hba->ufsf);
-		#endif
-
+		ufsf_hpb_suspend(&hba->ufsf);
 		ufsf_tw_suspend(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
-		if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX &&
-		IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
+		if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX)
 			skhpb_suspend(hba);
 #endif
 
@@ -9445,10 +9103,7 @@ enable_gating:
 		ufshcd_resume_clkscaling(hba);
 	hba->clk_gating.is_suspended = false;
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_resume(&hba->ufsf);
-	#endif
+	ufsf_hpb_resume(&hba->ufsf);
 	ufsf_tw_resume(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
@@ -9579,21 +9234,12 @@ static int ufshcd_resume(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 	if (hba->clk_scaling.is_allowed)
 		ufshcd_resume_clkscaling(hba);
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_resume(&hba->ufsf);
-	#endif
-
-	#if defined(CONFIG_UFSHID)
-     ufsf_hid_resume(&hba->ufsf);
-	#endif
-
+	ufsf_hpb_resume(&hba->ufsf);
 	ufsf_tw_resume(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
 	if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			skhpb_resume(hba);
+		skhpb_resume(hba);
 #endif
 
 	/* MTK PATCH: Enable auto-hibern8 if resume is successful */
@@ -9823,174 +9469,6 @@ static void ufshcd_device_quiesce(struct ufs_hba *hba)
 
 	ufs_mtk_rpmb_quiesce(hba);
 }
-#if defined(CONFIG_SCSI_UFS_FEATURE) && defined(CONFIG_SCSI_UFS_HPB)
-static struct attribute *ufs_hpb_attributes[] = {
-	&dev_attr_SEC_UFS_HPB_info.attr,
-	&dev_attr_SEC_UFS_HPB_err_info.attr,
-	NULL
-};
-
-static struct attribute_group ufs_hpb_attribute_group = {
-	.attrs  = ufs_hpb_attributes,
-};
-
-static void ufshcd_add_hpb_info_sysfs_node(struct ufs_hba *hba)
-{
-	int err  = -ENOMEM;
-	struct device *dev = &(hba->host->shost_dev);
-
-	err = sysfs_create_group(&dev->kobj, &ufs_hpb_attribute_group);
-
-	if (err)
-		dev_err(hba->dev, "cannot create hpb sysfs group err: %d\n", err);
-}
-#endif
-
-#if defined(CONFIG_SCSI_SKHID) && defined(CONFIG_SCSI_UFS_FEATURE)
-static ssize_t manual_gc_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-	u32 status = MANUAL_GC_OFF;
-
-	if (hba->manual_gc.state == MANUAL_GC_DISABLE)
-		return scnprintf(buf, PAGE_SIZE, "%s", "disabled\n");
-
-	pm_runtime_get_sync(hba->dev);
-
-	//down_read(&hba->query_lock);
-	if (hba->manual_gc.hagc_support) {
-		int err = ufshcd_query_attr_retry(hba,
-			UPIU_QUERY_OPCODE_READ_ATTR,
-			QUERY_ATTR_IDN_MANUAL_GC_STATUS, 0, 0, &status);
-
-		hba->manual_gc.hagc_support = err ? false: true;
-	}
-	//up_read(&hba->query_lock);
-	pm_runtime_mark_last_busy(hba->dev);
-	pm_runtime_put_noidle(hba->dev);
-
-	if (!hba->manual_gc.hagc_support)
-		return scnprintf(buf, PAGE_SIZE, "%s", "bkops\n");
-	return scnprintf(buf, PAGE_SIZE, "%s",
-			status == MANUAL_GC_OFF ? "off\n" : "on\n");
-}
-
-static int manual_gc_enable(struct ufs_hba *hba, u32 *value)
-{
-	return ufshcd_query_attr_retry(hba,
-				UPIU_QUERY_OPCODE_WRITE_ATTR,
-				QUERY_ATTR_IDN_MANUAL_GC_CONT, 0, 0,
-				value);
-}
-
-static ssize_t manual_gc_store(struct device *dev,
-			struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-	u32 value;
-	int err = 0;
-
-	if (kstrtou32(buf, 0, &value))
-		return -EINVAL;
-
-	if (value >= MANUAL_GC_MAX)
-		return -EINVAL;
-
-	if (value == MANUAL_GC_DISABLE || value == MANUAL_GC_ENABLE) {
-		hba->manual_gc.state = value;
-		return count;
-	}
-	if (hba->manual_gc.state == MANUAL_GC_DISABLE)
-		return count;
-
-	pm_runtime_get_sync(hba->dev);
-
-	if (hba->manual_gc.hagc_support)
-		hba->manual_gc.hagc_support =
-			manual_gc_enable(hba, &value) ? false : true;
-
-	if (!hba->manual_gc.hagc_support) {
-		enum query_opcode opcode = (value == MANUAL_GC_ON) ?
-						UPIU_QUERY_OPCODE_SET_FLAG:
-						UPIU_QUERY_OPCODE_CLEAR_FLAG;
-
-		err = ufshcd_bkops_ctrl(hba, (value == MANUAL_GC_ON) ?
-					BKOPS_STATUS_NON_CRITICAL:
-					BKOPS_STATUS_CRITICAL);
-		if (!hba->auto_bkops_enabled)
-			err = -EAGAIN;
-
-		/* flush wb buffer */
-		if (hba->dev_info.wspecversion >= 0x0310) {
-			u8 index = ufshcd_wb_get_query_index(hba);
-
-			ufshcd_query_flag_retry(hba, opcode,
-				QUERY_FLAG_IDN_WB_BUFF_FLUSH_DURING_HIBERN8,
-				index);
-			ufshcd_query_flag_retry(hba, opcode,
-				QUERY_FLAG_IDN_WB_BUFF_FLUSH_EN, index);
-		}
-	}
-
-	if (err || hrtimer_active(&hba->manual_gc.hrtimer)) {
-		pm_runtime_mark_last_busy(hba->dev);
-		pm_runtime_put_noidle(hba->dev);
-		return count;
-	} else {
-		/* pm_runtime_put_sync in delay_ms */
-		hrtimer_start(&hba->manual_gc.hrtimer,
-			ms_to_ktime(hba->manual_gc.delay_ms),
-			HRTIMER_MODE_REL);
-	}
-	return count;
-}
-
-static ssize_t manual_gc_hold_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-
-	return snprintf(buf, PAGE_SIZE, "%lu\n", hba->manual_gc.delay_ms);
-}
-
-static ssize_t manual_gc_hold_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct ufs_hba *hba = dev_get_drvdata(dev);
-	unsigned long value;
-
-	if (kstrtoul(buf, 0, &value))
-		return -EINVAL;
-
-	hba->manual_gc.delay_ms = value;
-	return count;
-}
-static DEVICE_ATTR(manual_gc, 0644, manual_gc_show, manual_gc_store);
-static DEVICE_ATTR(manual_gc_hold, 0644, manual_gc_hold_show, manual_gc_hold_store);
-
-static struct attribute *ufs_hid_default_attributes[] = {
-        &dev_attr_manual_gc.attr,
-        &dev_attr_manual_gc_hold.attr,
-        NULL
-};
-
-static struct attribute_group ufs_hid_default_group = {
-        .attrs  = ufs_hid_default_attributes,
-};
-
-static void ufshcd_add_hid_info_sysfs_node(struct ufs_hba *hba)
-{
-        int err  = -ENOMEM;
-        struct device *dev = hba->dev;
-
-        err = sysfs_create_group(&dev->kobj, &ufs_hid_default_group);
-
-        if (err)
-               dev_err(hba->dev, "cannot create hid sysfs group err: %d\n", err);
-}
-#endif
 
 /**
  * ufshcd_shutdown - shutdown routine
@@ -10037,29 +9515,16 @@ EXPORT_SYMBOL(ufshcd_shutdown);
 void ufshcd_remove(struct ufs_hba *hba)
 {
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined (CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_release(&hba->ufsf);
-	#endif
-
-	#if defined(CONFIG_UFSHID)
-     ufsf_hid_remove(&hba->ufsf);
-	#endif
-
+	ufsf_hpb_release(&hba->ufsf);
 	ufsf_tw_release(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)
-if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX &&
-	IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
+if (hba->dev_info.wmanufacturerid == UFS_VENDOR_SKHYNIX)
 	skhpb_release(hba, SKHPB_NEED_INIT);
 #endif
 	ufs_bsg_remove(hba);
 	ufs_sysfs_remove_nodes(hba->dev);
 	scsi_remove_host(hba->host);
-		ufshcd_hba_stop(hba, true);
-#if defined(CONFIG_SCSI_SKHID)
-	ufshcd_exit_manual_gc(hba);
-#endif
 	/* disable interrupts */
 	ufshcd_disable_intr(hba, hba->intr_mask);
 	ufshcd_hba_stop(hba, true);
@@ -10241,9 +9706,6 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 
 	ufshcd_init_clk_scaling(hba);
 
-#if defined(CONFIG_SCSI_SKHID)
-	ufshcd_init_manual_gc(hba);
-#endif
 	/*
 	 * In order to avoid any spurious interrupt immediately after
 	 * registering UFS controller interrupt handler, clear any pending UFS
@@ -10320,33 +9782,14 @@ int ufshcd_init(struct ufs_hba *hba, void __iomem *mmio_base, unsigned int irq)
 	 * ufshcd_probe_hba().
 	 */
 	ufshcd_set_ufs_dev_active(hba);
-	
 #if defined(CONFIG_SCSI_UFS_FEATURE)
-    get_storage_info(hba);
-    get_dram_info(hba);
-#endif
-
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-	#if defined(CONFIG_SCSI_UFS_HPB)
-		if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-			ufsf_hpb_set_init_state(&hba->ufsf);
-	#endif
-
-	#if defined(CONFIG_UFSHID)
-     ufsf_hid_set_init_state(&hba->ufsf);
-	#endif
-
+	ufsf_hpb_set_init_state(&hba->ufsf);
 	ufsf_tw_set_init_state(&hba->ufsf);
 #endif
 #if defined(CONFIG_SCSI_SKHPB)		/* initialize hpb structures */
-	if (IS_RAM_SIZE_GREATER_THAN_4G(ram_size))
-		ufshcd_init_hpb(hba);
+	ufshcd_init_hpb(hba);
 #endif
 
-#if defined(CONFIG_SCSI_UFS_HPB)
-	atomic64_set(&(hba->SEC_hpb_info.hpb_pinned_rb_cnt), 0);
-	atomic64_set(&(hba->SEC_hpb_info.hpb_active_rb_cnt), 0);
-#endif
 	async_schedule(ufshcd_async_scan, hba);
 	ufs_sysfs_add_nodes(hba->dev);
 
@@ -10356,9 +9799,6 @@ out_remove_scsi_host:
 	scsi_remove_host(hba->host);
 exit_gating:
 	ufshcd_exit_clk_scaling(hba);
-#if defined(CONFIG_SCSI_SKHID)
-	ufshcd_exit_manual_gc(hba);
-#endif
 	ufshcd_exit_clk_gating(hba);
 out_disable:
 	hba->is_irq_enabled = false;
@@ -10367,80 +9807,6 @@ out_error:
 	return err;
 }
 EXPORT_SYMBOL_GPL(ufshcd_init);
-
-#if defined(CONFIG_SCSI_UFS_FEATURE)
-static int get_storage_info(struct ufs_hba *hba)
-{
-    int ret = 0;
-    struct property *p;
-    struct device_node *n;
-    struct mmi_storage_info *info;
-
-    n = of_find_node_by_path("/chosen/mmi,storage");
-    if (n == NULL) {
-        ret = 1;
-        goto err;
-    }
-
-    info = kzalloc(sizeof(struct mmi_storage_info), GFP_KERNEL);
-    if (!info) {
-        dev_err(hba->dev,"%s: failed to allocate space for mmi_storage_info\n",
-           __func__);
-        ret = 1;
-        goto err;
-    }
-
-    for_each_property_of_node(n, p) {
-        if (!strcmp(p->name, "type") && p->value)
-            strlcpy(info->type, (char *)p->value, sizeof(info->type));
-        if (!strcmp(p->name, "size") && p->value)
-            strlcpy(info->size, (char *)p->value, sizeof(info->size));
-        if (!strcmp(p->name, "manufacturer") && p->value)
-            strlcpy(info->card_manufacturer, (char *)p->value, sizeof(info->card_manufacturer));
-        if (!strcmp(p->name, "product") && p->value)
-            strlcpy(info->product_name, (char *)p->value, sizeof(info->product_name));
-        if (!strcmp(p->name, "firmware") && p->value)
-            strlcpy(info->firmware_version, (char *)p->value, sizeof(info->firmware_version));
-    }
-
-    of_node_put(n);
-
-    dev_info(hba->dev, "manufacturer parsed from choosen is %s\n",info->card_manufacturer);
-	storage_mfrid = simple_strtol(info->card_manufacturer, NULL, 16);
-err:
-        return ret;
-}
-
-static int get_dram_info(struct ufs_hba *hba)
-{
-         int ret = -1;
-         struct device_node *n;
-         struct mmi_ddr_info *ddr_info;
-
-		ddr_info = kzalloc(sizeof(struct mmi_ddr_info), GFP_KERNEL);
-        if (!ddr_info) {
-                pr_err("%s: failed to allocate space for mmi_ddr_info\n", __func__);
-                goto err;
-        }
-
-        n = of_find_node_by_path("/chosen/mmi,ram");
-       if (n != NULL) {
-               of_property_read_u32(n, "mr5", &ddr_info->mr5);
-                of_property_read_u32(n, "mr6", &ddr_info->mr6);
-                of_property_read_u32(n, "mr7", &ddr_info->mr7);
-                of_property_read_u32(n, "mr8", &ddr_info->mr8);
-                of_property_read_u32(n, "type", &ddr_info->type);
-                of_property_read_u32(n, "ramsize", &ddr_info->ramsize);
-                of_node_put(n);
-        }
-
-        ram_size = (ddr_info->ramsize / 1024);
-        dev_info(hba->dev, "ram_size parsed from chosen is %d\n",ram_size);
-        return ram_size;
-err:
-        return ret;
-}
-#endif
 
 MODULE_AUTHOR("Santosh Yaragnavi <santosh.sy@samsung.com>");
 MODULE_AUTHOR("Vinayak Holikatti <h.vinayak@samsung.com>");

@@ -78,8 +78,6 @@ static void select_cv(struct mtk_charger *info)
 		}
 
 	constant_voltage = info->data.battery_cv;
-        constant_voltage = info->mmi.target_fv;//TODO CHECK
-
 	info->setting.cv = constant_voltage;
 }
 
@@ -87,37 +85,9 @@ static bool is_typec_adapter(struct mtk_charger *info)
 {
 	int rp;
 
-	if (info == NULL || info->pd_adapter == NULL)
-		return false;
-
 	rp = adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL);
-#ifdef MTK_BASE
 	if (info->pd_type == MTK_PD_CONNECT_TYPEC_ONLY_SNK &&
 			rp != 500 &&
-#else
-        if (rp > 500 &&
-#endif
-			info->chr_type != POWER_SUPPLY_TYPE_USB &&
-			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP)
-		return true;
-
-	return false;
-}
-
-bool extern_is_typec_adapter(struct mtk_charger *info)
-{
-	int rp;
-
-	if (info == NULL || info->pd_adapter == NULL)
-		return false;
-
-	rp = adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL);
-#ifdef MTK_BASE
-	if (info->pd_type == MTK_PD_CONNECT_TYPEC_ONLY_SNK &&
-			rp != 500 &&
-#else
-        if (rp > 500 &&
-#endif
 			info->chr_type != POWER_SUPPLY_TYPE_USB &&
 			info->chr_type != POWER_SUPPLY_TYPE_USB_CDP)
 		return true;
@@ -146,7 +116,6 @@ static bool support_fast_charging(struct mtk_charger *info)
 			break;
 		}
 	}
-        chr_debug("support_fast_charging ret: %d\n", ret);
 	return ret;
 }
 
@@ -185,7 +154,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		goto done;
 	}
 
-#ifdef MTK_BASE
 	if (info->atm_enabled == true
 		&& (info->chr_type == POWER_SUPPLY_TYPE_USB ||
 		info->chr_type == POWER_SUPPLY_TYPE_USB_CDP)
@@ -194,7 +162,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 		goto done;
 	}
-#endif
 
 	if (info->chr_type == POWER_SUPPLY_TYPE_USB) {
 		pdata->input_current_limit =
@@ -229,15 +196,10 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		is_basic = true;
 	}
 
-        chr_debug("%s info: chr_type:%d ac_input:%d ac_chg:%d conf:%d", __func__, info->chr_type,
-                info->data.ac_charger_input_current, info->data.ac_charger_current, info->config);
-
-	if (support_fast_charging(info)) {
+	if (support_fast_charging(info))
 		is_basic = false;
-                chr_debug("%s is_basic:false", __func__);
-        }else {
+	else {
 		is_basic = true;
-                chr_debug("%s is_basic:true", __func__);
 		/* AICL */
 		charger_dev_run_aicl(info->chg1_dev,
 			&pdata->input_current_limit_by_aicl);
@@ -250,14 +212,8 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		if (is_typec_adapter(info)) {
 			if (adapter_dev_get_property(info->pd_adapter, TYPEC_RP_LEVEL)
 				== 3000) {
-			        if (pdata->typec_input_current_limit > 1500000
-				       && pdata->typec_input_current_limit < 3000000)
-				        pdata->input_current_limit =
-					      pdata->typec_input_current_limit;
-			        else
-				        pdata->input_current_limit = 3000000;
+				pdata->input_current_limit = 3000000;
 				pdata->charging_current_limit = 3000000;
-			        chr_err("type-C:aicr:%d\n", pdata->input_current_limit);
 			} else if (adapter_dev_get_property(info->pd_adapter,
 				TYPEC_RP_LEVEL) == 1500) {
 				pdata->input_current_limit = 1500000;
@@ -287,9 +243,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	}
 
-	pdata->charging_current_limit = ((info->mmi.target_fcc < 0) ? 0 : info->mmi.target_fcc);
-	info->mmi.target_usb = pdata->input_current_limit;
-
 	if (pdata->thermal_charging_current_limit != -1) {
 		if (pdata->thermal_charging_current_limit <
 			pdata->charging_current_limit) {
@@ -300,7 +253,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	} else
 		info->setting.charging_current_limit1 = -1;
-                chr_debug("%s info:charging_current_limit1 = %d",  __func__, info->setting.charging_current_limit1);
 
 	if (pdata->thermal_input_current_limit != -1) {
 		if (pdata->thermal_input_current_limit <
@@ -312,7 +264,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 		}
 	} else
 		info->setting.input_current_limit1 = -1;
-                chr_debug("%s info:input_current_limit1 = %d", __func__, info->setting.input_current_limit1);
 
 	if (pdata2->thermal_charging_current_limit != -1) {
 		if (pdata2->thermal_charging_current_limit <
@@ -342,27 +293,6 @@ static bool select_charging_current_limit(struct mtk_charger *info,
 			pdata->input_current_limit =
 					pdata->input_current_limit_by_aicl;
 	}
-
-	if (pdata->moto_chg_tcmd_ibat != -1) {
-		pdata->charging_current_limit = pdata->moto_chg_tcmd_ibat;
-                info->setting.charging_current_limit1 = pdata->moto_chg_tcmd_ibat;//may not need as tcmd use normal usb as basic type
-        }
-
-	if (pdata->moto_chg_tcmd_ichg != -1) {
-		pdata->input_current_limit = pdata->moto_chg_tcmd_ichg;
-                info->setting.input_current_limit1 = pdata->moto_chg_tcmd_ichg;//may not need as tcmd use normal usb as basic type
-        }
-
-	if (info->mmi.adaptive_charging_disable_ibat) {
-		pdata->charging_current_limit = 0;
-		info->setting.charging_current_limit1 = 0;
-	}
-
-	if (info->mmi.adaptive_charging_disable_ichg) {
-		pdata->input_current_limit = 0;
-		info->setting.input_current_limit1 = 0;
-	}
-
 done:
 
 	ret = charger_dev_get_min_charging_current(info->chg1_dev, &ichg1_min);
@@ -412,14 +342,7 @@ static int do_algorithm(struct mtk_charger *info)
 	int val = 0;
 
 	pdata = &info->chg_data[CHG1_SETTING];
-
-        #ifdef MTK_BASE
 	charger_dev_is_charging_done(info->chg1_dev, &chg_done);
-	#else
-	if (info->mmi.pres_chrg_step == STEP_FULL)
-		chg_done = true;
-	#endif
-
 	is_basic = select_charging_current_limit(info, &info->setting);
 
 	if (info->is_chg_done != chg_done) {
@@ -510,7 +433,6 @@ static int do_algorithm(struct mtk_charger *info)
 	info->is_chg_done = chg_done;
 
 	if (is_basic == true) {
-
 		charger_dev_set_input_current(info->chg1_dev,
 			pdata->input_current_limit);
 		charger_dev_set_charging_current(info->chg1_dev,
@@ -518,11 +440,6 @@ static int do_algorithm(struct mtk_charger *info)
 		charger_dev_set_constant_voltage(info->chg1_dev,
 			info->setting.cv);
 	}
-
-	if (info->mmi.demo_discharging || info->mmi.adaptive_charging_disable_ichg)
-		charger_dev_enable_hz(info->chg1_dev, true);
-	else
-		charger_dev_enable_hz(info->chg1_dev, false);
 
 	if (pdata->input_current_limit == 0 ||
 	    pdata->charging_current_limit == 0)

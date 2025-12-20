@@ -81,10 +81,6 @@ static const char * const power_supply_scope_text[] = {
 	"Unknown", "System", "Device"
 };
 
-static const char * const power_supply_charge_rate_text[] = {
-        "None", "Normal", "Weak", "Turbo"
-};
-
 static const char * const power_supply_usbc_text[] = {
 	"Nothing attached", "Sink attached", "Powered cable w/ sink",
 	"Debug Accessory", "Audio Adapter", "Powered cable w/o sink",
@@ -177,10 +173,6 @@ static ssize_t power_supply_show_property(struct device *dev,
 		ret = sprintf(buf, "%s\n",
 			      power_supply_charge_type_text[value.intval]);
 		break;
-	case POWER_SUPPLY_PROP_CHARGE_RATE:
-                ret = sprintf(buf, "%s\n", 
-                              power_supply_charge_rate_text[value.intval]);
-                break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		ret = sprintf(buf, "%s\n",
 			      power_supply_health_text[value.intval]);
@@ -323,8 +315,6 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(charge_empty),
 	POWER_SUPPLY_ATTR(charge_now),
 	POWER_SUPPLY_ATTR(charge_avg),
-	POWER_SUPPLY_ATTR(charge_rate),
-	POWER_SUPPLY_ATTR(age),
 	POWER_SUPPLY_ATTR(charge_counter),
 	POWER_SUPPLY_ATTR(constant_charge_current),
 	POWER_SUPPLY_ATTR(constant_charge_current_max),
@@ -361,36 +351,6 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(precharge_current),
 	POWER_SUPPLY_ATTR(charge_term_current),
 	POWER_SUPPLY_ATTR(calibrate),
-
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
-	POWER_SUPPLY_ATTR(dp_dm_bq),
-	POWER_SUPPLY_ATTR(ti_bus_error_status),
-	POWER_SUPPLY_ATTR(ti_charge_mode),
-	POWER_SUPPLY_ATTR(ti_bypass_mode_enable),
-	POWER_SUPPLY_ATTR(ti_battery_present),
-	POWER_SUPPLY_ATTR(ti_vbus_present),
-	POWER_SUPPLY_ATTR(ti_battery_voltage),
-	POWER_SUPPLY_ATTR(ti_battery_current),
-	POWER_SUPPLY_ATTR(ti_battery_temperature),
-	POWER_SUPPLY_ATTR(ti_bus_voltage),
-	POWER_SUPPLY_ATTR(ti_bus_current),
-	POWER_SUPPLY_ATTR(ti_bus_temperature),
-	POWER_SUPPLY_ATTR(ti_die_temperature),
-	POWER_SUPPLY_ATTR(ti_alarm_status),
-	POWER_SUPPLY_ATTR(ti_fault_status),
-	POWER_SUPPLY_ATTR(ti_reg_status),
-	POWER_SUPPLY_ATTR(ti_set_bus_protection_for_qc3),
-	POWER_SUPPLY_ATTR(bq_charge_mode),
-	POWER_SUPPLY_ATTR(hv_charge_enable),
-	POWER_SUPPLY_ATTR(pd_active),
-	POWER_SUPPLY_ATTR(pd_authentication),
-	POWER_SUPPLY_ATTR(pd_type),
-	POWER_SUPPLY_ATTR(fastcharge_enable),
-	POWER_SUPPLY_ATTR(input_suspend),
-	POWER_SUPPLY_ATTR(fast_charge_current),
-	POWER_SUPPLY_ATTR(apdo),
-#endif
-
 	/* Local extensions */
 	POWER_SUPPLY_ATTR(usb_hc),
 	POWER_SUPPLY_ATTR(usb_otg),
@@ -403,8 +363,6 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(battery_charging_enabled),
 	POWER_SUPPLY_ATTR(charging_enabled),
 	POWER_SUPPLY_ATTR(step_charging_enabled),
-	POWER_SUPPLY_ATTR(charging_enable_adc),
-	POWER_SUPPLY_ATTR(pd_pps_support),
 	POWER_SUPPLY_ATTR(step_charging_step),
 	POWER_SUPPLY_ATTR(pin_enabled),
 	POWER_SUPPLY_ATTR(input_suspend),
@@ -562,7 +520,6 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(battery_type),
 	POWER_SUPPLY_ATTR(cycle_counts),
 	POWER_SUPPLY_ATTR(serial_number),
-	POWER_SUPPLY_ATTR(select_mux),
 };
 
 static struct attribute *

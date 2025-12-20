@@ -929,7 +929,7 @@ int kbase_mem_flags_change(struct kbase_context *kctx, u64 gpu_addr, unsigned in
 	 * & GPU queue ringbuffer and none of them needs to be explicitly marked
 	 * as evictable by Userspace.
 	 */
-	if (kbase_va_region_is_no_user_free(kctx, reg))
+	if (reg->flags & KBASE_REG_NO_USER_FREE)
 		goto out_unlock;
 
 	/* Is the region being transitioning between not needed and needed? */
@@ -1801,10 +1801,6 @@ unwind_dma_map:
 	}
 fault_mismatch:
 	if (pages) {
-		/* In this case, the region was not yet in the region tracker,
-		 * and so there are no CPU mappings to remove before we unpin
-		 * the page
-		 */
 		for (i = 0; i < faulted_pages; i++)
 			put_page(pages[i]);
 	}
@@ -1854,9 +1850,6 @@ u64 kbase_mem_alias(struct kbase_context *kctx, u64 *flags, u64 stride,
 
 	if (!nents)
 		goto bad_nents;
-
-	if (stride > U64_MAX / nents)
-		goto bad_size;
 
 	if ((nents * stride) > (U64_MAX / PAGE_SIZE))
 		/* 64-bit address range is the max */
@@ -1929,9 +1922,9 @@ u64 kbase_mem_alias(struct kbase_context *kctx, u64 *flags, u64 stride,
 			/* validate found region */
 			if (kbase_is_region_invalid_or_free(aliasing_reg))
 				goto bad_handle; /* Not found/already free */
-			if (kbase_is_region_shrinkable(aliasing_reg))
+			if (aliasing_reg->flags & KBASE_REG_DONT_NEED)
 				goto bad_handle; /* Ephemeral region */
-			if (kbase_va_region_is_no_user_free(kctx, aliasing_reg))
+			if (aliasing_reg->flags & KBASE_REG_NO_USER_FREE)
 				goto bad_handle; /* JIT regions can't be
 						  * aliased. NO_USER_FREE flag
 						  * covers the entire lifetime
@@ -2297,12 +2290,8 @@ int kbase_mem_commit(struct kbase_context *kctx, u64 gpu_addr, u64 new_pages)
 
 	if (atomic_read(&reg->cpu_alloc->kernel_mappings) > 0)
 		goto out_unlock;
-
 	/* can't grow regions which are ephemeral */
-	if (kbase_is_region_shrinkable(reg))
-		goto out_unlock;
-
-	if (kbase_va_region_is_no_user_free(kctx, reg))
+	if (reg->flags & KBASE_REG_DONT_NEED)
 		goto out_unlock;
 
 #ifdef CONFIG_MALI_MEMORY_FULLY_BACKED
@@ -2675,6 +2664,7 @@ static void kbase_free_unused_jit_allocations(struct kbase_context *kctx)
 	while (kbase_jit_evict(kctx))
 		;
 }
+#endif
 
 static int kbase_mmu_dump_mmap(struct kbase_context *kctx,
 			struct vm_area_struct *vma,
@@ -2691,7 +2681,9 @@ static int kbase_mmu_dump_mmap(struct kbase_context *kctx,
 	size = (vma->vm_end - vma->vm_start);
 	nr_pages = size >> PAGE_SHIFT;
 
+#ifdef CONFIG_MALI_VECTOR_DUMP
 	kbase_free_unused_jit_allocations(kctx);
+#endif
 
 	kaddr = kbase_mmu_dump(kctx, nr_pages);
 
@@ -2739,7 +2731,7 @@ out_va_region:
 out:
 	return err;
 }
-#endif
+
 
 void kbase_os_mem_map_lock(struct kbase_context *kctx)
 {
@@ -2882,7 +2874,6 @@ int kbase_context_mmap(struct kbase_context *const kctx,
 		err = -EINVAL;
 		goto out_unlock;
 	case PFN_DOWN(BASE_MEM_MMU_DUMP_HANDLE):
-#if defined(CONFIG_MALI_VECTOR_DUMP)
 		/* MMU dump */
 		err = kbase_mmu_dump_mmap(kctx, vma, &reg, &kaddr);
 		if (err != 0)
@@ -2890,11 +2881,6 @@ int kbase_context_mmap(struct kbase_context *const kctx,
 		/* free the region on munmap */
 		free_on_close = 1;
 		break;
-#else
-		/* Illegal handle for direct map */
-		err = -EINVAL;
-		goto out_unlock;
-#endif /* defined(CONFIG_MALI_VECTOR_DUMP) */
 #if MALI_USE_CSF
 	case PFN_DOWN(BASEP_MEM_CSF_USER_REG_PAGE_HANDLE):
 		kbase_gpu_vm_unlock(kctx);
@@ -2983,7 +2969,7 @@ int kbase_context_mmap(struct kbase_context *const kctx,
 
 	err = kbase_cpu_mmap(kctx, reg, vma, kaddr, nr_pages, aligned_offset,
 			free_on_close);
-#if defined(CONFIG_MALI_VECTOR_DUMP)
+
 	if (vma->vm_pgoff == PFN_DOWN(BASE_MEM_MMU_DUMP_HANDLE)) {
 		/* MMU dump - userspace should now have a reference on
 		 * the pages, so we can now free the kernel mapping
@@ -3002,7 +2988,7 @@ int kbase_context_mmap(struct kbase_context *const kctx,
 		 */
 		vma->vm_pgoff = PFN_DOWN(vma->vm_start);
 	}
-#endif /* defined(CONFIG_MALI_VECTOR_DUMP) */
+
 out_unlock:
 	kbase_gpu_vm_unlock(kctx);
 out:
@@ -3136,9 +3122,6 @@ void *kbase_vmap_prot(struct kbase_context *kctx, u64 gpu_addr, size_t size,
 	reg = kbase_region_tracker_find_region_enclosing_address(kctx,
 			gpu_addr);
 	if (kbase_is_region_invalid_or_free(reg))
-		goto out_unlock;
-
-	if (reg->gpu_alloc->type != KBASE_MEM_TYPE_NATIVE)
 		goto out_unlock;
 
 	/* check access permissions can be satisfied

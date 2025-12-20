@@ -89,7 +89,6 @@ static struct mtk_pm_qos_request mm_freq_request;
 static u64 freq_steps[MAX_FREQ_STEP];
 static u32 step_size;
 #endif
-static unsigned int cur_backlight = 0;
 
 unsigned int te_cnt;
 
@@ -683,37 +682,6 @@ static void bl_cmdq_cb(struct cmdq_cb_data data)
 	kfree(cb_data);
 }
 
-static bool panel_set_hbm_backlight(struct drm_crtc *crtc, unsigned int *bl_lvl)
-{
-	unsigned int bl_level;
-	static unsigned int bl_lvl_during_hbm = 0;
-	static bool hbm_mode = false;
-	struct mtk_panel_params *panel_ext = mtk_drm_get_lcm_ext_params(crtc);
-	int max_bl_level = (panel_ext->max_bl_level) ? (panel_ext->max_bl_level) : 255;
-
-	bl_level = *bl_lvl;
-
-	if (bl_level == BRIGHTNESS_HBM_ON || bl_level == BRIGHTNESS_HBM_OFF) {
-		*bl_lvl = bl_level == BRIGHTNESS_HBM_ON ? max_bl_level : bl_lvl_during_hbm;
-		hbm_mode = bl_level == BRIGHTNESS_HBM_ON ? true : false;
-
-		pr_info("HBM set  bl_level=%d bl_max_level = %d bl_lvl_during_hbm = %d hbm_mode = %d\n",
-				bl_level, max_bl_level, bl_lvl_during_hbm, hbm_mode);
-	} else {
-		bl_lvl_during_hbm = bl_level;
-
-		if (bl_level == 0) {
-			hbm_mode = false;
-			pr_info(" bl_vl=%d, set hbm_mode to false\n", bl_level);
-		}
-		else if (hbm_mode) {
-			pr_info("HBM is on.. ignore setting backlight. bl_vl=%d\n", bl_lvl_during_hbm);
-			return true;
-		}
-	}
-	return false;
-}
-
 int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -726,9 +694,6 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level)
 	int index = drm_crtc_index(crtc);
 	if (m_new_pq_persist_property[DISP_PQ_CCORR_SILKY_BRIGHTNESS])
 		sb_backlight = level;
-
-	if (panel_set_hbm_backlight(crtc, &level))
-		return 0;
 
 	CRTC_MMP_EVENT_START(index, backlight, (unsigned long)crtc,
 			level);
@@ -790,7 +755,6 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level)
 			mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
 	}
 
-	cur_backlight = level;
 	/* set backlight */
 	if (comp->funcs && comp->funcs->io_cmd)
 		comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_BL, &level);
@@ -826,45 +790,6 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level)
 
 	CRTC_MMP_EVENT_END(index, backlight, (unsigned long)crtc,
 			level);
-
-	return 0;
-}
-
-int mtk_drm_bl_recovery(struct drm_crtc *crtc)
-{
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	struct cmdq_pkt *cmdq_handle;
-	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
-
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("%s Sleep State set backlight stop --crtc not ebable\n",__func__);
-
-		return -EINVAL;
-	}
-
-	if (!comp) {
-		DDPINFO("%s no output comp\n", __func__);
-
-		return -EINVAL;
-	}
-
-	mtk_drm_idlemgr_kick(__func__, crtc, 0);
-
-	cmdq_handle =
-		cmdq_pkt_create(mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
-
-	if (mtk_crtc_with_sub_path(crtc, mtk_crtc->ddp_mode))
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_SECOND_PATH, 0);
-	else
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_FIRST_PATH, 0);
-
-	if (comp->funcs && comp->funcs->io_cmd)
-		comp->funcs->io_cmd(comp, cmdq_handle, DSI_SET_BL, &cur_backlight);
-
-	cmdq_pkt_flush(cmdq_handle);
-	cmdq_pkt_destroy(cmdq_handle);
 
 	return 0;
 }
@@ -1048,29 +973,6 @@ int mtk_drm_aod_setbacklight(struct drm_crtc *crtc, unsigned int level)
 	return 0;
 }
 
-int mtk_drm_crtc_set_panel_hbm_gpio(struct drm_crtc *crtc, bool en)
-{
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
-	bool state = false;
-
-	if (!(comp && comp->funcs && comp->funcs->io_cmd))
-		return -EINVAL;
-
-	comp->funcs->io_cmd(comp, NULL, DSI_HBM_GET_STATE, &state);
-	if (state == en)
-		return 0;
-
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("%s: skip, slept\n", __func__);
-		return -EINVAL;
-	}
-
-	comp->funcs->io_cmd(comp, NULL, DSI_HBM_SET, &en);
-	DDPINFO("%s:set LCM hbm en:%d success\n", __func__, en);
-	return 0;
-}
-
 int mtk_drm_crtc_set_panel_hbm(struct drm_crtc *crtc, bool en)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -1125,58 +1027,6 @@ int mtk_drm_crtc_set_panel_hbm(struct drm_crtc *crtc, bool en)
 	return 0;
 }
 
-int mtk_drm_crtc_set_panel_feature(struct drm_crtc *crtc, struct panel_param_info param_info)
-{
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
-	struct cmdq_pkt *cmdq_handle;
-	bool is_frame_mode;
-
-	if (!(comp && comp->funcs && comp->funcs->io_cmd))
-		return -EINVAL;
-
-	DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("%s: skip, slept\n", __func__);
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	mtk_drm_idlemgr_kick(__func__, crtc, 0);
-
-	is_frame_mode = mtk_crtc_is_frame_trigger_mode(&mtk_crtc->base);
-	cmdq_handle =
-		cmdq_pkt_create(mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
-
-	mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle, DDP_FIRST_PATH, 0);
-
-	if (is_frame_mode) {
-		cmdq_pkt_clear_event(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-		cmdq_pkt_wfe(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
-		cmdq_pkt_clear_event(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_STREAM_DIRTY]);
-	}
-
-	comp->funcs->io_cmd(comp, cmdq_handle, DSI_PANEL_FEATURE_SET, &param_info);
-
-	if (is_frame_mode) {
-		cmdq_pkt_set_event(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_CABC_EOF]);
-		cmdq_pkt_set_event(cmdq_handle,
-				mtk_crtc->gce_obj.event[EVENT_STREAM_BLOCK]);
-	}
-
-	cmdq_pkt_flush(cmdq_handle);
-	cmdq_pkt_destroy(cmdq_handle);
-
-	DDPMSG("%s set panel feature (%d) to %d, success!\n", __func__, param_info.param_idx, param_info.value);
-
-	DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-	return 0;
-}
-
 int mtk_drm_crtc_hbm_wait(struct drm_crtc *crtc, bool en)
 {
 	struct mtk_panel_params *panel_ext = mtk_drm_get_lcm_ext_params(crtc);
@@ -1208,112 +1058,6 @@ int mtk_drm_crtc_hbm_wait(struct drm_crtc *crtc, bool en)
 
 	wait = false;
 	comp->funcs->io_cmd(comp, NULL, DSI_HBM_SET_WAIT_STATE, &wait);
-
-	return 0;
-}
-
-static void cabc_cmdq_cb(struct cmdq_cb_data data)
-{
-	struct mtk_cmdq_cb_data *cb_data = data.data;
-
-	cmdq_pkt_destroy(cb_data->cmdq_handle);
-	kfree(cb_data);
-}
-
-int mtk_drm_crtc_set_panel_cabc(struct drm_crtc *crtc, unsigned int cabc_mode)
-{
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	struct cmdq_pkt *cmdq_handle;
-	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
-	struct mtk_cmdq_cb_data *cb_data;
-	unsigned int cabc_state;
-
-	DDP_MUTEX_LOCK(&mtk_crtc->lock, __func__, __LINE__);
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("Sleep State set CABC stop --crtc not ebable\n");
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	if (!(comp && comp->funcs && comp->funcs->io_cmd)) {
-		DDPINFO("%s no output comp\n", __func__);
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return -EINVAL;
-	}
-
-	comp->funcs->io_cmd(comp, NULL, DSI_CABC_GET_STATE, &cabc_state);
-	if (cabc_state == cabc_mode) {
-		DDPINFO("%s: the same value, skip!\n", __func__);
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return 0;
-	}
-
-	cb_data = kmalloc(sizeof(*cb_data), GFP_KERNEL);
-	if (!cb_data) {
-		DDPPR_ERR("cb data creation failed\n");
-		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-		return 0;
-	}
-
-	mtk_drm_idlemgr_kick(__func__, crtc, 0);
-
-	cmdq_handle =
-		cmdq_pkt_create(mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
-
-	if (mtk_crtc_with_sub_path(crtc, mtk_crtc->ddp_mode))
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_SECOND_PATH, 0);
-	else
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_FIRST_PATH, 0);
-
-	comp->funcs->io_cmd(comp, cmdq_handle, DSI_CABC_SET, &cabc_mode);
-
-	cb_data->crtc = crtc;
-	cb_data->cmdq_handle = cmdq_handle;
-
-	if (cmdq_pkt_flush_threaded(cmdq_handle, cabc_cmdq_cb, cb_data) < 0)
-		DDPPR_ERR("failed to flush bl_cmdq_cb\n");
-
-	DDPINFO("%s set cabc to %d, success!\n", __func__, cabc_mode);
-
-	DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
-	return 0;
-}
-
-static int mtk_drm_crtc_notify_panel_fps_chg(struct drm_crtc *crtc, unsigned int mode)
-{
-	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-	struct cmdq_pkt *cmdq_handle;
-	struct mtk_ddp_comp *comp = mtk_ddp_comp_request_output(mtk_crtc);
-
-
-	if (!(mtk_crtc->enabled)) {
-		DDPINFO("%s crtc not ebable\n",  __func__);
-		return -EINVAL;
-	}
-
-	if (!(comp && comp->funcs && comp->funcs->io_cmd)) {
-		DDPINFO("%s no output comp\n", __func__);
-		return -EINVAL;
-	}
-
-	mtk_drm_idlemgr_kick(__func__, crtc, 0);
-
-	cmdq_handle =
-		cmdq_pkt_create(mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
-
-	if (mtk_crtc_with_sub_path(crtc, mtk_crtc->ddp_mode))
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_SECOND_PATH, 0);
-	else
-		mtk_crtc_wait_frame_done(mtk_crtc, cmdq_handle,
-			DDP_FIRST_PATH, 0);
-
-	comp->funcs->io_cmd(comp, cmdq_handle, DSI_NOTIFY_FPS_CHG, &mode);
-
-	cmdq_pkt_flush(cmdq_handle);
-	cmdq_pkt_destroy(cmdq_handle);
 
 	return 0;
 }
@@ -2689,8 +2433,6 @@ static void mtk_crtc_disp_mode_switch_begin(struct drm_crtc *crtc,
 	crtc_id = drm_crtc_index(crtc);
 	CRTC_MMP_EVENT_END(crtc_id, mode_switch, 0, 0);
 #endif
-	
-	mtk_drm_crtc_notify_panel_fps_chg(crtc, mtk_state->prop_val[CRTC_PROP_DISP_MODE_IDX]);
 }
 
 bool already_free;
