@@ -58,7 +58,6 @@ struct lcm {
 	bool enabled;
 
 	int error;
-	bool hbm_en;
 	unsigned int cabc_mode;
 };
 
@@ -426,7 +425,6 @@ static int lcm_prepare(struct drm_panel *panel)
 	ctx->prepared = true;
 
 	ctx->cabc_mode = 0; //UI mode
-	ctx->hbm_en = 0;
 
 #if defined(CONFIG_MTK_PANEL_EXT)
 	mtk_panel_tch_rst(panel);
@@ -459,10 +457,9 @@ static int lcm_enable(struct drm_panel *panel)
 #define HSA (4)
 #define HBP (66)
 #define VFP_60HZ (1000)
-#define VFP_90HZ (170)
 #define VSA (4)
 #define VBP (12)
-#define VAC (1600)
+#define VAC (1640)
 #define HAC (720)
 
 static struct drm_display_mode default_mode = {
@@ -476,19 +473,6 @@ static struct drm_display_mode default_mode = {
 	.vsync_end = VAC + VFP_60HZ + VSA,
 	.vtotal = VAC + VFP_60HZ + VSA + VBP,
 	.vrefresh = 60,
-};
-
-static struct drm_display_mode performance_mode = {
-	.clock = 137593,
-	.hdisplay = HAC,
-	.hsync_start = HAC + HFP,
-	.hsync_end = HAC + HFP + HSA,
-	.htotal = HAC + HFP + HSA + HBP,
-	.vdisplay = VAC,
-	.vsync_start = VAC + VFP_90HZ,
-	.vsync_end = VAC + VFP_90HZ + VSA,
-	.vtotal = VAC + VFP_90HZ + VSA + VBP,
-	.vrefresh = 90,
 };
 
 #if defined(CONFIG_MTK_PANEL_EXT)
@@ -582,28 +566,7 @@ static struct mtk_panel_params ext_params = {
 		.switch_en = 1,
 		.vact_timing_fps = 60,
 	},
-	.lcm_index = 0,
-	.hbm_type = HBM_MODE_DCS_GPIO,
-	.max_bl_level = 2047,
-};
-
-static struct mtk_panel_params ext_params_90hz = {
-	.pll_clk = 449,
-	.vfp_low_power = VFP_90HZ,
-	.cust_esd_check = 1,
-	.esd_check_enable = 1,
-	.lcm_esd_check_table[0] = {
-		.cmd = 0x0a,
-		.count = 1,
-		.para_list[0] = 0x9c,
-	},
-	.dyn_fps = {
-		.switch_en = 1,
-		.vact_timing_fps = 90,
-	},
-	.lcm_index = 0,
-	.hbm_type = HBM_MODE_DCS_GPIO,
-	.max_bl_level = 2047,
+	.lcm_index = 2,
 };
 
 static int mtk_panel_ext_param_set(struct drm_panel *panel, unsigned int mode)
@@ -613,8 +576,6 @@ static int mtk_panel_ext_param_set(struct drm_panel *panel, unsigned int mode)
 
 	if (mode == 0)
 		ext->params = &ext_params;
-	else if (mode == 1)
-		ext->params = &ext_params_90hz;
 	else
 		ret = 1;
 
@@ -628,8 +589,6 @@ static int mtk_panel_ext_param_get(struct mtk_panel_params *ext_para,
 
 	if (mode == 0)
 		ext_para = &ext_params;
-	else if (mode == 1)
-		ext_para = &ext_params_90hz;
 	else
 		ret = 1;
 
@@ -637,115 +596,63 @@ static int mtk_panel_ext_param_get(struct mtk_panel_params *ext_para,
 
 }
 
-static int panel_cabc_set_cmdq(struct drm_panel *panel, void *dsi,
-			      dcs_write_gce cb, void *handle, unsigned int cabc_mode)
-{
-	const unsigned int cabc_value_map[3] = {1, 3, 0};
-	int cabc_value = 1;
-	char cabc_tb[2] = {0x55, 0x01};
-	u8 cabc_tb1[] = {0xF0, 0x5A, 0x59};//Password open
-	u8 cabc_tb2[] = {0xF1, 0xA5, 0xA6};//Password open
-	u8 cabc_ui_tb3[] = {0xE0, 0x30, 0x00, 0x80, 0x88, 0x11, 0x3F, 0x22, 0x62, 0xDF, 0xA0, 0x04, 0xCC, 0x01, 0xFF, 0xF6, 0xFF, 0xF0, 0xFD, 0xFF, 0xFD, 0xF8, 0xF5, 0xFC, 0xFC, 0xFD, 0xFF};
-	u8 cabc_ui_tb4[] = {0xE1, 0xEF, 0xFE, 0xFE, 0xFE, 0xFE, 0xEE, 0xF0, 0x20, 0x33, 0xFF, 0x00, 0x00, 0x6A, 0x90, 0xC0, 0x0D, 0x6A, 0xF0, 0x3E, 0xFF, 0x00, 0x07, 0xD0};
-	u8 cabc_movie_tb3[] = {0xE0, 0x30, 0x00, 0x80, 0x88, 0x11, 0x3F, 0x22, 0x62, 0xDF, 0xA0, 0x04, 0xCC, 0x01, 0xFF, 0xFA, 0xFF, 0xF0, 0xFD, 0xFF, 0xFB, 0xF8, 0xF5, 0xFC, 0xFC, 0xFB, 0xFF};
-	u8 cabc_movie_tb4[] = {0xE1, 0xBC, 0xF8, 0xCC, 0xFA, 0xDB, 0x9B, 0xF0, 0xE7, 0xF0, 0x85, 0xF0, 0x70, 0x00, 0x50, 0x00, 0x9A, 0xFD, 0xF0, 0xE0, 0xFF, 0x00, 0x07, 0xD0};
-	u8 cabc_tb5[] = {0xF1, 0x5A, 0x59};//Password off
-	u8 cabc_tb6[] = {0xF0, 0xA5, 0xA6};//Password off
+// seems to be only declared in motos code?
 
-	struct lcm *ctx = panel_to_lcm(panel);
-
-	if (ctx->cabc_mode == cabc_mode)
-		goto done;
-
-	if (!cb)
-		return -1;
-
-	if (cabc_mode > 2) return -1;
-
-	cabc_value = cabc_value_map[cabc_mode];
-	cabc_tb[1] = cabc_value;
-
-	cb(dsi, handle, cabc_tb, ARRAY_SIZE(cabc_tb));
-	cb(dsi, handle, cabc_tb1, ARRAY_SIZE(cabc_tb1));
-	cb(dsi, handle, cabc_tb2, ARRAY_SIZE(cabc_tb2));
-
-	if (cabc_value == 3) {
-		cb(dsi, handle, cabc_movie_tb3, ARRAY_SIZE(cabc_movie_tb3));
-		cb(dsi, handle, cabc_movie_tb4, ARRAY_SIZE(cabc_movie_tb4));
-	}else {
-		cb(dsi, handle, cabc_ui_tb3, ARRAY_SIZE(cabc_ui_tb3));
-		cb(dsi, handle, cabc_ui_tb4, ARRAY_SIZE(cabc_ui_tb4));
-	}
-
-	cb(dsi, handle, cabc_tb1, ARRAY_SIZE(cabc_tb5));
-	cb(dsi, handle, cabc_tb2, ARRAY_SIZE(cabc_tb6));
-	pr_info(" set cabc to %d\n", cabc_value);
-
-done:
-	ctx->cabc_mode = cabc_mode;
-	return 0;
-}
-
-static void panel_cabc_get_state(struct drm_panel *panel, unsigned int *cabc_mode)
-{
-	struct lcm *ctx = panel_to_lcm(panel);
-
-	*cabc_mode = ctx->cabc_mode;
-}
-
-static int panel_hbm_set(struct drm_panel *panel, void *dsi,
-			      dcs_write_gce cb, void *handle, bool hbm_en)
-{
-	struct lcm *ctx = panel_to_lcm(panel);
-
-	if (hbm_en) {
-		ctx->bl_iset_en_gpio =
-		devm_gpiod_get(ctx->dev, "bl-iset-en", GPIOD_OUT_LOW);
-		if (IS_ERR(ctx->bl_iset_en_gpio)) {
-			dev_err(ctx->dev, "%s: cannot get bl_iset_en_gpio %ld\n",
-				__func__, PTR_ERR(ctx->bl_iset_en_gpio));
-			return -1;
-		}
-		devm_gpiod_put(ctx->dev, ctx->bl_iset_en_gpio);
-	} else {
-		ctx->bl_iset_en_gpio =
-		devm_gpiod_get(ctx->dev, "bl-iset-en", GPIOD_IN);
-		if (IS_ERR(ctx->bl_iset_en_gpio)) {
-			dev_err(ctx->dev, "%s: cannot get bl_iset_en_gpio %ld\n",
-				__func__, PTR_ERR(ctx->bl_iset_en_gpio));
-			return -1;
-		}
-		devm_gpiod_put(ctx->dev, ctx->bl_iset_en_gpio);
-	}
-	ctx->hbm_en = hbm_en;
-	pr_info("%s set HBM to %d\n", __func__, hbm_en);
-	return 0;
-}
-
-static void panel_hbm_get_state(struct drm_panel *panel, bool *state)
-{
-	struct lcm *ctx = panel_to_lcm(panel);
-
-	*state = ctx->hbm_en;
-}
-
-static int panel_notify_fps_chg(void *dsi, dcs_write_gce cb, void *handle, unsigned int mode)
-{
-	char dfps_cmd[2][2]= {
-				{0x26, 0x1},
-				{0x26, 0x2},
-			   };
-
-	if (!cb)
-		return -1;
-
-	if (mode > 2) return -1;
-
-	cb(dsi, handle, &dfps_cmd[mode], ARRAY_SIZE(dfps_cmd[mode]));
-	pr_info("%s send_dfps_cmd 0x%x 0x%x\n", __func__, dfps_cmd[mode][0], dfps_cmd[mode][1]);
-
-	return 0;
-}
+//static int panel_cabc_set_cmdq(struct drm_panel *panel, void *dsi,
+//			      dcs_write_gce cb, void *handle, unsigned int cabc_mode)
+//{
+//	const unsigned int cabc_value_map[3] = {1, 3, 0};
+//	int cabc_value = 1;
+//	char cabc_tb[2] = {0x55, 0x01};
+//	u8 cabc_tb1[] = {0xF0, 0x5A, 0x59};//Password open
+//	u8 cabc_tb2[] = {0xF1, 0xA5, 0xA6};//Password open
+//	u8 cabc_ui_tb3[] = {0xE0, 0x30, 0x00, 0x80, 0x88, 0x11, 0x3F, 0x22, 0x62, 0xDF, 0xA0, 0x04, 0xCC, 0x01, 0xFF, 0xF6, 0xFF, 0xF0, 0xFD, 0xFF, 0xFD, 0xF8, 0xF5, 0xFC, 0xFC, 0xFD, 0xFF};
+//	u8 cabc_ui_tb4[] = {0xE1, 0xEF, 0xFE, 0xFE, 0xFE, 0xFE, 0xEE, 0xF0, 0x20, 0x33, 0xFF, 0x00, 0x00, 0x6A, 0x90, 0xC0, 0x0D, 0x6A, 0xF0, 0x3E, 0xFF, 0x00, 0x07, 0xD0};
+//	u8 cabc_movie_tb3[] = {0xE0, 0x30, 0x00, 0x80, 0x88, 0x11, 0x3F, 0x22, 0x62, 0xDF, 0xA0, 0x04, 0xCC, 0x01, 0xFF, 0xFA, 0xFF, 0xF0, 0xFD, 0xFF, 0xFB, 0xF8, 0xF5, 0xFC, 0xFC, 0xFB, 0xFF};
+//	u8 cabc_movie_tb4[] = {0xE1, 0xBC, 0xF8, 0xCC, 0xFA, 0xDB, 0x9B, 0xF0, 0xE7, 0xF0, 0x85, 0xF0, 0x70, 0x00, 0x50, 0x00, 0x9A, 0xFD, 0xF0, 0xE0, 0xFF, 0x00, 0x07, 0xD0};
+//	u8 cabc_tb5[] = {0xF1, 0x5A, 0x59};//Password off
+//	u8 cabc_tb6[] = {0xF0, 0xA5, 0xA6};//Password off
+//
+//	struct lcm *ctx = panel_to_lcm(panel);
+//
+//	if (ctx->cabc_mode == cabc_mode)
+//		goto done;
+//
+//	if (!cb)
+//		return -1;
+//
+//	if (cabc_mode > 2) return -1;
+//
+//	cabc_value = cabc_value_map[cabc_mode];
+//	cabc_tb[1] = cabc_value;
+//
+//	cb(dsi, handle, cabc_tb, ARRAY_SIZE(cabc_tb));
+//	cb(dsi, handle, cabc_tb1, ARRAY_SIZE(cabc_tb1));
+//	cb(dsi, handle, cabc_tb2, ARRAY_SIZE(cabc_tb2));
+//
+//	if (cabc_value == 3) {
+//		cb(dsi, handle, cabc_movie_tb3, ARRAY_SIZE(cabc_movie_tb3));
+//		cb(dsi, handle, cabc_movie_tb4, ARRAY_SIZE(cabc_movie_tb4));
+//	}else {
+//		cb(dsi, handle, cabc_ui_tb3, ARRAY_SIZE(cabc_ui_tb3));
+//		cb(dsi, handle, cabc_ui_tb4, ARRAY_SIZE(cabc_ui_tb4));
+//	}
+//
+//	cb(dsi, handle, cabc_tb1, ARRAY_SIZE(cabc_tb5));
+//	cb(dsi, handle, cabc_tb2, ARRAY_SIZE(cabc_tb6));
+//	pr_info(" set cabc to %d\n", cabc_value);
+//
+//done:
+//	ctx->cabc_mode = cabc_mode;
+//	return 0;
+//}
+//
+//static void panel_cabc_get_state(struct drm_panel *panel, unsigned int *cabc_mode)
+//{
+//	struct lcm *ctx = panel_to_lcm(panel);
+//
+//	*cabc_mode = ctx->cabc_mode;
+//}
 
 static struct mtk_panel_funcs ext_funcs = {
 	.reset = panel_ext_reset,
@@ -755,11 +662,8 @@ static struct mtk_panel_funcs ext_funcs = {
 	.ata_check = panel_ata_check,
 	.get_virtual_heigh = lcm_get_virtual_heigh,
 	.get_virtual_width = lcm_get_virtual_width,
-	.hbm_set_cmdq = panel_hbm_set,
-	.hbm_get_state = panel_hbm_get_state,
-	.cabc_set_cmdq = panel_cabc_set_cmdq,
-	.cabc_get_state = panel_cabc_get_state,
-	.notify_fps_chg = panel_notify_fps_chg,
+	//.cabc_set_cmdq = panel_cabc_set_cmdq,
+	//.cabc_get_state = panel_cabc_get_state,
 };
 #endif
 
@@ -785,7 +689,6 @@ struct panel_desc {
 static int lcm_get_modes(struct drm_panel *panel)
 {
 	struct drm_display_mode *mode;
-	struct drm_display_mode *mode2;
 
 	mode = drm_mode_duplicate(panel->drm, &default_mode);
 	if (!mode) {
@@ -799,25 +702,9 @@ static int lcm_get_modes(struct drm_panel *panel)
 	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
 	drm_mode_probed_add(panel->connector, mode);
 
-	mode2 = drm_mode_duplicate(panel->drm, &performance_mode);
-	if (!mode2) {
-		dev_info(panel->drm->dev, "failed to add mode %ux%ux@%u\n",
-			 performance_mode.hdisplay, performance_mode.vdisplay,
-			 performance_mode.vrefresh);
-		return -ENOMEM;
-	}
-
-	drm_mode_set_name(mode2);
-	mode2->type = DRM_MODE_TYPE_DRIVER;
-	drm_mode_probed_add(panel->connector, mode2);
-
-	panel->connector->display_info.width_mm = 68;
-	panel->connector->display_info.height_mm = 151;
-
-	panel->connector->display_info.panel_ver = 0x01;
-	panel->connector->display_info.panel_id = 0x020A1C74;
-	strcpy(panel->connector->display_info.panel_name, "mipi_mot_vid_boe_hdp_653");
-	strcpy(panel->connector->display_info.panel_supplier, "boe-icnl9911c");
+	// busted out ye old ruler for this
+	panel->connector->display_info.width_mm = 79;
+	panel->connector->display_info.height_mm = 159;
 
 	return 1;
 }
@@ -838,11 +725,11 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	int ret;
 	struct device_node *dsi_node, *remote_node = NULL, *endpoint = NULL;
 
-	if (strstr(saved_command_line, "mipi_mot_vid_boe_icnl9911c_720p_653") ||
+	if (strstr(saved_command_line, "mipi_vid_dongshan_icnl9911c_720p_653") ||
                         !strstr(saved_command_line, "lcd_name=")) {
-		pr_err("%s boe icnl9911c\n", __func__);
+		pr_err("%s dongshan icnl9911c\n", __func__);
 	} else {
-		pr_err("not match boe icnl9911c !!!\n");
+		pr_err("not match dongshan icnl9911c !!!\n");
 		return -ENODEV;
 	}
 	dsi_node = of_get_parent(dev->of_node);
@@ -908,13 +795,15 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	}
 	devm_gpiod_put(dev, ctx->bias_neg);
 #endif
-	ctx->bl_iset_en_gpio = devm_gpiod_get(dev, "bl-iset-en", GPIOD_IN);
-	if (IS_ERR(ctx->bl_iset_en_gpio)) {
-		dev_err(dev, "%s: cannot get bl_iset_en_gpio %ld\n",
-			__func__, PTR_ERR(ctx->bl_iset_en_gpio));
-		return PTR_ERR(ctx->bl_iset_en_gpio);
-	}
-	devm_gpiod_put(dev, ctx->bl_iset_en_gpio);
+	//ctx->bl_iset_en_gpio = devm_gpiod_get(dev, "bl-iset-en", GPIOD_IN);
+	//if (IS_ERR(ctx->bl_iset_en_gpio)) {
+	//	dev_err(dev, "%s: cannot get bl_iset_en_gpio %ld\n",
+	//		__func__, PTR_ERR(ctx->bl_iset_en_gpio));
+	//	return PTR_ERR(ctx->bl_iset_en_gpio);
+	//}
+	//devm_gpiod_put(dev, ctx->bl_iset_en_gpio);
+
+	ctx->bl_iset_en_gpio = 0;
 
 	ctx->prepared = true;
 	ctx->enabled = true;
@@ -954,7 +843,7 @@ static int lcm_remove(struct mipi_dsi_device *dsi)
 }
 
 static const struct of_device_id lcm_of_match[] = {
-	{ .compatible = "icnl9911c,boe,vdo", },
+	{ .compatible = "icnl9911c,dongshan,vdo", },
 	{ }
 };
 
@@ -964,7 +853,7 @@ static struct mipi_dsi_driver lcm_driver = {
 	.probe = lcm_probe,
 	.remove = lcm_remove,
 	.driver = {
-		.name = "panel-icnl9911c-boe-vdo",
+		.name = "panel-icnl9911c-dongshan-vdo",
 		.owner = THIS_MODULE,
 		.of_match_table = lcm_of_match,
 	},
@@ -973,5 +862,5 @@ static struct mipi_dsi_driver lcm_driver = {
 module_mipi_dsi_driver(lcm_driver);
 
 MODULE_AUTHOR("Yi-Lun Wang <Yi-Lun.Wang@mediatek.com>");
-MODULE_DESCRIPTION("icnl9911c boe VDO LCD Panel Driver");
+MODULE_DESCRIPTION("icnl9911c dongshan VDO LCD Panel Driver");
 MODULE_LICENSE("GPL v2");
