@@ -707,7 +707,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 	mode2->type = DRM_MODE_TYPE_DRIVER;
 	drm_mode_probed_add(panel->connector, mode2);
 
-	panel->connector->display_info.width_mm = 79;
+	panel->connector->display_info.width_mm = 69;
 	panel->connector->display_info.height_mm = 159;
 
 	return 1;

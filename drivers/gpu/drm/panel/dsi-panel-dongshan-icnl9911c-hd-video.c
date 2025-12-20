@@ -463,7 +463,7 @@ static int lcm_enable(struct drm_panel *panel)
 #define HAC (720)
 
 static struct drm_display_mode default_mode = {
-	.clock = 134357,
+	.clock = 142467,
 	.hdisplay = HAC,
 	.hsync_start = HAC + HFP,
 	.hsync_end = HAC + HFP + HSA,
@@ -703,7 +703,7 @@ static int lcm_get_modes(struct drm_panel *panel)
 	drm_mode_probed_add(panel->connector, mode);
 
 	// busted out ye old ruler for this
-	panel->connector->display_info.width_mm = 79;
+	panel->connector->display_info.width_mm = 69;
 	panel->connector->display_info.height_mm = 159;
 
 	return 1;
