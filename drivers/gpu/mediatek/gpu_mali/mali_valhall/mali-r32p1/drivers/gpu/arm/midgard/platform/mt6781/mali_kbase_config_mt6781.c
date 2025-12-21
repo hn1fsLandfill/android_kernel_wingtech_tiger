@@ -1,7 +1,24 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019 MediaTek Inc.
-*/
+ *
+ * (C) COPYRIGHT 2011-2017 ARM Limited. All rights reserved.
+ *
+ * This program is free software and is provided to you under the terms of the
+ * GNU General Public License version 2 as published by the Free Software
+ * Foundation, and any use by you of this program is subject to the terms
+ * of such GNU licence.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, you can access it online at
+ * http://www.gnu.org/licenses/gpl-2.0.html.
+ *
+ * SPDX-License-Identifier: GPL-2.0
+ *
+ */
 
 #include <linux/ioport.h>
 #include <linux/of.h>
@@ -17,8 +34,8 @@
 #include "ged_dvfs.h"
 #include "mtk_gpufreq.h"
 #include "mtk_idle.h"
-#if IS_ENABLED(CONFIG_MTK_GPU_SWPM_SUPPORT)
-//#include <mtk_gpu_power_sspm_ipi.h>
+#ifdef CONFIG_MTK_GPU_SWPM_SUPPORT
+#include <mtk_gpu_power_sspm_ipi.h>
 #endif
 
 #define MALI_TAG				"[GPU/MALI]"
@@ -26,10 +43,7 @@
 #define mali_pr_debug(fmt, args...)		pr_debug(MALI_TAG"[DEBUG]"fmt, ##args)
 
 DEFINE_MUTEX(g_mfg_lock);
-
-//FIXME
 static int g_curFreqID;
-static int g_is_suspend;
 
 enum gpu_dvfs_status_step {
 	GPU_DVFS_STATUS_STEP_1 = 0x1,
@@ -51,7 +65,7 @@ enum gpu_dvfs_status_step {
 
 static inline void gpu_dvfs_status_footprint(enum gpu_dvfs_status_step step)
 {
-#if IS_ENABLED(CONFIG_MTK_RAM_CONSOLE)
+#ifdef CONFIG_MTK_RAM_CONSOLE
 	aee_rr_rec_gpu_dvfs_status(step |
 				(aee_rr_curr_gpu_dvfs_status() & 0xF0));
 #endif
@@ -59,7 +73,7 @@ static inline void gpu_dvfs_status_footprint(enum gpu_dvfs_status_step step)
 
 static inline void gpu_dvfs_status_reset_footprint(void)
 {
-#if IS_ENABLED(CONFIG_MTK_RAM_CONSOLE)
+#ifdef CONFIG_MTK_RAM_CONSOLE
 	aee_rr_rec_gpu_dvfs_status(0);
 #endif
 }
@@ -86,17 +100,14 @@ static int pm_callback_power_on_nolock(struct kbase_device *kbdev)
 
 	gpu_dvfs_status_footprint(GPU_DVFS_STATUS_STEP_1);
 
-	if (g_is_suspend == 1) {
-		mali_pr_info("@%s: discard powering on since GPU is suspended\n", __func__);
-		return 0;
-	}
-
 	/* on,off/ SWCG(BG3D)/ MTCMOS/ BUCK */
 	mt_gpufreq_power_control(POWER_ON, CG_ON, MTCMOS_ON, BUCK_ON);
 
 	gpu_dvfs_status_footprint(GPU_DVFS_STATUS_STEP_2);
 
 	mt_gpufreq_set_timestamp();
+
+	mt_gpufreq_set_gpm();
 
 	/* set a flag to enable GPU DVFS */
 	mtk_common_pm_mfg_active();
@@ -164,9 +175,10 @@ static int pm_callback_power_on(struct kbase_device *kbdev)
 	int ret = 0;
 
 	mutex_lock(&g_mfg_lock);
+
 	ret = pm_callback_power_on_nolock(kbdev);
-#if IS_ENABLED(CONFIG_MTK_GPU_SWPM_SUPPORT)
-//	MTKGPUPower_model_resume();
+#ifdef CONFIG_MTK_GPU_SWPM_SUPPORT
+	MTKGPUPower_model_resume();
 #endif
 	mutex_unlock(&g_mfg_lock);
 
@@ -176,8 +188,8 @@ static int pm_callback_power_on(struct kbase_device *kbdev)
 static void pm_callback_power_off(struct kbase_device *kbdev)
 {
 	mutex_lock(&g_mfg_lock);
-#if IS_ENABLED(CONFIG_MTK_GPU_SWPM_SUPPORT)
-//	MTKGPUPower_model_suspend();
+#ifdef CONFIG_MTK_GPU_SWPM_SUPPORT
+	MTKGPUPower_model_suspend();
 #endif
 	pm_callback_power_off_nolock(kbdev);
 	mutex_unlock(&g_mfg_lock);
@@ -186,28 +198,19 @@ static void pm_callback_power_off(struct kbase_device *kbdev)
 static void pm_callback_power_suspend(struct kbase_device *kbdev)
 {
 	mutex_lock(&g_mfg_lock);
-
+	mali_pr_debug("@%s: gpu_suspend\n", __func__);
 	if (mtk_common_pm_is_mfg_active()) {
-		pm_callback_power_off_nolock(kbdev);
-		mali_pr_info("@%s: force powering off GPU\n", __func__);
+		mali_pr_info("@%s: someone power on GPU during suspend\n", __func__);
 	}
-	g_is_suspend = 1;
-	mali_pr_info("@%s: gpu_suspend\n", __func__);
-
 	gpu_dvfs_status_footprint(GPU_DVFS_STATUS_STEP_E);
-
 	mutex_unlock(&g_mfg_lock);
 }
 
 static void pm_callback_power_resume(struct kbase_device *kbdev)
 {
 	mutex_lock(&g_mfg_lock);
-
-	g_is_suspend = 0;
-	mali_pr_info("@%s: gpu_resume\n", __func__);
-
+	mali_pr_debug("@%s: gpu_resume\n", __func__);
 	gpu_dvfs_status_footprint(GPU_DVFS_STATUS_STEP_F);
-
 	mutex_unlock(&g_mfg_lock);
 }
 
@@ -218,6 +221,7 @@ struct kbase_pm_callback_conf pm_callbacks = {
 	.power_resume_callback = pm_callback_power_resume,
 };
 
+// MT6781_TODO
 #ifndef CONFIG_OF
 static struct kbase_io_resources io_resources = {
 	.job_irq_number = 68,
@@ -228,7 +232,7 @@ static struct kbase_io_resources io_resources = {
 	.end = 0xFC010000 + (4096 * 4) - 1
 	}
 };
-#endif /* CONFIG_OF */
+#endif
 
 static struct kbase_platform_config versatile_platform_config = {
 #ifndef CONFIG_OF
@@ -250,9 +254,6 @@ int mtk_platform_device_init(struct kbase_device *kbdev)
 	}
 
 	gpu_dvfs_status_reset_footprint();
-
-	//FIXME
-	g_is_suspend = -1;
 
 	mali_pr_info("@%s: initialize successfully\n", __func__);
 
