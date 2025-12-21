@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019 MediaTek Inc.
-*/
+ * Copyright (c) 2020 MediaTek Inc.
+ */
 
 #ifndef __M4U_PORT_H__
 #define __M4U_PORT_H__
@@ -32,8 +32,6 @@ enum {
 	M4U_PORT_MDP_PVRIC1,
 	M4U_PORT_MDP_RDMA0,
 	M4U_PORT_MDP_RDMA1,
-	M4U_PORT_MDP_WDMA0,
-	M4U_PORT_MDP_WROT0,
 	M4U_PORT_MDP_WROT0_R,
 	M4U_PORT_MDP_WROT0_W,
 	M4U_PORT_MDP_WROT1_R,
@@ -211,6 +209,5 @@ enum {
 	M4U_PORT_UNKNOWN
 };
 #define M4U_PORT_NR M4U_PORT_UNKNOWN
-#define M4U_PORT_MIN M4U_PORT_DISP_POSTMASK0
 
 #endif

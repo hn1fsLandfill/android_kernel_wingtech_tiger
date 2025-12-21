@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019 MediaTek Inc.
-*/
+ * Copyright (c) 2020 MediaTek Inc.
+ */
 
 #ifndef __M4U_PORT_PRIV_H__
 #define __M4U_PORT_PRIV_H__
@@ -22,18 +22,6 @@ static const char *const gM4U_SMILARB[] = {
 		name, 1, slave, larb_id, port, \
 		(((smi_select_larb_id)<<7)|((port)<<2)), 1\
 }
-#define M4U_SLAVE0 (0)
-#define M4U_SLAVE1 (0)
-#define M4U_SLAVE2 (0)
-#define M4U_SLAVE3 (0)
-#define M4U_SLAVE4 (0)
-
-#define M4U_LARB0 (0)
-#define M4U_LARB1 (1)
-#define M4U_LARB2 (2)
-#define M4U_LARB3 (3)
-#define M4U_LARB4 (4)
-
 
 struct m4u_port_t gM4uPort[] = {
 	/* larb0 -MMSYS-9 */
