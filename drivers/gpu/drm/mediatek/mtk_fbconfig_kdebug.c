@@ -13,13 +13,18 @@
 #include <linux/wait.h>
 #include <linux/types.h>
 
+
 #include "mtk_fbconfig_kdebug.h"
 #include "mtk_mipi_tx.h"
 #include "mtk_drm_crtc.h"
 #include "mtk_panel_ext.h"
 #include "mtk_drm_drv.h"
 #include "mtk_drm_ddp_comp.h"
-#include "mtk_drm_assert.h"
+
+
+
+
+
 /* ************************************************************************* */
 /* This part is for customization parameters of D-IC and DSI . */
 /* ************************************************************************* */
@@ -71,7 +76,6 @@
 #define LCM_GET_DSI_CLK_V2    FBCONFIG_IOR(77, unsigned int)
 #define LCM_TEST_DSI_CLK    FBCONFIG_IOR(78, unsigned int)
 #define FB_GET_MISC FBCONFIG_IOR(80, unsigned int)
-#define FB_DUMP_FOR_POWER FBCONFIG_IOR(81, unsigned int)
 
 #ifdef UFMT_GET_bpp
 #define DP_COLOR_BITS_PER_PIXEL(color) UFMT_GET_bpp(color)
@@ -183,7 +187,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 	struct PM_TOOL_S *pm = (struct PM_TOOL_S *) pm_get_handle();
 	uint32_t dsi_id = pm->dsi_id;
 
-	if (!(crtc->state->active) && cmd != FB_DUMP_FOR_POWER)
+	if (!(crtc->state->active))
 		return -EFAULT;
 
 #ifdef FBCONFIG_SHOULD_KICK_IDLEMGR
@@ -193,7 +197,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 	case GET_DSI_ID:
 	{
 		put_user(dsi_id, (unsigned long *)argp);
-		break;
+		return 0;
 	}
 	case SET_DSI_ID:
 	{
@@ -201,7 +205,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 			return -EINVAL;
 		pm->dsi_id = arg;
 		pr_debug("fbconfig=>SET_DSI_ID:%d\n", dsi_id);
-		break;
+		return 0;
 	}
 	case LCM_TEST_DSI_CLK:
 	{
@@ -211,62 +215,24 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		lcm_fb.lcm_type = fbconfig_mtk_dsi_get_mode_type(output_comp);
 
 		pr_debug("fbconfig=>LCM_TEST_DSI_CLK:%d\n", ret);
-		ret = copy_to_user(argp, &lcm_fb,
+		return copy_to_user(argp, &lcm_fb,
 			sizeof(lcm_fb)) ? -EFAULT : 0;
-		break;
-	}
-	case FB_DUMP_FOR_POWER:
-	{
-		struct PM_MMQOS_REL_INFO qos_info;
-		unsigned int bpp, bpc;
 
-		qos_info.vact = crtc->state->adjusted_mode.vdisplay;
-		qos_info.hact = crtc->state->adjusted_mode.hdisplay;
-		qos_info.vrefresh = crtc->state->adjusted_mode.vrefresh;
-		qos_info.vtotal = crtc->state->adjusted_mode.vtotal;
-		qos_info.htotal = crtc->state->adjusted_mode.htotal;
-		if (pm->pMtk_panel_params->data_rate > 0)
-			qos_info.data_rate = pm->pMtk_panel_params->data_rate;
-		else
-			qos_info.data_rate = pm->pMtk_panel_params->pll_clk * 2;
-		qos_info.isCphy = pm->pMtk_panel_params->is_cphy;
-		qos_info.mode = fbconfig_mtk_dsi_get_mode_type(output_comp);
-		qos_info.lane_num = fbconfig_mtk_dsi_get_lanes_num(output_comp);
-		if (pm->pMtk_panel_params->dsc_params.enable) {
-			bpp = pm->pMtk_panel_params->dsc_params.bit_per_pixel / 16;
-			bpc = pm->pMtk_panel_params->dsc_params.bit_per_channel;
-			//compress_rate*100 for 3.75 or 2.5 case
-			qos_info.compress_ratio = bpc * 3 * 100 / bpp;
-		} else
-			qos_info.compress_ratio = 100;
-		qos_info.scr_bpp = fbconfig_mtk_dsi_get_bpp(output_comp);
-		qos_info.is_dual_pipe = mtk_crtc->is_dual_pipe;
-		qos_info.idle = mtk_crtc->idlemgr->idlemgr_ctx->is_idle;
-		qos_info.bdg_rxtx_ratio = 1;
-		qos_info.dal_enable = mtk_drm_dal_enable();
-#ifdef CONFIG_MTK_MT6382_BDG
-		qos_info.bdg_rxtx_ratio = 229;
-		if ((qos_info.mode & MIPI_DSI_MODE_VIDEO) == 0)
-			qos_info.bdg_rxtx_ratio = 300;
-#endif
-		ret = copy_to_user(argp, &qos_info,
-			sizeof(qos_info)) ? -EFAULT : 0;
-		break;
 	}
 	case LCM_GET_ID:
 	{
 		/* not support anymore */
-		break;
+		return 0;
 	}
 	case DRIVER_IC_CONFIG:
 	{
 		/* not support anymore */
-		break;
+		return 0;
 	}
 	case DRIVER_IC_CONFIG_DONE:
 	{
 		/* not support anymore */
-		break;
+		return 0;
 	}
 	case MIPI_SET_CC:
 	{
@@ -280,7 +246,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		if (enable > 1)
 			return -EFAULT;
 		Panel_Master_mipi_set_cc_entry(crtc, enable);
-		break;
+		return 0;
 	}
 	case LCM_GET_DSI_CONTINU:
 	{
@@ -288,8 +254,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 
 		/*need to improve ,0 now means nothing but one parameter. */
 		pr_debug("LCM_GET_DSI_CONTINU=>DSI: %d\n", ret);
-		ret = put_user(ret, (unsigned long *)argp);
-		break;
+		return put_user(ret, (unsigned long *)argp);
 	}
 	case MIPI_SET_CLK:
 	{
@@ -303,7 +268,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 
 		pr_debug("LCM_GET_DSI_CLK=>dsi:%d\n", clk);
 		Panel_Master_dsi_config_entry(crtc, "PM_CLK", clk);
-		break;
+		return 0;
 	}
 	case LCM_GET_DSI_CLK:
 	{
@@ -311,8 +276,8 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 
 		pr_debug("LCM_GET_DSI_CLK=>dsi:%d\n", clk);
 
-		ret = put_user(clk, (unsigned long *)argp);
-		break;
+		return put_user(clk, (unsigned long *)argp);
+
 	}
 	case MIPI_SET_SSC:
 	{
@@ -328,7 +293,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		pr_debug("Pmaster:set mipi ssc line:%d\n", __LINE__);
 		/* not support ssc in drm */
 		/* Panel_Master_dsi_config_entry(crtc, "PM_SSC", dsi_ssc); */
-		break;
+		return 0;
 	}
 	case LCM_GET_DSI_SSC:
 	{
@@ -337,8 +302,7 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 
 		if (pm->pMtk_panel_params->ssc_disable)
 			ssc = 0;
-		ret = put_user(ssc, (unsigned long *)argp);
-		break;
+		return put_user(ssc, (unsigned long *)argp);
 	}
 	case LCM_GET_DSI_LANE_NUM:
 	{
@@ -347,13 +311,12 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		lanes_num = fbconfig_mtk_dsi_get_lanes_num(output_comp);
 		pr_debug("Panel Master=>LCM_GET_DSI_Lane_num=>dsi:%d\r\n",
 			lanes_num);
-		ret = put_user(lanes_num, (unsigned long *)argp);
-		break;
+		return put_user(lanes_num, (unsigned long *)argp);
 	}
 	case LCM_GET_DSI_TE:
 	{
 		/* not support anymore */
-		break;
+		return 0;
 	}
 	case LCM_GET_DSI_TIMING:
 	{
@@ -369,9 +332,8 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		ret = Panel_Master_lcm_get_dsi_timing_entry(crtc, timing.type);
 		pr_debug("fbconfig=>LCM_GET_DSI_TIMING:%d\n", ret);
 		timing.value = ret;
-		ret = copy_to_user(argp,
+		return copy_to_user(argp,
 			&timing, sizeof(timing)) ? -EFAULT : 0;
-		break;
 	}
 	case MIPI_SET_TIMING:
 	{
@@ -387,23 +349,23 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 			return -EFAULT;
 		}
 		ret = Panel_Master_mipi_set_timing_entry(crtc, timing);
-		break;
+		return ret;
 	}
 	case FB_LAYER_GET_EN:
 	{
 		pr_debug("[FB_LAYER_GET_EN] not support any more\n");
-		break;
+		return 0;
 	}
 	case FB_LAYER_GET_INFO:
 	{
 		pr_debug("[FB_LAYER_GET_INFO] not support any more\n");
-		break;
+		return  0;
 	}
 
 	case FB_LAYER_DUMP:
 	{
 		pr_debug("[FB_LAYER_DUMP] not support any more\n");
-		break;
+		return  0;
 	}
 
 	case LCM_GET_ESD:
@@ -437,26 +399,27 @@ static long fbconfig_ioctl(struct file *file, unsigned int cmd,
 		ret = copy_to_user(esd_para.esd_ret_buffer,
 			buffer, esd_para.para_num);
 		kfree(buffer);
-		break;
+		return ret;
+
 	}
 	case TE_SET_ENABLE:
 	{
-		break;
+
+		return 0;
 	}
 	case DRIVER_IC_RESET:
 	{
 		Panel_Master_dsi_config_entry(crtc, "PM_DRIVER_IC_RESET", 0);
-		break;
+		return 0;
 	}
 	case FB_GET_MISC:
 	{
 		/* not support anymore */
-		break;
+		return 0;
 	}
 	default:
-		break;
+		return ret;
 	}
-	return ret;
 }
 
 static int fbconfig_release(struct inode *inode, struct file *file)
