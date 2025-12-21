@@ -62,12 +62,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "proc_stats.h"
 #endif
 
-#if defined(__KERNEL__)
-#include "srvcore.h"
-#else
-#include "srvcore_intern.h"
-#endif
-
 /*
 	SVM heap management support functions for CPU (un)mapping
  */
@@ -381,12 +375,8 @@ IMG_BOOL DevmemImportStructRelease(DEVMEM_IMPORT *psImport)
 
 	if (iRefCount == 0)
 	{
-		PVRSRV_ERROR eError = DestroyServerResource(psImport->hDevConnection,
-		                                            NULL,
-		                                            BridgePMRUnrefPMR,
-		                                            psImport->hPMR);
-		PVR_ASSERT(eError == PVRSRV_OK);
-
+		BridgePMRUnrefPMR(GetBridgeHandle(psImport->hDevConnection),
+				psImport->hPMR);
 		OSLockDestroy(psImport->sCPUImport.hLock);
 		OSLockDestroy(psImport->sDeviceImport.hLock);
 		OSLockDestroy(psImport->hLock);
@@ -510,10 +500,8 @@ IMG_BOOL DevmemMemDescRelease(DEVMEM_MEMDESC *psMemDesc)
 		{
 			PVRSRV_ERROR eError;
 
-			eError = DestroyServerResource(psMemDesc->psImport->hDevConnection,
-			                               NULL,
-			                               BridgeRIDeleteMEMDESCEntry,
-			                               psMemDesc->hRIHandle);
+			eError = BridgeRIDeleteMEMDESCEntry(GetBridgeHandle(psMemDesc->psImport->hDevConnection),
+			                                    psMemDesc->hRIHandle);
 			if (eError != PVRSRV_OK)
 			{
 				PVR_DPF((PVR_DBG_ERROR, "%s: call to BridgeRIDeleteMEMDESCEntry failed (Error=%d)", __func__, eError));
@@ -1054,17 +1042,13 @@ IMG_BOOL DevmemImportStructDevUnmap(DEVMEM_IMPORT *psImport)
 		{
 			if (psDeviceImport->bMapped)
 			{
-				eError = DestroyServerResource(psImport->hDevConnection,
-				                               NULL,
-				                               BridgeDevmemIntUnmapPMR,
-				                               psDeviceImport->hMapping);
+				eError = BridgeDevmemIntUnmapPMR(GetBridgeHandle(psImport->hDevConnection),
+						psDeviceImport->hMapping);
 				PVR_ASSERT(eError == PVRSRV_OK);
 			}
 
-			eError = DestroyServerResource(psImport->hDevConnection,
-			                               NULL,
-			                               BridgeDevmemIntUnreserveRange,
-			                               psDeviceImport->hReservation);
+			eError = BridgeDevmemIntUnreserveRange(GetBridgeHandle(psImport->hDevConnection),
+					psDeviceImport->hReservation);
 			PVR_ASSERT(eError == PVRSRV_OK);
 		}
 

@@ -66,29 +66,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Server-side bridge entry points
  */
 
-static PVRSRV_ERROR _PhysmemImportDmaBufpsPMRPtrIntRelease(void *pvData)
-{
-	PVRSRV_ERROR eError;
-	eError = PMRUnrefPMR((PMR *) pvData);
-	return eError;
-}
-
-static_assert(DEVMEM_ANNOTATION_MAX_LEN <= IMG_UINT32_MAX,
-	      "DEVMEM_ANNOTATION_MAX_LEN must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgePhysmemImportDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
-				IMG_UINT8 * psPhysmemImportDmaBufIN_UI8,
-				IMG_UINT8 * psPhysmemImportDmaBufOUT_UI8,
+				PVRSRV_BRIDGE_IN_PHYSMEMIMPORTDMABUF *
+				psPhysmemImportDmaBufIN,
+				PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTDMABUF *
+				psPhysmemImportDmaBufOUT,
 				CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_PHYSMEMIMPORTDMABUF *psPhysmemImportDmaBufIN =
-	    (PVRSRV_BRIDGE_IN_PHYSMEMIMPORTDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemImportDmaBufIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTDMABUF *psPhysmemImportDmaBufOUT =
-	    (PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemImportDmaBufOUT_UI8, 0);
-
 	IMG_CHAR *uiNameInt = NULL;
 	PMR *psPMRPtrInt = NULL;
 
@@ -98,10 +83,8 @@ PVRSRVBridgePhysmemImportDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) psPhysmemImportDmaBufIN->ui32NameSize *
-	     sizeof(IMG_CHAR)) + 0;
+	IMG_UINT32 ui32BufferSize =
+	    (psPhysmemImportDmaBufIN->ui32NameSize * sizeof(IMG_CHAR)) + 0;
 
 	if (unlikely
 	    (psPhysmemImportDmaBufIN->ui32NameSize > DEVMEM_ANNOTATION_MAX_LEN))
@@ -110,15 +93,6 @@ PVRSRVBridgePhysmemImportDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
 		goto PhysmemImportDmaBuf_exit;
 	}
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psPhysmemImportDmaBufOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto PhysmemImportDmaBuf_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -206,8 +180,7 @@ PVRSRVBridgePhysmemImportDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 				      (void *)psPMRPtrInt,
 				      PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
-				      (PFN_HANDLE_RELEASE) &
-				      _PhysmemImportDmaBufpsPMRPtrIntRelease);
+				      (PFN_HANDLE_RELEASE) & PMRUnrefPMR);
 	if (unlikely(psPhysmemImportDmaBufOUT->eError != PVRSRV_OK))
 	{
 		UnlockHandle(psConnection->psHandleBase);
@@ -230,10 +203,7 @@ PhysmemImportDmaBuf_exit:
 	}
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psPhysmemImportDmaBufOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)
@@ -247,17 +217,12 @@ PhysmemImportDmaBuf_exit:
 
 static IMG_INT
 PVRSRVBridgePhysmemExportDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
-				IMG_UINT8 * psPhysmemExportDmaBufIN_UI8,
-				IMG_UINT8 * psPhysmemExportDmaBufOUT_UI8,
+				PVRSRV_BRIDGE_IN_PHYSMEMEXPORTDMABUF *
+				psPhysmemExportDmaBufIN,
+				PVRSRV_BRIDGE_OUT_PHYSMEMEXPORTDMABUF *
+				psPhysmemExportDmaBufOUT,
 				CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_PHYSMEMEXPORTDMABUF *psPhysmemExportDmaBufIN =
-	    (PVRSRV_BRIDGE_IN_PHYSMEMEXPORTDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemExportDmaBufIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_PHYSMEMEXPORTDMABUF *psPhysmemExportDmaBufOUT =
-	    (PVRSRV_BRIDGE_OUT_PHYSMEMEXPORTDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemExportDmaBufOUT_UI8, 0);
-
 	IMG_HANDLE hPMR = psPhysmemExportDmaBufIN->hPMR;
 	PMR *psPMRInt = NULL;
 
@@ -301,35 +266,14 @@ PhysmemExportDmaBuf_exit:
 	return 0;
 }
 
-static PVRSRV_ERROR _PhysmemImportSparseDmaBufpsPMRPtrIntRelease(void *pvData)
-{
-	PVRSRV_ERROR eError;
-	eError = PMRUnrefPMR((PMR *) pvData);
-	return eError;
-}
-
-static_assert(PMR_MAX_SUPPORTED_PAGE_COUNT <= IMG_UINT32_MAX,
-	      "PMR_MAX_SUPPORTED_PAGE_COUNT must not be larger than IMG_UINT32_MAX");
-static_assert(DEVMEM_ANNOTATION_MAX_LEN <= IMG_UINT32_MAX,
-	      "DEVMEM_ANNOTATION_MAX_LEN must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgePhysmemImportSparseDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
-				      IMG_UINT8 *
-				      psPhysmemImportSparseDmaBufIN_UI8,
-				      IMG_UINT8 *
-				      psPhysmemImportSparseDmaBufOUT_UI8,
+				      PVRSRV_BRIDGE_IN_PHYSMEMIMPORTSPARSEDMABUF
+				      * psPhysmemImportSparseDmaBufIN,
+				      PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTSPARSEDMABUF
+				      * psPhysmemImportSparseDmaBufOUT,
 				      CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_PHYSMEMIMPORTSPARSEDMABUF
-	    *psPhysmemImportSparseDmaBufIN =
-	    (PVRSRV_BRIDGE_IN_PHYSMEMIMPORTSPARSEDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemImportSparseDmaBufIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTSPARSEDMABUF
-	    *psPhysmemImportSparseDmaBufOUT =
-	    (PVRSRV_BRIDGE_OUT_PHYSMEMIMPORTSPARSEDMABUF *)
-	    IMG_OFFSET_ADDR(psPhysmemImportSparseDmaBufOUT_UI8, 0);
-
 	IMG_UINT32 *ui32MappingTableInt = NULL;
 	IMG_CHAR *uiNameInt = NULL;
 	PMR *psPMRPtrInt = NULL;
@@ -340,12 +284,11 @@ PVRSRVBridgePhysmemImportSparseDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) psPhysmemImportSparseDmaBufIN->ui32NumPhysChunks *
+	IMG_UINT32 ui32BufferSize =
+	    (psPhysmemImportSparseDmaBufIN->ui32NumPhysChunks *
 	     sizeof(IMG_UINT32)) +
-	    ((IMG_UINT64) psPhysmemImportSparseDmaBufIN->ui32NameSize *
-	     sizeof(IMG_CHAR)) + 0;
+	    (psPhysmemImportSparseDmaBufIN->ui32NameSize * sizeof(IMG_CHAR)) +
+	    0;
 
 	if (unlikely
 	    (psPhysmemImportSparseDmaBufIN->ui32NumPhysChunks >
@@ -364,15 +307,6 @@ PVRSRVBridgePhysmemImportSparseDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
 		goto PhysmemImportSparseDmaBuf_exit;
 	}
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psPhysmemImportSparseDmaBufOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto PhysmemImportSparseDmaBuf_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -494,8 +428,7 @@ PVRSRVBridgePhysmemImportSparseDmaBuf(IMG_UINT32 ui32DispatchTableEntry,
 				      (void *)psPMRPtrInt,
 				      PVRSRV_HANDLE_TYPE_PHYSMEM_PMR,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
-				      (PFN_HANDLE_RELEASE) &
-				      _PhysmemImportSparseDmaBufpsPMRPtrIntRelease);
+				      (PFN_HANDLE_RELEASE) & PMRUnrefPMR);
 	if (unlikely(psPhysmemImportSparseDmaBufOUT->eError != PVRSRV_OK))
 	{
 		UnlockHandle(psConnection->psHandleBase);
@@ -518,10 +451,7 @@ PhysmemImportSparseDmaBuf_exit:
 	}
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psPhysmemImportSparseDmaBufOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)

@@ -46,7 +46,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "img_defs.h"
 
 #include "rgxhwperf.h"
-#include "rgx_fwif_km.h"
 
 #include "common_rgxhwperf_bridge.h"
 
@@ -68,16 +67,10 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 static IMG_INT
 PVRSRVBridgeRGXCtrlHWPerf(IMG_UINT32 ui32DispatchTableEntry,
-			  IMG_UINT8 * psRGXCtrlHWPerfIN_UI8,
-			  IMG_UINT8 * psRGXCtrlHWPerfOUT_UI8,
+			  PVRSRV_BRIDGE_IN_RGXCTRLHWPERF * psRGXCtrlHWPerfIN,
+			  PVRSRV_BRIDGE_OUT_RGXCTRLHWPERF * psRGXCtrlHWPerfOUT,
 			  CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_RGXCTRLHWPERF *psRGXCtrlHWPerfIN =
-	    (PVRSRV_BRIDGE_IN_RGXCTRLHWPERF *)
-	    IMG_OFFSET_ADDR(psRGXCtrlHWPerfIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_RGXCTRLHWPERF *psRGXCtrlHWPerfOUT =
-	    (PVRSRV_BRIDGE_OUT_RGXCTRLHWPERF *)
-	    IMG_OFFSET_ADDR(psRGXCtrlHWPerfOUT_UI8, 0);
 
 	psRGXCtrlHWPerfOUT->eError =
 	    PVRSRVRGXCtrlHWPerfKM(psConnection, OSGetDevNode(psConnection),
@@ -88,26 +81,14 @@ PVRSRVBridgeRGXCtrlHWPerf(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-static_assert(RGXFWIF_HWPERF_CTRL_BLKS_MAX <= IMG_UINT32_MAX,
-	      "RGXFWIF_HWPERF_CTRL_BLKS_MAX must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgeRGXConfigureHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
-				     IMG_UINT8 *
-				     psRGXConfigureHWPerfBlocksIN_UI8,
-				     IMG_UINT8 *
-				     psRGXConfigureHWPerfBlocksOUT_UI8,
+				     PVRSRV_BRIDGE_IN_RGXCONFIGUREHWPERFBLOCKS *
+				     psRGXConfigureHWPerfBlocksIN,
+				     PVRSRV_BRIDGE_OUT_RGXCONFIGUREHWPERFBLOCKS
+				     * psRGXConfigureHWPerfBlocksOUT,
 				     CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_RGXCONFIGUREHWPERFBLOCKS *psRGXConfigureHWPerfBlocksIN
-	    =
-	    (PVRSRV_BRIDGE_IN_RGXCONFIGUREHWPERFBLOCKS *)
-	    IMG_OFFSET_ADDR(psRGXConfigureHWPerfBlocksIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_RGXCONFIGUREHWPERFBLOCKS
-	    *psRGXConfigureHWPerfBlocksOUT =
-	    (PVRSRV_BRIDGE_OUT_RGXCONFIGUREHWPERFBLOCKS *)
-	    IMG_OFFSET_ADDR(psRGXConfigureHWPerfBlocksOUT_UI8, 0);
-
 	RGX_HWPERF_CONFIG_CNTBLK *psBlockConfigsInt = NULL;
 
 	IMG_UINT32 ui32NextOffset = 0;
@@ -116,28 +97,18 @@ PVRSRVBridgeRGXConfigureHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) psRGXConfigureHWPerfBlocksIN->ui16ArrayLen *
+	IMG_UINT32 ui32BufferSize =
+	    (psRGXConfigureHWPerfBlocksIN->ui16ArrayLen *
 	     sizeof(RGX_HWPERF_CONFIG_CNTBLK)) + 0;
 
 	if (unlikely
 	    (psRGXConfigureHWPerfBlocksIN->ui16ArrayLen >
-	     RGXFWIF_HWPERF_CTRL_BLKS_MAX))
+	     RGX_HWPERF_MAX_CFG_BLKS))
 	{
 		psRGXConfigureHWPerfBlocksOUT->eError =
 		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
 		goto RGXConfigureHWPerfBlocks_exit;
 	}
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psRGXConfigureHWPerfBlocksOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto RGXConfigureHWPerfBlocks_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -212,10 +183,7 @@ PVRSRVBridgeRGXConfigureHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
 RGXConfigureHWPerfBlocks_exit:
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psRGXConfigureHWPerfBlocksOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)
@@ -229,20 +197,12 @@ RGXConfigureHWPerfBlocks_exit:
 
 static IMG_INT
 PVRSRVBridgeRGXGetHWPerfBvncFeatureFlags(IMG_UINT32 ui32DispatchTableEntry,
-					 IMG_UINT8 *
-					 psRGXGetHWPerfBvncFeatureFlagsIN_UI8,
-					 IMG_UINT8 *
-					 psRGXGetHWPerfBvncFeatureFlagsOUT_UI8,
+					 PVRSRV_BRIDGE_IN_RGXGETHWPERFBVNCFEATUREFLAGS
+					 * psRGXGetHWPerfBvncFeatureFlagsIN,
+					 PVRSRV_BRIDGE_OUT_RGXGETHWPERFBVNCFEATUREFLAGS
+					 * psRGXGetHWPerfBvncFeatureFlagsOUT,
 					 CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_RGXGETHWPERFBVNCFEATUREFLAGS
-	    *psRGXGetHWPerfBvncFeatureFlagsIN =
-	    (PVRSRV_BRIDGE_IN_RGXGETHWPERFBVNCFEATUREFLAGS *)
-	    IMG_OFFSET_ADDR(psRGXGetHWPerfBvncFeatureFlagsIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_RGXGETHWPERFBVNCFEATUREFLAGS
-	    *psRGXGetHWPerfBvncFeatureFlagsOUT =
-	    (PVRSRV_BRIDGE_OUT_RGXGETHWPERFBVNCFEATUREFLAGS *)
-	    IMG_OFFSET_ADDR(psRGXGetHWPerfBvncFeatureFlagsOUT_UI8, 0);
 
 	PVR_UNREFERENCED_PARAMETER(psRGXGetHWPerfBvncFeatureFlagsIN);
 
@@ -255,22 +215,14 @@ PVRSRVBridgeRGXGetHWPerfBvncFeatureFlags(IMG_UINT32 ui32DispatchTableEntry,
 	return 0;
 }
 
-static_assert(RGXFWIF_HWPERF_CTRL_BLKS_MAX <= IMG_UINT32_MAX,
-	      "RGXFWIF_HWPERF_CTRL_BLKS_MAX must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgeRGXControlHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
-				   IMG_UINT8 * psRGXControlHWPerfBlocksIN_UI8,
-				   IMG_UINT8 * psRGXControlHWPerfBlocksOUT_UI8,
+				   PVRSRV_BRIDGE_IN_RGXCONTROLHWPERFBLOCKS *
+				   psRGXControlHWPerfBlocksIN,
+				   PVRSRV_BRIDGE_OUT_RGXCONTROLHWPERFBLOCKS *
+				   psRGXControlHWPerfBlocksOUT,
 				   CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_RGXCONTROLHWPERFBLOCKS *psRGXControlHWPerfBlocksIN =
-	    (PVRSRV_BRIDGE_IN_RGXCONTROLHWPERFBLOCKS *)
-	    IMG_OFFSET_ADDR(psRGXControlHWPerfBlocksIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_RGXCONTROLHWPERFBLOCKS *psRGXControlHWPerfBlocksOUT =
-	    (PVRSRV_BRIDGE_OUT_RGXCONTROLHWPERFBLOCKS *)
-	    IMG_OFFSET_ADDR(psRGXControlHWPerfBlocksOUT_UI8, 0);
-
 	IMG_UINT16 *ui16BlockIDsInt = NULL;
 
 	IMG_UINT32 ui32NextOffset = 0;
@@ -279,28 +231,17 @@ PVRSRVBridgeRGXControlHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) psRGXControlHWPerfBlocksIN->ui16ArrayLen *
-	     sizeof(IMG_UINT16)) + 0;
+	IMG_UINT32 ui32BufferSize =
+	    (psRGXControlHWPerfBlocksIN->ui16ArrayLen * sizeof(IMG_UINT16)) + 0;
 
 	if (unlikely
 	    (psRGXControlHWPerfBlocksIN->ui16ArrayLen >
-	     RGXFWIF_HWPERF_CTRL_BLKS_MAX))
+	     RGX_HWPERF_MAX_CFG_BLKS))
 	{
 		psRGXControlHWPerfBlocksOUT->eError =
 		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
 		goto RGXControlHWPerfBlocks_exit;
 	}
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psRGXControlHWPerfBlocksOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto RGXControlHWPerfBlocks_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -373,10 +314,7 @@ PVRSRVBridgeRGXControlHWPerfBlocks(IMG_UINT32 ui32DispatchTableEntry,
 RGXControlHWPerfBlocks_exit:
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psRGXControlHWPerfBlocksOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)

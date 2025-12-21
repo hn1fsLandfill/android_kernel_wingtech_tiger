@@ -3454,7 +3454,7 @@ PVRSRV_ERROR PVRSRVRGXKickTA3DKM(RGX_SERVER_RENDER_CONTEXT	*psRenderContext,
 		{
 			CHKPT_DBG((PVR_DBG_ERROR, "%s: ...done, returned ERROR (eError=%d)",
 			          __func__, eError));
-			goto fail_resolve_input_ta_fence;
+			goto fail_resolve_input_fence;
 		}
 
 		CHKPT_DBG((PVR_DBG_ERROR, "%s: ...done, fence %d contained %d "
@@ -3492,7 +3492,7 @@ PVRSRV_ERROR PVRSRVRGXKickTA3DKM(RGX_SERVER_RENDER_CONTEXT	*psRenderContext,
 		{
 			CHKPT_DBG((PVR_DBG_ERROR, "%s: ...done, returned ERROR (eError=%d)",
 			          __func__, eError));
-			goto fail_resolve_input_3d_fence;
+			goto fail_resolve_input_fence;
 		}
 
 		CHKPT_DBG((PVR_DBG_ERROR, "%s: ...done, fence %d contained %d "
@@ -3918,9 +3918,8 @@ PVRSRV_ERROR PVRSRVRGXKickTA3DKM(RGX_SERVER_RENDER_CONTEXT	*psRenderContext,
 		PVR_DPF((PVR_DBG_ERROR,
 				 "%s: Buffer sync not supported but got %u buffers",
 				 __func__, ui32SyncPMRCount));
-
-		eError = PVRSRV_ERROR_INVALID_PARAMS;
-		goto err_no_buffer_sync_invalid_params;
+		OSLockRelease(psRenderContext->hLock);
+		return PVRSRV_ERROR_INVALID_PARAMS;
 #endif /* defined(SUPPORT_BUFFER_SYNC) */
 	}
 
@@ -3967,7 +3966,7 @@ PVRSRV_ERROR PVRSRVRGXKickTA3DKM(RGX_SERVER_RENDER_CONTEXT	*psRenderContext,
 				if (unlikely(eError != PVRSRV_OK))
 				{
 					PVR_DPF((PVR_DBG_ERROR, "%s:   SyncCheckpointCreateFence[TA] failed (%d)", __func__, eError));
-					goto fail_create_ta_fence;
+					goto fail_create_output_fence;
 				}
 
 				CHKPT_DBG((PVR_DBG_ERROR, "%s: returned from SyncCheckpointCreateFence[TA] (iUpdateFence=%d, psFenceTimelineUpdateSync=<%p>, ui32FenceTimelineUpdateValue=0x%x)", __func__, \
@@ -4023,7 +4022,7 @@ PVRSRV_ERROR PVRSRVRGXKickTA3DKM(RGX_SERVER_RENDER_CONTEXT	*psRenderContext,
 				if (unlikely(eError != PVRSRV_OK))
 				{
 					PVR_DPF((PVR_DBG_ERROR, "%s:   SyncCheckpointCreateFence[3D] failed (%d)", __func__, eError));
-					goto fail_create_3d_fence;
+					goto fail_create_output_fence;
 				}
 
 				CHKPT_DBG((PVR_DBG_ERROR, "%s: returned from SyncCheckpointCreateFence[3D] (iUpdateFence=%d, psFenceTimelineUpdateSync=<%p>, ui32FenceTimelineUpdateValue=0x%x)", __func__, \
@@ -4876,20 +4875,26 @@ fail_taacquirecmd:
 	}
 
 fail_alloc_update_values_mem_3D:
-	if (iUpdate3DFence != PVRSRV_NO_FENCE)
-	{
-		SyncCheckpointRollbackFenceData(iUpdate3DFence, pv3DUpdateFenceFinaliseData);
-	}
-fail_create_3d_fence:
 fail_alloc_update_values_mem_TA:
 	if (iUpdateTAFence != PVRSRV_NO_FENCE)
 	{
 		SyncCheckpointRollbackFenceData(iUpdateTAFence, pvTAUpdateFenceFinaliseData);
 	}
-fail_create_ta_fence:
-#if !defined(SUPPORT_BUFFER_SYNC)
-err_no_buffer_sync_invalid_params:
-#endif /* !defined(SUPPORT_BUFFER_SYNC) */
+	if (iUpdate3DFence != PVRSRV_NO_FENCE)
+	{
+		SyncCheckpointRollbackFenceData(iUpdate3DFence, pv3DUpdateFenceFinaliseData);
+	}
+fail_create_output_fence:
+	/* Drop the references taken on the sync checkpoints in the
+	 * resolved input fence.
+	 * NOTE: 3D fence is always submitted, either via 3D or TA(PR).
+	 */
+	if (bKickTA)
+	{
+		SyncAddrListDeRefCheckpoints(ui32FenceTASyncCheckpointCount, apsFenceTASyncCheckpoints);
+	}
+	SyncAddrListDeRefCheckpoints(ui32Fence3DSyncCheckpointCount, apsFence3DSyncCheckpoints);
+
 err_pr_fence_address:
 err_populate_sync_addr_list_3d_update:
 err_populate_sync_addr_list_3d_fence:
@@ -4897,17 +4902,7 @@ err_populate_sync_addr_list_ta_update:
 err_populate_sync_addr_list_ta_fence:
 err_not_enough_space:
 fail_tacmdinvalfbsc:
-	/* Drop the references taken on the sync checkpoints in the
-	 * resolved input fence.
-	 * NOTE: 3D fence is always submitted, either via 3D or TA(PR).
-	 */
-	SyncAddrListDeRefCheckpoints(ui32Fence3DSyncCheckpointCount, apsFence3DSyncCheckpoints);
-fail_resolve_input_3d_fence:
-	if (bKickTA)
-	{
-		SyncAddrListDeRefCheckpoints(ui32FenceTASyncCheckpointCount, apsFenceTASyncCheckpoints);
-	}
-fail_resolve_input_ta_fence:
+fail_resolve_input_fence:
 	/* Free the memory that was allocated for the sync checkpoint list returned by ResolveFence() */
 	if (apsFenceTASyncCheckpoints)
 	{

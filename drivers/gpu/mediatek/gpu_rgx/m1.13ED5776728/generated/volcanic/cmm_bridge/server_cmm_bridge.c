@@ -68,26 +68,14 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Server-side bridge entry points
  */
 
-static PVRSRV_ERROR _DevmemIntExportCtxpsContextExportIntRelease(void *pvData)
-{
-	PVRSRV_ERROR eError;
-	eError = DevmemIntUnexportCtx((DEVMEMINT_CTX_EXPORT *) pvData);
-	return eError;
-}
-
 static IMG_INT
 PVRSRVBridgeDevmemIntExportCtx(IMG_UINT32 ui32DispatchTableEntry,
-			       IMG_UINT8 * psDevmemIntExportCtxIN_UI8,
-			       IMG_UINT8 * psDevmemIntExportCtxOUT_UI8,
+			       PVRSRV_BRIDGE_IN_DEVMEMINTEXPORTCTX *
+			       psDevmemIntExportCtxIN,
+			       PVRSRV_BRIDGE_OUT_DEVMEMINTEXPORTCTX *
+			       psDevmemIntExportCtxOUT,
 			       CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_DEVMEMINTEXPORTCTX *psDevmemIntExportCtxIN =
-	    (PVRSRV_BRIDGE_IN_DEVMEMINTEXPORTCTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntExportCtxIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_DEVMEMINTEXPORTCTX *psDevmemIntExportCtxOUT =
-	    (PVRSRV_BRIDGE_OUT_DEVMEMINTEXPORTCTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntExportCtxOUT_UI8, 0);
-
 	IMG_HANDLE hContext = psDevmemIntExportCtxIN->hContext;
 	DEVMEMINT_CTX *psContextInt = NULL;
 	IMG_HANDLE hPMR = psDevmemIntExportCtxIN->hPMR;
@@ -143,7 +131,7 @@ PVRSRVBridgeDevmemIntExportCtx(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX_EXPORT,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
-				      _DevmemIntExportCtxpsContextExportIntRelease);
+				      DevmemIntUnexportCtx);
 	if (unlikely(psDevmemIntExportCtxOUT->eError != PVRSRV_OK))
 	{
 		UnlockHandle(psConnection->psHandleBase);
@@ -191,26 +179,22 @@ DevmemIntExportCtx_exit:
 
 static IMG_INT
 PVRSRVBridgeDevmemIntUnexportCtx(IMG_UINT32 ui32DispatchTableEntry,
-				 IMG_UINT8 * psDevmemIntUnexportCtxIN_UI8,
-				 IMG_UINT8 * psDevmemIntUnexportCtxOUT_UI8,
+				 PVRSRV_BRIDGE_IN_DEVMEMINTUNEXPORTCTX *
+				 psDevmemIntUnexportCtxIN,
+				 PVRSRV_BRIDGE_OUT_DEVMEMINTUNEXPORTCTX *
+				 psDevmemIntUnexportCtxOUT,
 				 CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_DEVMEMINTUNEXPORTCTX *psDevmemIntUnexportCtxIN =
-	    (PVRSRV_BRIDGE_IN_DEVMEMINTUNEXPORTCTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntUnexportCtxIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_DEVMEMINTUNEXPORTCTX *psDevmemIntUnexportCtxOUT =
-	    (PVRSRV_BRIDGE_OUT_DEVMEMINTUNEXPORTCTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntUnexportCtxOUT_UI8, 0);
 
 	/* Lock over handle destruction. */
 	LockHandle(psConnection->psHandleBase);
 
 	psDevmemIntUnexportCtxOUT->eError =
-	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psHandleBase,
-					      (IMG_HANDLE)
-					      psDevmemIntUnexportCtxIN->
-					      hContextExport,
-					      PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX_EXPORT);
+	    PVRSRVReleaseHandleStagedUnlock(psConnection->psHandleBase,
+					    (IMG_HANDLE)
+					    psDevmemIntUnexportCtxIN->
+					    hContextExport,
+					    PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX_EXPORT);
 	if (unlikely
 	    ((psDevmemIntUnexportCtxOUT->eError != PVRSRV_OK)
 	     && (psDevmemIntUnexportCtxOUT->eError != PVRSRV_ERROR_RETRY)))
@@ -232,30 +216,14 @@ DevmemIntUnexportCtx_exit:
 	return 0;
 }
 
-static PVRSRV_ERROR _DevmemIntAcquireRemoteCtxpsContextIntRelease(void *pvData)
-{
-	PVRSRV_ERROR eError;
-	eError = DevmemIntCtxDestroy((DEVMEMINT_CTX *) pvData);
-	return eError;
-}
-
 static IMG_INT
 PVRSRVBridgeDevmemIntAcquireRemoteCtx(IMG_UINT32 ui32DispatchTableEntry,
-				      IMG_UINT8 *
-				      psDevmemIntAcquireRemoteCtxIN_UI8,
-				      IMG_UINT8 *
-				      psDevmemIntAcquireRemoteCtxOUT_UI8,
+				      PVRSRV_BRIDGE_IN_DEVMEMINTACQUIREREMOTECTX
+				      * psDevmemIntAcquireRemoteCtxIN,
+				      PVRSRV_BRIDGE_OUT_DEVMEMINTACQUIREREMOTECTX
+				      * psDevmemIntAcquireRemoteCtxOUT,
 				      CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_DEVMEMINTACQUIREREMOTECTX
-	    *psDevmemIntAcquireRemoteCtxIN =
-	    (PVRSRV_BRIDGE_IN_DEVMEMINTACQUIREREMOTECTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntAcquireRemoteCtxIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_DEVMEMINTACQUIREREMOTECTX
-	    *psDevmemIntAcquireRemoteCtxOUT =
-	    (PVRSRV_BRIDGE_OUT_DEVMEMINTACQUIREREMOTECTX *)
-	    IMG_OFFSET_ADDR(psDevmemIntAcquireRemoteCtxOUT_UI8, 0);
-
 	IMG_HANDLE hPMR = psDevmemIntAcquireRemoteCtxIN->hPMR;
 	PMR *psPMRInt = NULL;
 	DEVMEMINT_CTX *psContextInt = NULL;
@@ -299,7 +267,7 @@ PVRSRVBridgeDevmemIntAcquireRemoteCtx(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_TYPE_DEVMEMINT_CTX,
 				      PVRSRV_HANDLE_ALLOC_FLAG_NONE,
 				      (PFN_HANDLE_RELEASE) &
-				      _DevmemIntAcquireRemoteCtxpsContextIntRelease);
+				      DevmemIntCtxDestroy);
 	if (unlikely(psDevmemIntAcquireRemoteCtxOUT->eError != PVRSRV_OK))
 	{
 		UnlockHandle(psConnection->psHandleBase);
@@ -348,7 +316,7 @@ DevmemIntAcquireRemoteCtx_exit:
 			LockHandle(psConnection->psHandleBase);
 
 			eError =
-			    PVRSRVDestroyHandleUnlocked(psConnection->
+			    PVRSRVReleaseHandleUnlocked(psConnection->
 							psHandleBase,
 							(IMG_HANDLE)
 							psDevmemIntAcquireRemoteCtxOUT->

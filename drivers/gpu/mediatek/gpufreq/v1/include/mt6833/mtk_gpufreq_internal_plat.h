@@ -123,7 +123,7 @@
 /**************************************************
  * PTPOD Calibration
  **************************************************/
-#define MT_GPUFREQ_PTPOD_CALIBRATION_ENABLE 1
+#define MT_GPUFREQ_PTPOD_CALIBRATION_ENABLE 0
 
 /**************************************************
  * Register Manipulations

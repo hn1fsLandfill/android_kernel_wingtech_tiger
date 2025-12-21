@@ -65,29 +65,12 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * Server-side bridge entry points
  */
 
-static PVRSRV_ERROR _TLOpenStreampsSDIntRelease(void *pvData)
-{
-	PVRSRV_ERROR eError;
-	eError = TLServerCloseStreamKM((TL_STREAM_DESC *) pvData);
-	return eError;
-}
-
-static_assert(PRVSRVTL_MAX_STREAM_NAME_SIZE <= IMG_UINT32_MAX,
-	      "PRVSRVTL_MAX_STREAM_NAME_SIZE must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgeTLOpenStream(IMG_UINT32 ui32DispatchTableEntry,
-			 IMG_UINT8 * psTLOpenStreamIN_UI8,
-			 IMG_UINT8 * psTLOpenStreamOUT_UI8,
+			 PVRSRV_BRIDGE_IN_TLOPENSTREAM * psTLOpenStreamIN,
+			 PVRSRV_BRIDGE_OUT_TLOPENSTREAM * psTLOpenStreamOUT,
 			 CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLOPENSTREAM *psTLOpenStreamIN =
-	    (PVRSRV_BRIDGE_IN_TLOPENSTREAM *)
-	    IMG_OFFSET_ADDR(psTLOpenStreamIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLOPENSTREAM *psTLOpenStreamOUT =
-	    (PVRSRV_BRIDGE_OUT_TLOPENSTREAM *)
-	    IMG_OFFSET_ADDR(psTLOpenStreamOUT_UI8, 0);
-
 	IMG_CHAR *uiNameInt = NULL;
 	TL_STREAM_DESC *psSDInt = NULL;
 	PMR *psTLPMRInt = NULL;
@@ -98,20 +81,10 @@ PVRSRVBridgeTLOpenStream(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) PRVSRVTL_MAX_STREAM_NAME_SIZE * sizeof(IMG_CHAR)) + 0;
+	IMG_UINT32 ui32BufferSize =
+	    (PRVSRVTL_MAX_STREAM_NAME_SIZE * sizeof(IMG_CHAR)) + 0;
 
 	psTLOpenStreamOUT->hSD = NULL;
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psTLOpenStreamOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto TLOpenStream_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -191,7 +164,7 @@ PVRSRVBridgeTLOpenStream(IMG_UINT32 ui32DispatchTableEntry,
 				      PVRSRV_HANDLE_TYPE_PVR_TL_SD,
 				      PVRSRV_HANDLE_ALLOC_FLAG_MULTI,
 				      (PFN_HANDLE_RELEASE) &
-				      _TLOpenStreampsSDIntRelease);
+				      TLServerCloseStreamKM);
 	if (unlikely(psTLOpenStreamOUT->eError != PVRSRV_OK))
 	{
 		UnlockHandle(psConnection->psHandleBase);
@@ -226,7 +199,7 @@ TLOpenStream_exit:
 			LockHandle(psConnection->psHandleBase);
 
 			eError =
-			    PVRSRVDestroyHandleUnlocked(psConnection->
+			    PVRSRVReleaseHandleUnlocked(psConnection->
 							psHandleBase,
 							(IMG_HANDLE)
 							psTLOpenStreamOUT->hSD,
@@ -259,10 +232,7 @@ TLOpenStream_exit:
 	}
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psTLOpenStreamOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)
@@ -276,28 +246,20 @@ TLOpenStream_exit:
 
 static IMG_INT
 PVRSRVBridgeTLCloseStream(IMG_UINT32 ui32DispatchTableEntry,
-			  IMG_UINT8 * psTLCloseStreamIN_UI8,
-			  IMG_UINT8 * psTLCloseStreamOUT_UI8,
+			  PVRSRV_BRIDGE_IN_TLCLOSESTREAM * psTLCloseStreamIN,
+			  PVRSRV_BRIDGE_OUT_TLCLOSESTREAM * psTLCloseStreamOUT,
 			  CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLCLOSESTREAM *psTLCloseStreamIN =
-	    (PVRSRV_BRIDGE_IN_TLCLOSESTREAM *)
-	    IMG_OFFSET_ADDR(psTLCloseStreamIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLCLOSESTREAM *psTLCloseStreamOUT =
-	    (PVRSRV_BRIDGE_OUT_TLCLOSESTREAM *)
-	    IMG_OFFSET_ADDR(psTLCloseStreamOUT_UI8, 0);
 
 	/* Lock over handle destruction. */
 	LockHandle(psConnection->psHandleBase);
 
 	psTLCloseStreamOUT->eError =
-	    PVRSRVDestroyHandleStagedUnlocked(psConnection->psHandleBase,
-					      (IMG_HANDLE) psTLCloseStreamIN->
-					      hSD,
-					      PVRSRV_HANDLE_TYPE_PVR_TL_SD);
-	if (unlikely
-	    ((psTLCloseStreamOUT->eError != PVRSRV_OK)
-	     && (psTLCloseStreamOUT->eError != PVRSRV_ERROR_RETRY)))
+	    PVRSRVReleaseHandleStagedUnlock(psConnection->psHandleBase,
+					    (IMG_HANDLE) psTLCloseStreamIN->hSD,
+					    PVRSRV_HANDLE_TYPE_PVR_TL_SD);
+	if (unlikely((psTLCloseStreamOUT->eError != PVRSRV_OK) &&
+		     (psTLCloseStreamOUT->eError != PVRSRV_ERROR_RETRY)))
 	{
 		PVR_DPF((PVR_DBG_ERROR,
 			 "%s: %s",
@@ -317,17 +279,10 @@ TLCloseStream_exit:
 
 static IMG_INT
 PVRSRVBridgeTLAcquireData(IMG_UINT32 ui32DispatchTableEntry,
-			  IMG_UINT8 * psTLAcquireDataIN_UI8,
-			  IMG_UINT8 * psTLAcquireDataOUT_UI8,
+			  PVRSRV_BRIDGE_IN_TLACQUIREDATA * psTLAcquireDataIN,
+			  PVRSRV_BRIDGE_OUT_TLACQUIREDATA * psTLAcquireDataOUT,
 			  CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLACQUIREDATA *psTLAcquireDataIN =
-	    (PVRSRV_BRIDGE_IN_TLACQUIREDATA *)
-	    IMG_OFFSET_ADDR(psTLAcquireDataIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLACQUIREDATA *psTLAcquireDataOUT =
-	    (PVRSRV_BRIDGE_OUT_TLACQUIREDATA *)
-	    IMG_OFFSET_ADDR(psTLAcquireDataOUT_UI8, 0);
-
 	IMG_HANDLE hSD = psTLAcquireDataIN->hSD;
 	TL_STREAM_DESC *psSDInt = NULL;
 
@@ -372,17 +327,10 @@ TLAcquireData_exit:
 
 static IMG_INT
 PVRSRVBridgeTLReleaseData(IMG_UINT32 ui32DispatchTableEntry,
-			  IMG_UINT8 * psTLReleaseDataIN_UI8,
-			  IMG_UINT8 * psTLReleaseDataOUT_UI8,
+			  PVRSRV_BRIDGE_IN_TLRELEASEDATA * psTLReleaseDataIN,
+			  PVRSRV_BRIDGE_OUT_TLRELEASEDATA * psTLReleaseDataOUT,
 			  CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLRELEASEDATA *psTLReleaseDataIN =
-	    (PVRSRV_BRIDGE_IN_TLRELEASEDATA *)
-	    IMG_OFFSET_ADDR(psTLReleaseDataIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLRELEASEDATA *psTLReleaseDataOUT =
-	    (PVRSRV_BRIDGE_OUT_TLRELEASEDATA *)
-	    IMG_OFFSET_ADDR(psTLReleaseDataOUT_UI8, 0);
-
 	IMG_HANDLE hSD = psTLReleaseDataIN->hSD;
 	TL_STREAM_DESC *psSDInt = NULL;
 
@@ -425,22 +373,14 @@ TLReleaseData_exit:
 	return 0;
 }
 
-static_assert(PRVSRVTL_MAX_STREAM_NAME_SIZE <= IMG_UINT32_MAX,
-	      "PRVSRVTL_MAX_STREAM_NAME_SIZE must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgeTLDiscoverStreams(IMG_UINT32 ui32DispatchTableEntry,
-			      IMG_UINT8 * psTLDiscoverStreamsIN_UI8,
-			      IMG_UINT8 * psTLDiscoverStreamsOUT_UI8,
+			      PVRSRV_BRIDGE_IN_TLDISCOVERSTREAMS *
+			      psTLDiscoverStreamsIN,
+			      PVRSRV_BRIDGE_OUT_TLDISCOVERSTREAMS *
+			      psTLDiscoverStreamsOUT,
 			      CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLDISCOVERSTREAMS *psTLDiscoverStreamsIN =
-	    (PVRSRV_BRIDGE_IN_TLDISCOVERSTREAMS *)
-	    IMG_OFFSET_ADDR(psTLDiscoverStreamsIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLDISCOVERSTREAMS *psTLDiscoverStreamsOUT =
-	    (PVRSRV_BRIDGE_OUT_TLDISCOVERSTREAMS *)
-	    IMG_OFFSET_ADDR(psTLDiscoverStreamsOUT_UI8, 0);
-
 	IMG_CHAR *uiNamePatternInt = NULL;
 	IMG_CHAR *puiStreamsInt = NULL;
 
@@ -450,11 +390,9 @@ PVRSRVBridgeTLDiscoverStreams(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) PRVSRVTL_MAX_STREAM_NAME_SIZE * sizeof(IMG_CHAR)) +
-	    ((IMG_UINT64) psTLDiscoverStreamsIN->ui32Size * sizeof(IMG_CHAR)) +
-	    0;
+	IMG_UINT32 ui32BufferSize =
+	    (PRVSRVTL_MAX_STREAM_NAME_SIZE * sizeof(IMG_CHAR)) +
+	    (psTLDiscoverStreamsIN->ui32Size * sizeof(IMG_CHAR)) + 0;
 
 	if (psTLDiscoverStreamsIN->ui32Size >
 	    PVRSRVTL_MAX_DISCOVERABLE_STREAMS_BUFFER)
@@ -467,15 +405,6 @@ PVRSRVBridgeTLDiscoverStreams(IMG_UINT32 ui32DispatchTableEntry,
 	PVR_UNREFERENCED_PARAMETER(psConnection);
 
 	psTLDiscoverStreamsOUT->puiStreams = psTLDiscoverStreamsIN->puiStreams;
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psTLDiscoverStreamsOUT->eError =
-		    PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto TLDiscoverStreams_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -551,11 +480,6 @@ PVRSRVBridgeTLDiscoverStreams(IMG_UINT32 ui32DispatchTableEntry,
 				      psTLDiscoverStreamsIN->ui32Size,
 				      puiStreamsInt,
 				      &psTLDiscoverStreamsOUT->ui32NumFound);
-	/* Exit early if bridged call fails */
-	if (unlikely(psTLDiscoverStreamsOUT->eError != PVRSRV_OK))
-	{
-		goto TLDiscoverStreams_exit;
-	}
 
 	/* If dest ptr is non-null and we have data to copy */
 	if ((puiStreamsInt) &&
@@ -578,10 +502,7 @@ PVRSRVBridgeTLDiscoverStreams(IMG_UINT32 ui32DispatchTableEntry,
 TLDiscoverStreams_exit:
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psTLDiscoverStreamsOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)
@@ -595,17 +516,12 @@ TLDiscoverStreams_exit:
 
 static IMG_INT
 PVRSRVBridgeTLReserveStream(IMG_UINT32 ui32DispatchTableEntry,
-			    IMG_UINT8 * psTLReserveStreamIN_UI8,
-			    IMG_UINT8 * psTLReserveStreamOUT_UI8,
+			    PVRSRV_BRIDGE_IN_TLRESERVESTREAM *
+			    psTLReserveStreamIN,
+			    PVRSRV_BRIDGE_OUT_TLRESERVESTREAM *
+			    psTLReserveStreamOUT,
 			    CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLRESERVESTREAM *psTLReserveStreamIN =
-	    (PVRSRV_BRIDGE_IN_TLRESERVESTREAM *)
-	    IMG_OFFSET_ADDR(psTLReserveStreamIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLRESERVESTREAM *psTLReserveStreamOUT =
-	    (PVRSRV_BRIDGE_OUT_TLRESERVESTREAM *)
-	    IMG_OFFSET_ADDR(psTLReserveStreamOUT_UI8, 0);
-
 	IMG_HANDLE hSD = psTLReserveStreamIN->hSD;
 	TL_STREAM_DESC *psSDInt = NULL;
 
@@ -652,17 +568,10 @@ TLReserveStream_exit:
 
 static IMG_INT
 PVRSRVBridgeTLCommitStream(IMG_UINT32 ui32DispatchTableEntry,
-			   IMG_UINT8 * psTLCommitStreamIN_UI8,
-			   IMG_UINT8 * psTLCommitStreamOUT_UI8,
-			   CONNECTION_DATA * psConnection)
+			   PVRSRV_BRIDGE_IN_TLCOMMITSTREAM * psTLCommitStreamIN,
+			   PVRSRV_BRIDGE_OUT_TLCOMMITSTREAM *
+			   psTLCommitStreamOUT, CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLCOMMITSTREAM *psTLCommitStreamIN =
-	    (PVRSRV_BRIDGE_IN_TLCOMMITSTREAM *)
-	    IMG_OFFSET_ADDR(psTLCommitStreamIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLCOMMITSTREAM *psTLCommitStreamOUT =
-	    (PVRSRV_BRIDGE_OUT_TLCOMMITSTREAM *)
-	    IMG_OFFSET_ADDR(psTLCommitStreamOUT_UI8, 0);
-
 	IMG_HANDLE hSD = psTLCommitStreamIN->hSD;
 	TL_STREAM_DESC *psSDInt = NULL;
 
@@ -703,22 +612,12 @@ TLCommitStream_exit:
 	return 0;
 }
 
-static_assert(PVRSRVTL_MAX_PACKET_SIZE <= IMG_UINT32_MAX,
-	      "PVRSRVTL_MAX_PACKET_SIZE must not be larger than IMG_UINT32_MAX");
-
 static IMG_INT
 PVRSRVBridgeTLWriteData(IMG_UINT32 ui32DispatchTableEntry,
-			IMG_UINT8 * psTLWriteDataIN_UI8,
-			IMG_UINT8 * psTLWriteDataOUT_UI8,
+			PVRSRV_BRIDGE_IN_TLWRITEDATA * psTLWriteDataIN,
+			PVRSRV_BRIDGE_OUT_TLWRITEDATA * psTLWriteDataOUT,
 			CONNECTION_DATA * psConnection)
 {
-	PVRSRV_BRIDGE_IN_TLWRITEDATA *psTLWriteDataIN =
-	    (PVRSRV_BRIDGE_IN_TLWRITEDATA *)
-	    IMG_OFFSET_ADDR(psTLWriteDataIN_UI8, 0);
-	PVRSRV_BRIDGE_OUT_TLWRITEDATA *psTLWriteDataOUT =
-	    (PVRSRV_BRIDGE_OUT_TLWRITEDATA *)
-	    IMG_OFFSET_ADDR(psTLWriteDataOUT_UI8, 0);
-
 	IMG_HANDLE hSD = psTLWriteDataIN->hSD;
 	TL_STREAM_DESC *psSDInt = NULL;
 	IMG_BYTE *psDataInt = NULL;
@@ -729,9 +628,8 @@ PVRSRVBridgeTLWriteData(IMG_UINT32 ui32DispatchTableEntry,
 	IMG_BOOL bHaveEnoughSpace = IMG_FALSE;
 #endif
 
-	IMG_UINT32 ui32BufferSize = 0;
-	IMG_UINT64 ui64BufferSize =
-	    ((IMG_UINT64) psTLWriteDataIN->ui32Size * sizeof(IMG_BYTE)) + 0;
+	IMG_UINT32 ui32BufferSize =
+	    (psTLWriteDataIN->ui32Size * sizeof(IMG_BYTE)) + 0;
 
 	if (unlikely(psTLWriteDataIN->ui32Size > PVRSRVTL_MAX_PACKET_SIZE))
 	{
@@ -739,14 +637,6 @@ PVRSRVBridgeTLWriteData(IMG_UINT32 ui32DispatchTableEntry,
 		    PVRSRV_ERROR_BRIDGE_ARRAY_SIZE_TOO_BIG;
 		goto TLWriteData_exit;
 	}
-
-	if (ui64BufferSize > IMG_UINT32_MAX)
-	{
-		psTLWriteDataOUT->eError = PVRSRV_ERROR_BRIDGE_BUFFER_TOO_SMALL;
-		goto TLWriteData_exit;
-	}
-
-	ui32BufferSize = (IMG_UINT32) ui64BufferSize;
 
 	if (ui32BufferSize != 0)
 	{
@@ -838,10 +728,7 @@ TLWriteData_exit:
 	UnlockHandle(psConnection->psHandleBase);
 
 	/* Allocated space should be equal to the last updated offset */
-#ifdef PVRSRV_NEED_PVR_ASSERT
-	if (psTLWriteDataOUT->eError == PVRSRV_OK)
-		PVR_ASSERT(ui32BufferSize == ui32NextOffset);
-#endif /* PVRSRV_NEED_PVR_ASSERT */
+	PVR_ASSERT(ui32BufferSize == ui32NextOffset);
 
 #if defined(INTEGRITY_OS)
 	if (pArrayArgsBuffer)
