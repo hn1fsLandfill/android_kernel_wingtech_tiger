@@ -1,13 +1,13 @@
-// SPDX-License-Identifier: GPL-2.0+
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  */
 
 
 #ifndef _MTK_VCODEC_PM_H_
 #define _MTK_VCODEC_PM_H_
 
-#define MTK_PLATFORM_STR        "platform:mt6853"
+#define MTK_PLATFORM_STR        "platform:mt6833"
 
 /**
  * struct mtk_vcodec_pm - Power management data structure

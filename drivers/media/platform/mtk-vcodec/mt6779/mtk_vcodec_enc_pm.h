@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
  * Copyright (c) 2019 MediaTek Inc.
  */
-
 
 #ifndef _MTK_VCODEC_ENC_PM_H_
 #define _MTK_VCODEC_ENC_PM_H_
@@ -31,8 +30,8 @@ void mtk_venc_pmqos_end_frame(struct mtk_vcodec_ctx *ctx, int core_id);
 
 /* GCE version PMQoS */
 void mtk_venc_pmqos_gce_flush(struct mtk_vcodec_ctx *ctx, int core_id,
-			int job_cnt);
+	int job_cnt);
 void mtk_venc_pmqos_gce_done(struct mtk_vcodec_ctx *ctx, int core_id,
-			int job_cnt);
+	int job_cnt);
 
 #endif /* _MTK_VCODEC_ENC_PM_H_ */

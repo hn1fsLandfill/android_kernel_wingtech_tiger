@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
  */
-
 
 #include <linux/time.h>
 #include <linux/ktime.h>
@@ -753,7 +752,7 @@ u64 match_freq(int target_mhz, u64 *freq_list, u32 freq_cnt)
 	target64 = (u64)target_mhz;
 
 	for (i = 0; i < freq_cnt ; i++) {
-		if (freq_list[i] > target_mhz && freq_list[i] < res_mhz)
+		if (freq_list[i] >= target_mhz && freq_list[i] < res_mhz)
 			res_mhz = freq_list[i];
 	}
 

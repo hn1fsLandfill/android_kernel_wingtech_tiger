@@ -686,9 +686,6 @@ static int vidioc_venc_g_parm(struct file *file, void *priv,
 static struct mtk_q_data *mtk_venc_get_q_data(struct mtk_vcodec_ctx *ctx,
 					      enum v4l2_buf_type type)
 {
-	if (ctx == NULL)
-		return NULL;
-
 	if (V4L2_TYPE_IS_OUTPUT(type))
 		return &ctx->q_data[MTK_Q_DATA_SRC];
 
@@ -1648,23 +1645,14 @@ static int vb2ops_venc_queue_setup(struct vb2_queue *vq,
 				   unsigned int sizes[],
 				   struct device *alloc_devs[])
 {
-	struct mtk_vcodec_ctx *ctx;
+	struct mtk_vcodec_ctx *ctx = vb2_get_drv_priv(vq);
 	struct mtk_q_data *q_data;
 	unsigned int i;
 
-	if (IS_ERR_OR_NULL(vq) || IS_ERR_OR_NULL(nbuffers) ||
-	    IS_ERR_OR_NULL(nplanes) || IS_ERR_OR_NULL(alloc_devs)) {
-		mtk_v4l2_err("vq %p, nbuffers %p, nplanes %p, alloc_devs %p",
-			vq, nbuffers, nplanes, alloc_devs);
-		return -EINVAL;
-	}
-
-	ctx = vb2_get_drv_priv(vq);
 	q_data = mtk_venc_get_q_data(ctx, vq->type);
-	if (q_data == NULL || (*nplanes) > MTK_VCODEC_MAX_PLANES) {
-		mtk_v4l2_err("vq->type=%d nplanes %d err", vq->type, *nplanes);
+
+	if (q_data == NULL)
 		return -EINVAL;
-	}
 
 	if (*nplanes) {
 		for (i = 0; i < *nplanes; i++)
@@ -1995,8 +1983,6 @@ static int mtk_venc_encode_header(void *priv)
 	bs_buf->dma_addr = vb2_dma_contig_plane_dma_addr(dst_buf, 0);
 	bs_buf->size = (size_t)dst_buf->planes[0].length;
 	bs_buf->dmabuf = dst_buf->planes[0].dbuf;
-	bs_buf->index = dst_buf->index;
-	ctx->bs_list[bs_buf->index + 1] = (uintptr_t)bs_buf;
 
 	mtk_v4l2_debug(1,
 		       "[%d] buf id=%d va=0x%p dma_addr=0x%llx size=%zu",
@@ -2436,8 +2422,6 @@ static void mtk_venc_worker(struct work_struct *work)
 	pbs_buf->dma_addr = vb2_dma_contig_plane_dma_addr(dst_buf, 0);
 	pbs_buf->size = (size_t)dst_buf->planes[0].length;
 	pbs_buf->dmabuf = dst_buf->planes[0].dbuf;
-	pbs_buf->index = dst_buf->index;
-	ctx->bs_list[pbs_buf->index + 1] = (uintptr_t)pbs_buf;
 
 	if (src_buf_info->lastframe == EOS) {
 		src_buf_info->lastframe = NON_EOS;
@@ -2556,13 +2540,10 @@ static void mtk_venc_worker(struct work_struct *work)
 	}
 	pfrm_buf->num_planes = src_buf->num_planes;
 	pfrm_buf->timestamp = src_vb2_v4l2->vb2_buf.timestamp;
-	pfrm_buf->index = src_buf->index;
-	ctx->fb_list[pfrm_buf->index + 1] = (uintptr_t)pfrm_buf;
 	length = q_data_src->coded_width * q_data_src->coded_height;
 
 	mtk_v4l2_debug(2,
-			"Framebuf %d VA=%p PA=%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=%zu Offset=%d",
-			pfrm_buf->index,
+			"Framebuf VA=%p PA=%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=0x%zx Offset=%d;VA=%p PA=0x%llx Size=%zu Offset=%d",
 			pfrm_buf->fb_addr[0].va,
 			(u64)pfrm_buf->fb_addr[0].dma_addr,
 			pfrm_buf->fb_addr[0].size,

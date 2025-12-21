@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: GPL-2.0+
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (c) 2019 MediaTek Inc.
+ * Copyright (C) 2016 MediaTek Inc.
  */
 
 
@@ -14,7 +14,7 @@
 #include "mtk_vcodec_util.h"
 #include "mtk_vcu.h"
 #include "smi_public.h"
-#include "mt6853/smi_port.h"
+#include "mt6781/smi_port.h"
 
 #ifdef CONFIG_MTK_PSEUDO_M4U
 #include <mach/mt_iommu.h>
@@ -28,9 +28,9 @@
 #include <linux/soc/mediatek/mtk-pm-qos.h>
 #include <mmdvfs_pmqos.h>
 #include "vcodec_dvfs.h"
-#define STD_VENC_FREQ 249
-#define STD_LUMA_BW 70
-#define STD_CHROMA_BW 35
+#define STD_VENC_FREQ 364
+#define STD_LUMA_BW 100
+#define STD_CHROMA_BW 50
 static struct mtk_pm_qos_request venc_qos_req_f;
 static u64 venc_freq;
 static u32 venc_freq_step_size;
@@ -75,7 +75,7 @@ int mtk_vcodec_init_enc_pm(struct mtk_vcodec_dev *mtkdev)
 	dev = &pdev->dev;
 
 	pm->chip_node = of_find_compatible_node(NULL,
-		NULL, "mediatek,mt6853-vcodec-enc");
+		NULL, "mediatek,mt6833-vcodec-enc");
 	node = of_parse_phandle(dev->of_node, "mediatek,larb", 0);
 	if (!node) {
 		mtk_v4l2_err("no mediatek,larb found");
@@ -247,9 +247,8 @@ void mtk_venc_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 		target_freq_64 = match_freq(target_freq, &venc_freq_steps[0],
 					venc_freq_step_size);
 
-		if (ctx->enc_params.operationrate >= 120 &&
-			target_freq_64 > 458)
-			target_freq_64 = 458;
+		if (target_freq_64 > 450)
+			target_freq_64 = 450;
 
 		if (target_freq > 0) {
 			venc_freq = target_freq;
@@ -271,7 +270,7 @@ void mtk_venc_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 #if ENC_DVFS
 static int mtk_venc_get_exec_cnt(struct mtk_vcodec_ctx *ctx)
 {
-	return (int)((readl(ctx->dev->enc_reg_base[VENC_SYS] + 0x17C) &
+	return (int)((readl(ctx->dev->enc_reg_base[VENC_SYS] + 0x1030) &
 			0x7FFFFFFF) / 1000);
 }
 #endif
@@ -325,6 +324,10 @@ void mtk_venc_dvfs_end(struct mtk_vcodec_ctx *ctx)
 			} else {
 				update_hist(venc_cur_job, &venc_hists, 0);
 			}
+		} else if (ctx->enc_params.operationrate == 120) {
+			interval = (long long)(1000 * 1000 /
+					(int)ctx->enc_params.operationrate);
+			update_hist(venc_cur_job, &venc_hists, interval);
 		} else {
 			/* Set allowed time for slowmotion 4 buffer pack */
 			interval = (long long)(1000 * 1000 * 4 /
@@ -359,14 +362,8 @@ void mtk_venc_emi_bw_begin(struct mtk_vcodec_ctx *ctx)
 	int ref_luma_bw = 0;
 	int ref_chroma_bw = 0;
 
-	if (ctx->enc_params.operationrate >= 120 ||
-		ctx->q_data[MTK_Q_DATA_DST].fmt->fourcc == V4L2_PIX_FMT_H265 ||
-		(ctx->q_data[MTK_Q_DATA_SRC].visible_width == 3840 &&
-		ctx->q_data[MTK_Q_DATA_SRC].visible_height == 2160)) {
-		boost_perc = 100;
-	} else if (ctx->enc_params.operationrate == 60) {
+	if (ctx->enc_params.operationrate >= 60)
 		boost_perc = 30;
-	}
 
 	/* Input BW scaling to venc_freq & config */
 	cur_luma_bw = STD_LUMA_BW * venc_freq * (100 + boost_perc)

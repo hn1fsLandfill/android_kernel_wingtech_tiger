@@ -233,10 +233,8 @@ struct gce_ctx_info {
 	atomic_t flush_done;
 	/* gce callbacked but user not waited cnt */
 	struct gce_callback_data buff[GCE_PENDING_CNT];
-	struct semaphore buff_sem[GCE_PENDING_CNT];
 	atomic_t flush_pending;
 	/* gce not callbacked cnt */
-	struct vcu_page_info used_pages[GCE_PENDING_CNT];
 };
 
 /**
@@ -315,7 +313,6 @@ struct mtk_vcu {
 	int gce_th_num[VCU_CODEC_MAX];
 	int gce_codec_eid[GCE_EVENT_MAX];
 	struct gce_cmds *gce_cmds[VCU_CODEC_MAX];
-	struct mutex gce_cmds_mutex[VCU_CODEC_MAX];
 	void *curr_ctx[VCU_CODEC_MAX];
 	struct vb2_buffer *curr_src_vb[VCU_CODEC_MAX];
 	struct vb2_buffer *curr_dst_vb[VCU_CODEC_MAX];
@@ -631,8 +628,7 @@ static void vcu_gce_clear_inst_id(void *ctx)
 	pr_info("%s ctx %p not found!\n", __func__, ctx);
 }
 
-static void *vcu_check_gce_pa_base(struct mtk_vcu_queue *vcu_queue,
-	u64 addr, u64 length, bool null_err)
+static void *vcu_check_gce_pa_base(struct mtk_vcu_queue *vcu_queue, u64 addr, u64 length)
 {
 	struct vcu_pa_pages *tmp;
 	struct list_head *p, *q;
@@ -643,39 +639,9 @@ static void *vcu_check_gce_pa_base(struct mtk_vcu_queue *vcu_queue,
 			addr + length <= (u64)tmp->pa + PAGE_SIZE)
 			return tmp;
 	}
-	if (null_err)
-		pr_info("%s addr %llx length %llx not found!\n", __func__, addr, length);
-	else
-		vcu_dbg_log("%s addr %llx length %llx not found!\n", __func__, addr, length);
+	pr_info("%s addr %llx length %llx not found!\n", __func__, addr, length);
 
 	return NULL;
-}
-
-static void vcu_gce_add_used_page(struct vcu_page_info *used_pages,
-	struct vcu_pa_pages *page)
-{
-	struct vcu_page_info *page_info;
-
-	page_info = kmalloc(sizeof(struct vcu_page_info), GFP_KERNEL);
-	if (!page_info)
-		return;
-
-	atomic_inc(&page->ref_cnt);
-	page_info->page = page;
-	list_add_tail(&page_info->list, &used_pages->list);
-}
-
-static void vcu_gce_release_used_pages(struct vcu_page_info *used_pages)
-{
-	struct vcu_page_info *page_info;
-	struct list_head *p, *q;
-
-	list_for_each_safe(p, q, &used_pages->list) {
-		page_info = list_entry(p, struct vcu_page_info, list);
-		list_del(p);
-		atomic_dec(&page_info->page->ref_cnt);
-		kfree(page_info);
-	}
 }
 
 static int vcu_check_reg_base(struct mtk_vcu *vcu, u64 addr, u64 length)
@@ -695,12 +661,9 @@ static int vcu_check_reg_base(struct mtk_vcu *vcu, u64 addr, u64 length)
 }
 
 static void vcu_set_gce_cmd(struct cmdq_pkt *pkt,
-	struct mtk_vcu *vcu, int gce_index, int gce_order, struct mtk_vcu_queue *q,
-	unsigned char cmd, u64 addr, u64 data, u32 mask, u32 gpr, u32 dma_offset, u32 dma_size)
+	struct mtk_vcu *vcu, struct mtk_vcu_queue *q, unsigned char cmd,
+	u64 addr, u64 data, u32 mask, u32 gpr, u32 dma_offset, u32 dma_size)
 {
-	void *src_page, *dst_page;
-	int reg_check;
-
 	switch (cmd) {
 	case CMD_READ:
 		if (vcu_check_reg_base(vcu, addr, 4) == 0)
@@ -712,7 +675,7 @@ static void vcu_set_gce_cmd(struct cmdq_pkt *pkt,
 		if (vcu_check_reg_base(vcu, addr, 4) == 0)
 			cmdq_pkt_write(pkt, vcu->clt_base, addr, data, mask);
 		else
-			pr_info("[VCU] CMD_WRITE wrong addr: 0x%llx 0x%llx 0x%x\n",
+			pr_info("[VCU] CMD_WRITE wrong addr: 0x%llx 0x%llx 0x%llx\n",
 				addr, data, mask);
 	break;
 #if defined(CONFIG_MTK_SEC_VIDEO_PATH_SUPPORT)
@@ -742,7 +705,7 @@ static void vcu_set_gce_cmd(struct cmdq_pkt *pkt,
 		if (vcu_check_reg_base(vcu, addr, 4) == 0)
 			cmdq_pkt_poll_addr(pkt, data, addr, mask, gpr);
 		else
-			pr_info("[VCU] CMD_POLL_REG wrong addr: 0x%llx 0x%llx 0x%x\n",
+			pr_info("[VCU] CMD_POLL_REG wrong addr: 0x%llx 0x%llx 0x%llx\n",
 				addr, data, mask);
 	break;
 	case CMD_WAIT_EVENT:
@@ -753,35 +716,23 @@ static void vcu_set_gce_cmd(struct cmdq_pkt *pkt,
 				__func__, data);
 	break;
 	case CMD_MEM_MV:
-		mutex_lock(&q->mmap_lock);
-		reg_check = vcu_check_reg_base(vcu, addr, 4);
-		src_page = vcu_check_gce_pa_base(q, addr, 4, reg_check != 0);
-		dst_page = vcu_check_gce_pa_base(q, data, 4, true);
-		if ((reg_check == 0 || src_page != NULL) && dst_page != NULL) {
-			if (src_page != NULL)
-				vcu_gce_add_used_page(
-				    &vcu->gce_info[gce_index].used_pages[gce_order], src_page);
-			vcu_gce_add_used_page(
-				    &vcu->gce_info[gce_index].used_pages[gce_order], dst_page);
-			cmdq_pkt_mem_move(pkt, vcu->clt_base, addr, data, CMDQ_THR_SPR_IDX1);
-		} else
+		if ((vcu_check_reg_base(vcu, addr, 4) == 0 ||
+			vcu_check_gce_pa_base(q, addr, 4) != NULL) &&
+			vcu_check_gce_pa_base(q, data, 4) != NULL)
+			cmdq_pkt_mem_move(pkt, vcu->clt_base, addr,
+				data, CMDQ_THR_SPR_IDX1);
+		else
 			pr_info("[VCU] CMD_MEM_MV wrong addr/data: 0x%llx 0x%llx\n",
 				addr, data);
-		mutex_unlock(&q->mmap_lock);
 	break;
 	case CMD_POLL_ADDR:
-		mutex_lock(&q->mmap_lock);
-		reg_check = vcu_check_reg_base(vcu, addr, 4);
-		src_page = vcu_check_gce_pa_base(q, addr, 4, reg_check != 0);
-		if (reg_check == 0 || src_page != NULL) {
-			if (src_page != NULL)
-				vcu_gce_add_used_page(
-				    &vcu->gce_info[gce_index].used_pages[gce_order], src_page);
-			cmdq_pkt_poll_timeout(pkt, data, SUBSYS_NO_SUPPORT, addr, mask, ~0, gpr);
-		} else
-			pr_info("[VCU] CMD_POLL_REG wrong addr: 0x%llx 0x%llx 0x%x\n",
+		if (vcu_check_reg_base(vcu, addr, 4) == 0 ||
+			vcu_check_gce_pa_base(q, addr, 4) != NULL)
+			cmdq_pkt_poll_timeout(pkt, data, SUBSYS_NO_SUPPORT,
+				addr, mask, ~0, gpr);
+		else
+			pr_info("[VCU] CMD_POLL_REG wrong addr: 0x%llx 0x%llx 0x%llx\n",
 				addr, data, mask);
-		mutex_unlock(&q->mmap_lock);
 	break;
 	default:
 		vcu_dbg_log("[VCU] unknown GCE cmd %d\n", cmd);
@@ -795,7 +746,6 @@ static void vcu_gce_flush_callback(struct cmdq_cb_data data)
 	struct gce_callback_data *buff;
 	struct mtk_vcu *vcu;
 	unsigned int core_id;
-	int gce_order;
 
 	buff = (struct gce_callback_data *)data.data;
 	i = (buff->cmdq_buff.codec_type == VCU_VDEC) ? VCU_VDEC : VCU_VENC;
@@ -837,9 +787,6 @@ IS_ENABLED(CONFIG_MACH_MT6785) || IS_ENABLED(CONFIG_MACH_MT8168))
 	}
 	mutex_unlock(&vcu->vcu_gce_mutex[i]);
 
-	gce_order = buff->cmdq_buff.flush_order % GCE_PENDING_CNT;
-	vcu_gce_release_used_pages(&vcu->gce_info[j].used_pages[gce_order]);
-
 	wake_up(&vcu->gce_wq[i]);
 
 	vcu_dbg_log("[VCU][%d] %s: buff %p type %d order %d handle %llx\n",
@@ -847,7 +794,6 @@ IS_ENABLED(CONFIG_MACH_MT6785) || IS_ENABLED(CONFIG_MACH_MT8168))
 		buff->cmdq_buff.flush_order, buff->cmdq_buff.gce_handle);
 
 	cmdq_pkt_destroy(buff->pkt_ptr);
-	up(&vcu->gce_info[j].buff_sem[gce_order]);
 }
 
 static void vcu_gce_timeout_callback(struct cmdq_cb_data data)
@@ -869,21 +815,19 @@ static void vcu_gce_timeout_callback(struct cmdq_cb_data data)
 	else if (buff->cmdq_buff.codec_type == VCU_VDEC)
 		mtk_vcodec_gce_timeout_dump(vcu->curr_ctx[VCU_VDEC]);
 
-	mutex_lock(&vcu_queue->mmap_lock);
 	list_for_each_safe(p, q, &vcu_queue->pa_pages.list) {
 		tmp = list_entry(p, struct vcu_pa_pages, list);
 		pr_info("%s: vcu_pa_pages %lx kva %lx data %lx\n",
 			__func__, tmp->pa, tmp->kva,
 			*(unsigned long *)tmp->kva);
 	}
-	mutex_unlock(&vcu_queue->mmap_lock);
 
 }
 
 static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 	struct mtk_vcu_queue *q, unsigned long arg)
 {
-	int i, codec_type, gce_idx, ret;
+	int i, j, ret;
 	unsigned char *user_data_addr = NULL;
 	struct gce_callback_data buff;
 	struct cmdq_pkt *pkt_ptr;
@@ -891,7 +835,6 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 	struct gce_cmds *cmds;
 	unsigned int suspend_block_cnt = 0;
 	unsigned int core_id;
-	int gce_order;
 
 	vcu_dbg_log("[VCU] %s +\n", __func__);
 
@@ -905,11 +848,9 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		return -EINVAL;
 	}
 
-	codec_type = (buff.cmdq_buff.codec_type == VCU_VDEC) ? VCU_VDEC : VCU_VENC;
-	gce_order = buff.cmdq_buff.flush_order % GCE_PENDING_CNT;
-	cmds = vcu->gce_cmds[codec_type];
+	i = (buff.cmdq_buff.codec_type == VCU_VDEC) ? VCU_VDEC : VCU_VENC;
+	cmds = vcu->gce_cmds[i];
 
-	mutex_lock(&vcu->gce_cmds_mutex[codec_type]);
 	if (buff.cmdq_buff.cmds_user_ptr > 0) {
 		user_data_addr = (unsigned char *)
 				   (unsigned long)buff.cmdq_buff.cmds_user_ptr;
@@ -918,13 +859,10 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		if (ret != 0L) {
 			pr_info("[VCU] %s(%d) gce_cmds copy_from_user failed!%d\n",
 				__func__, __LINE__, ret);
-			mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
 			return -EINVAL;
 		}
-	} else {
-		mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
+	} else
 		return -EINVAL;
-	}
 
 	buff.cmdq_buff.cmds_user_ptr = (u64)(unsigned long)cmds;
 	core_id = buff.cmdq_buff.core_id;
@@ -934,7 +872,6 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		vcu->gce_th_num[buff.cmdq_buff.codec_type]) {
 		pr_info("[VCU] %s invalid core(th) id %d\n",
 			__func__, core_id);
-		mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
 		return -EINVAL;
 	}
 
@@ -954,7 +891,6 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		pr_info("[VCU] %s gce thread is null id %d type %d\n",
 			__func__, core_id,
 			buff.cmdq_buff.codec_type);
-		mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
 		return -EINVAL;
 	}
 
@@ -970,49 +906,48 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 		usleep_range(10000, 20000);
 	}
 
-	gce_idx = vcu_gce_get_inst_id(buff.cmdq_buff.gce_handle);
+	j = vcu_gce_get_inst_id(buff.cmdq_buff.gce_handle);
 
-	if (gce_idx < 0)
-		gce_idx = vcu_gce_set_inst_id(vcu->curr_ctx[codec_type],
+	if (j < 0)
+		j = vcu_gce_set_inst_id(vcu->curr_ctx[i],
 			buff.cmdq_buff.gce_handle);
-	if (gce_idx < 0) {
-		mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
+	if (j < 0)
 		return -EINVAL;
-	}
+
 	time_check_end(100, strlen(vcodec_param_string));
 
 	time_check_start();
-	mutex_lock(&vcu->vcu_gce_mutex[codec_type]);
+	mutex_lock(&vcu->vcu_gce_mutex[i]);
 
 	if (buff.cmdq_buff.codec_type == VCU_VENC) {
 		int lock = -1;
 
 		while (lock != 0) {
-			lock = venc_lock(vcu->gce_info[gce_idx].v4l2_ctx, core_id,
+			lock = venc_lock(vcu->gce_info[j].v4l2_ctx, core_id,
 				(bool)buff.cmdq_buff.secure);
 			if (lock != 0) {
-				mutex_unlock(&vcu->vcu_gce_mutex[codec_type]);
+				mutex_unlock(&vcu->vcu_gce_mutex[i]);
 				usleep_range(1000, 2000);
-				mutex_lock(&vcu->vcu_gce_mutex[codec_type]);
+				mutex_lock(&vcu->vcu_gce_mutex[i]);
 			}
 		}
 	}
 
-	if (atomic_read(&vcu->gce_job_cnt[codec_type][core_id]) == 0 &&
-		vcu->gce_info[gce_idx].v4l2_ctx != NULL){
-		if (codec_type == VCU_VENC) {
-			venc_encode_prepare(vcu->gce_info[gce_idx].v4l2_ctx,
-				core_id, &vcu->flags[codec_type]);
+	if (atomic_read(&vcu->gce_job_cnt[i][core_id]) == 0 &&
+		vcu->gce_info[j].v4l2_ctx != NULL){
+		if (i == VCU_VENC) {
+			venc_encode_prepare(vcu->gce_info[j].v4l2_ctx,
+				core_id, &vcu->flags[i]);
 		}
 	}
 	vcu_dbg_log("vcu gce_info[%d].v4l2_ctx %p\n",
-		gce_idx, (gce_idx >= 0) ? vcu->gce_info[gce_idx].v4l2_ctx : NULL);
-	if (codec_type == VCU_VENC) {
-		venc_encode_pmqos_gce_begin(vcu->gce_info[gce_idx].v4l2_ctx, core_id,
-			vcu->gce_job_cnt[codec_type][core_id].counter);
+		j, (j >= 0) ? vcu->gce_info[j].v4l2_ctx : NULL);
+	if (i == VCU_VENC) {
+		venc_encode_pmqos_gce_begin(vcu->gce_info[j].v4l2_ctx, core_id,
+			vcu->gce_job_cnt[i][core_id].counter);
 	}
-	atomic_inc(&vcu->gce_job_cnt[codec_type][core_id]);
-	mutex_unlock(&vcu->vcu_gce_mutex[codec_type]);
+	atomic_inc(&vcu->gce_job_cnt[i][core_id]);
+	mutex_unlock(&vcu->vcu_gce_mutex[i]);
 	time_check_end(100, strlen(vcodec_param_string));
 
 	time_check_start();
@@ -1073,40 +1008,31 @@ static int vcu_gce_cmd_flush(struct mtk_vcu *vcu,
 #endif
 
 	for (i = 0; i < cmds->cmd_cnt; i++) {
-		vcu_set_gce_cmd(pkt_ptr, vcu, gce_idx, gce_order, q, cmds->cmd[i],
+		vcu_set_gce_cmd(pkt_ptr, vcu, q, cmds->cmd[i],
 			cmds->addr[i], cmds->data[i],
 			cmds->mask[i], vcu->gce_gpr[core_id],
 			cmds->dma_offset[i], cmds->dma_size[i]);
 	}
 
-	ret = down_interruptible(&vcu_ptr->gce_info[gce_idx].buff_sem[gce_order]);
-	if (ret < 0) {
-		mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
-		return -ERESTARTSYS;
-	}
-	memcpy(&vcu_ptr->gce_info[gce_idx].buff[gce_order], &buff, sizeof(buff));
+	i = buff.cmdq_buff.flush_order % GCE_PENDING_CNT;
+	memcpy(&vcu_ptr->gce_info[j].buff[i], &buff, sizeof(buff));
 
 	pkt_ptr->err_cb.cb =
 		(buff.cmdq_buff.secure == 0)?vcu_gce_timeout_callback:NULL;
-	pkt_ptr->err_cb.data = (void *)&vcu_ptr->gce_info[gce_idx].buff[gce_order];
+	pkt_ptr->err_cb.data = (void *)&vcu_ptr->gce_info[j].buff[i];
 
 	pr_info("[VCU][%d] %s: buff %p type %d cnt %d order %d pkt %p hndl %llx %d %d\n",
-		core_id, __func__, &vcu_ptr->gce_info[gce_idx].buff[gce_order],
+		core_id, __func__, &vcu_ptr->gce_info[j].buff[i],
 		buff.cmdq_buff.codec_type,
 		cmds->cmd_cnt, buff.cmdq_buff.flush_order, pkt_ptr,
-		buff.cmdq_buff.gce_handle, ret, gce_idx);
-	mutex_unlock(&vcu->gce_cmds_mutex[codec_type]);
+		buff.cmdq_buff.gce_handle, ret, j);
 
 	/* flush cmd async */
 	ret = cmdq_pkt_flush_threaded(pkt_ptr,
-		vcu_gce_flush_callback, (void *)&vcu_ptr->gce_info[gce_idx].buff[gce_order]);
-
-	if (ret < 0) {
+		vcu_gce_flush_callback, (void *)&vcu_ptr->gce_info[j].buff[i]);
+	if (ret < 0)
 		pr_info("[VCU] cmdq flush fail pkt %p\n", pkt_ptr);
-		vcu_gce_release_used_pages(&vcu->gce_info[gce_idx].used_pages[gce_order]);
-		up(&vcu_ptr->gce_info[gce_idx].buff_sem[gce_order]);
-	} else
-		atomic_inc(&vcu_ptr->gce_info[gce_idx].flush_pending);
+	atomic_inc(&vcu_ptr->gce_info[j].flush_pending);
 	time_check_end(100, strlen(vcodec_param_string));
 
 	return ret;
@@ -1232,7 +1158,7 @@ void *vcu_mapping_dm_addr(struct platform_device *pdev,
 	d_va_start = (uintptr_t)VCU_DMEM0_VIRT(vcu);
 	d_off = d_vma - VCU_DMEM0_VMA(vcu);
 
-	if (dtcm_dmem_addr == 0UL || d_off >= VCU_DMEM0_LEN(vcu)) {
+	if (dtcm_dmem_addr == 0UL || d_off > VCU_DMEM0_LEN(vcu)) {
 		dev_info(&pdev->dev, "[VCU] %s: Invalid vma 0x%lx len %lx\n",
 			__func__, dtcm_dmem_addr, VCU_DMEM0_LEN(vcu));
 		return NULL;
@@ -1634,17 +1560,6 @@ static int vcu_alloc_d_ext_mem(struct mtk_vcu *vcu, unsigned long len)
 	return 0;
 }
 
-static void mtk_vcu_page_vm_open(struct vm_area_struct *vma)
-{
-	struct vcu_pa_pages *vcu_page = (struct vcu_pa_pages *)vma->vm_private_data;
-
-	atomic_inc(&vcu_page->ref_cnt);
-
-	vcu_dbg_log("[VCU] %s vma->start 0x%lx, end 0x%lx, pgoff 0x%lx, ref_cnt %d\n",
-		__func__, vma->vm_start, vma->vm_end, vma->vm_pgoff,
-		atomic_read(&vcu_page->ref_cnt));
-}
-
 static void mtk_vcu_page_vm_close(struct vm_area_struct *vma)
 {
 	struct vcu_pa_pages *vcu_page = (struct vcu_pa_pages *)vma->vm_private_data;
@@ -1654,13 +1569,11 @@ static void mtk_vcu_page_vm_close(struct vm_area_struct *vma)
 	else
 		pr_info("[VCU][Error] %s ummap fail\n", __func__);
 
-	vcu_dbg_log("[VCU] %s vma->start 0x%lx, end 0x%lx, pgoff 0x%lx, ref_cnt %d\n",
-		__func__, vma->vm_start, vma->vm_end, vma->vm_pgoff,
-		atomic_read(&vcu_page->ref_cnt));
+	vcu_dbg_log("[VCU] %s vma->start 0x%lx, end 0x%lx, pgoff 0x%lx\n",
+		__func__, vma->vm_start, vma->vm_end, vma->vm_pgoff);
 }
 
 const struct vm_operations_struct mtk_vcu_page_vm_ops = {
-	.open = mtk_vcu_page_vm_open,
 	.close = mtk_vcu_page_vm_close,
 };
 
@@ -1704,20 +1617,17 @@ static int mtk_vcu_mmap(struct file *file, struct vm_area_struct *vma)
 	// First handle map pa case, because maybe pa will smaller than
 	// MAP_PA_BASE_1GB in 32bit project
 	if (vcu_queue->map_buf_pa >= MAP_SHMEM_PA_BASE) {
-		mutex_lock(&vcu_queue->mmap_lock);
 		vcu_queue->map_buf_pa = 0;
-		ret = vcu_check_gce_pa_base(vcu_queue, pa_start, length, true);
+		ret = vcu_check_gce_pa_base(vcu_queue, pa_start, length);
 		if (ret != NULL) {
+			atomic_inc(&((struct vcu_pa_pages *)ret)->ref_cnt);
 			vma->vm_ops = &mtk_vcu_page_vm_ops;
 			vma->vm_private_data = ret;
 			vma->vm_pgoff = pa_start >> PAGE_SHIFT;
 			vma->vm_page_prot =
 				pgprot_writecombine(vma->vm_page_prot);
-			mtk_vcu_page_vm_open(vma);
-			mutex_unlock(&vcu_queue->mmap_lock);
 			goto valid_map;
 		}
-		mutex_unlock(&vcu_queue->mmap_lock);
 		pr_info("[VCU] map pa fail with pa_start=0x%lx\n",
 			pa_start);
 		return -EINVAL;
@@ -2292,7 +2202,7 @@ static int mtk_vcu_probe(struct platform_device *pdev)
 	struct mtk_vcu *vcu;
 	struct device *dev;
 	struct resource *res;
-	int i, j, ret = 0;
+	int i, ret = 0;
 	unsigned int vcuid = 0;
 
 	dev_dbg(&pdev->dev, "[VCU] initialization\n");
@@ -2402,10 +2312,6 @@ static int mtk_vcu_probe(struct platform_device *pdev)
 		atomic_set(&vcu->gce_info[i].flush_pending, 0);
 		vcu->gce_info[i].user_hdl = 0;
 		vcu->gce_info[i].v4l2_ctx = NULL;
-		for (j = 0; j < (int)GCE_PENDING_CNT; j++) {
-			INIT_LIST_HEAD(&vcu->gce_info[i].used_pages[j].list);
-			sema_init(&vcu->gce_info[i].buff_sem[j], 1);
-		}
 	}
 	atomic_set(&vcu->gce_job_cnt[VCU_VDEC][0], 0);
 	atomic_set(&vcu->gce_job_cnt[VCU_VDEC][1], 0);
@@ -2570,8 +2476,6 @@ static int mtk_vcu_probe(struct platform_device *pdev)
 		if (vcu->gce_cmds[i] == NULL)
 			goto err_device;
 	}
-	for (i = 0; i < (int)VCU_CODEC_MAX; i++)
-		mutex_init(&vcu->gce_cmds_mutex[i]);
 	sema_init(&vcu->vpud_killed, 1);
 
 	for (i = 0; i < (int)VCU_CODEC_MAX; i++) {
@@ -2585,7 +2489,7 @@ static int mtk_vcu_probe(struct platform_device *pdev)
 	ret = vcu_alloc_d_ext_mem(vcu, VCU_SHMEM_SIZE);
 	if (ret != 0) {
 		dev_dbg(dev, "[VCU] allocate SHMEM failed\n");
-		goto err_after_gce;
+		goto err_device;
 	}
 
 	//register_trace_signal_generate(probe_death_signal, NULL);
@@ -2597,9 +2501,6 @@ static int mtk_vcu_probe(struct platform_device *pdev)
 	dev_dbg(dev, "[VCU] initialization completed\n");
 	return 0;
 
-err_after_gce:
-	for (i = 0; i < (int)VCU_CODEC_MAX; i++)
-		mutex_destroy(&vcu->gce_cmds_mutex[i]);
 err_device:
 	class_destroy(vcu_mtkdev[vcuid]->vcu_class);
 err_add:

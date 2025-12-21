@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (c) 2019 MediaTek Inc.
  */
-
 
 #include <linux/clk.h>
 #include <linux/of_address.h>
@@ -14,7 +13,7 @@
 #include "mtk_vcodec_dec_pm.h"
 #include "mtk_vcodec_util.h"
 #include "mtk_vcu.h"
-#include "mt6853/smi_port.h"
+#include "mt6877/smi_port.h"
 
 #ifdef CONFIG_MTK_PSEUDO_M4U
 #include <mach/mt_iommu.h>
@@ -78,7 +77,7 @@ int mtk_vcodec_init_dec_pm(struct mtk_vcodec_dev *mtkdev)
 	pm = &mtkdev->pm;
 	pm->mtkdev = mtkdev;
 	pm->chip_node = of_find_compatible_node(NULL,
-		NULL, "mediatek,mt6853-vcodec-dec");
+		NULL, "mediatek,mt6877-vcodec-dec");
 	node = of_parse_phandle(pdev->dev.of_node, "mediatek,larb", 0);
 	if (!node) {
 		mtk_v4l2_err("of_parse_phandle mediatek,larb fail!");
@@ -125,6 +124,7 @@ void mtk_vcodec_dec_pw_off(struct mtk_vcodec_pm *pm, int hw_id)
 
 void mtk_vcodec_dec_clock_on(struct mtk_vcodec_pm *pm, int hw_id)
 {
+
 #ifdef CONFIG_MTK_PSEUDO_M4U
 	int i, larb_port_num, larb_id;
 	struct M4U_PORT_STRUCT port;
@@ -197,11 +197,10 @@ void mtk_vcodec_dec_clock_off(struct mtk_vcodec_pm *pm, int hw_id)
 
 void mtk_vdec_hw_break(struct mtk_vcodec_dev *dev, int hw_id)
 {
-	u32 cg_status = 0, ufo_cg_status = 0;
+	u32 cg_status = 0;
 	void __iomem *vdec_misc_addr = dev->dec_reg_base[VDEC_MISC];
 	void __iomem *vdec_vld_addr = dev->dec_reg_base[VDEC_VLD];
 	void __iomem *vdec_gcon_addr = dev->dec_reg_base[VDEC_SYS];
-	void __iomem *vdec_ufo_addr = dev->dec_reg_base[VDEC_UFO];
 	struct mtk_vcodec_ctx *ctx = NULL;
 	int misc_offset[4] = {64, 66, 67, 65};
 
@@ -211,7 +210,6 @@ void mtk_vdec_hw_break(struct mtk_vcodec_dev *dev, int hw_id)
 	int offset, idx;
 	unsigned long value;
 	u32 fourcc;
-	u32 is_ufo = 0;
 
 	if (hw_id == MTK_VDEC_CORE) {
 		ctx = dev->curr_dec_ctx[hw_id];
@@ -225,30 +223,20 @@ void mtk_vdec_hw_break(struct mtk_vcodec_dev *dev, int hw_id)
 			    (fourcc >> 16) & 0xFF, (fourcc >> 24) & 0xFF);
 			return;
 		}
-
-		if (fourcc != V4L2_PIX_FMT_AV1)
-			is_ufo = readl(vdec_ufo_addr + 0x08C) & 0x1;
-
 		/* hw break */
 		writel((readl(vdec_misc_addr + 0x0100) | 0x1),
 			vdec_misc_addr + 0x0100);
-		if (is_ufo)
-			writel((readl(vdec_ufo_addr + 0x01C) & 0xFFFFFFFD),
-				vdec_ufo_addr + 0x01C);
 
 		do_gettimeofday(&tv_start);
 		cg_status = readl(vdec_misc_addr + 0x0104);
-		if (is_ufo)
-			ufo_cg_status = readl(vdec_ufo_addr + 0x08C);
-		while (((cg_status & 0x11) != 0x11) ||
-		      (is_ufo && ((ufo_cg_status & 0x11000) != 0x11000))) {
+		while (!((cg_status & 0x1) && (cg_status & 0x10))) {
 			do_gettimeofday(&tv_end);
 			usec = (tv_end.tv_sec - tv_start.tv_sec) * 1000000 +
 			       tv_end.tv_usec - tv_start.tv_usec;
 			if (usec > timeout) {
-				mtk_v4l2_err("VDEC HW break timeout. codec:0x%08x(%c%c%c%c) ufo %d",
+				mtk_v4l2_err("VDEC HW break timeout. codec:0x%08x(%c%c%c%c)",
 				    fourcc, fourcc & 0xFF, (fourcc >> 8) & 0xFF,
-				    (fourcc >> 16) & 0xFF, (fourcc >> 24) & 0xFF, is_ufo);
+				    (fourcc >> 16) & 0xFF, (fourcc >> 24) & 0xFF);
 				value = readl(vdec_gcon_addr + (0 << 2));
 				mtk_v4l2_err("[DEBUG][GCON] 0x%x(%d) = 0x%lx",
 					0 << 2, 0, value);
@@ -268,9 +256,6 @@ void mtk_vdec_hw_break(struct mtk_vcodec_dev *dev, int hw_id)
 					mtk_v4l2_err("[DEBUG][MISC] 0x%x(%d) = 0x%lx",
 						offset << 2, offset, value);
 				}
-				if (is_ufo)
-					mtk_v4l2_err("[DEBUG][UFO] 0x%x(%d) = 0x%lx",
-						0x08C, 0x08C >> 2, ufo_cg_status);
 
 				if (timeout == 20000)
 					timeout = 1000000;
@@ -287,14 +272,9 @@ void mtk_vdec_hw_break(struct mtk_vcodec_dev *dev, int hw_id)
 				//smi_debug_bus_hang_detect(0, "VCODEC");
 			}
 			cg_status = readl(vdec_misc_addr + 0x0104);
-			if (is_ufo)
-				ufo_cg_status = readl(vdec_ufo_addr + 0x08C);
 		}
 
 		/* sw reset */
-		if (is_ufo)
-			writel((readl(vdec_ufo_addr + 0x01C) | 0x2),
-				vdec_ufo_addr + 0x01C);
 		writel(0x1, vdec_vld_addr + 0x0108);
 		writel(0x0, vdec_vld_addr + 0x0108);
 	} else {
@@ -468,7 +448,6 @@ void mtk_vdec_dump_addr_reg(
 	default:
 		mtk_v4l2_err("unknown addr type");
 	}
-
 	spin_unlock_irqrestore(&dev->dec_power_lock[hw_id], flags);
 }
 
@@ -595,16 +574,28 @@ void mtk_vdec_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 	u64 target_freq_64 = 0;
 	struct codec_job *vdec_cur_job = 0;
 	long long op_rate_to_freq = 0;
+	long long pixel_tput = 0;
 
 	mutex_lock(&ctx->dev->dec_dvfs_mutex);
 	vdec_cur_job = move_job_to_head(&ctx->id, &vdec_jobs);
 
 	if (ctx->dec_params.operating_rate > 0) {
+		switch (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc) {
+		case V4L2_PIX_FMT_H264:
+		case V4L2_PIX_FMT_H265:
+		case V4L2_PIX_FMT_VP9:
+			pixel_tput = 3840LL * 2176LL * 30LL;
+			break;
+		default:
+			pixel_tput = 1920LL * 1088LL * 60LL;
+			break;
+		}
+
 		op_rate_to_freq = 312LL *
 				ctx->q_data[MTK_Q_DATA_DST].coded_width *
 				ctx->q_data[MTK_Q_DATA_DST].coded_height *
 				ctx->dec_params.operating_rate /
-				3840LL / 2160LL / 30LL;
+				pixel_tput;
 		target_freq_64 = match_freq((int)op_rate_to_freq,
 					&vdec_freq_steps[0],
 					vdec_freq_step_size);
@@ -621,9 +612,7 @@ void mtk_vdec_dvfs_begin(struct mtk_vcodec_ctx *ctx)
 		target_freq_64 = match_freq(target_freq, &vdec_freq_steps[0],
 					vdec_freq_step_size);
 		if (target_freq > 0) {
-			vdec_freq = target_freq;
-			if (vdec_freq > target_freq_64)
-				vdec_freq = target_freq_64;
+			vdec_freq = target_freq_64;
 			vdec_cur_job->mhz = (int)target_freq_64;
 			mtk_pm_qos_update_request(&vdec_qos_req_f, target_freq_64);
 		}
@@ -675,8 +664,8 @@ void mtk_vdec_emi_bw_begin(struct mtk_vcodec_ctx *ctx)
 		b_freq_idx = vdec_freq_step_size - 1;
 
 	emi_bw = 8L * 1920 * 1080 * 2 * 10 * vdec_freq;
-	emi_bw_input = 8 * vdec_freq / STD_VDEC_FREQ;
-	emi_bw_output = 1920 * 1088 * 3 * 20 * 10 * vdec_freq /
+	emi_bw_input = 25L * vdec_freq / STD_VDEC_FREQ;
+	emi_bw_output = 1920L * 1088 * 3 * 20 * 10 * vdec_freq /
 			2 / 3 / STD_VDEC_FREQ / 1024 / 1024;
 
 	switch (ctx->q_data[MTK_Q_DATA_SRC].fmt->fourcc) {
@@ -710,34 +699,33 @@ void mtk_vdec_emi_bw_begin(struct mtk_vcodec_ctx *ctx)
 			ctx->q_data[MTK_Q_DATA_DST].coded_height) >=
 			(1920 * 1080)) ? 1 : 0;
 
-	/* bits/s to MBytes/s */
-	emi_bw = emi_bw / (1024 * 1024) / 8;
+	/* bits/s to MBytes/s and occupied BW */
+	emi_bw = emi_bw * 4 / 3 / (1024 * 1024) / 8;
+	emi_bw_output = emi_bw_output * 4 / 3;
+	emi_bw_input = emi_bw_input * 4 / 3;
 
 	if (is_ufo_on == 1) {    /* UFO */
 		emi_bw = emi_bw * 6 / 10;
 		emi_bw_output = emi_bw_output * 6 / 10;
 	}
 
-	emi_bw = emi_bw - emi_bw_output - (emi_bw_input * 2);
-	if (emi_bw < 0)
-		emi_bw = 0;
-
 	if (is_ufo_on == 1) {    /* UFO */
-		mm_qos_set_request(&vdec_ufo, emi_bw, 0, BW_COMP_DEFAULT);
+		mm_qos_set_request(&vdec_ufo, 10, 0, BW_COMP_DEFAULT);
 		mm_qos_set_request(&vdec_ufo_enc, emi_bw_output, 0,
 					BW_COMP_DEFAULT);
 	} else {
+		/* non-UFO */
 		mm_qos_set_request(&vdec_pp, emi_bw_output, 0, BW_COMP_NONE);
 	}
 	mm_qos_set_request(&vdec_mc, emi_bw, 0, BW_COMP_NONE);
 	mm_qos_set_request(&vdec_pred_rd, 1, 0, BW_COMP_NONE);
 	mm_qos_set_request(&vdec_pred_wr, 1, 0, BW_COMP_NONE);
-	mm_qos_set_request(&vdec_ppwrap, 0, 0, BW_COMP_NONE);
-	mm_qos_set_request(&vdec_tile, 0, 0, BW_COMP_NONE);
+	mm_qos_set_request(&vdec_ppwrap, 1, 0, BW_COMP_NONE);
+	mm_qos_set_request(&vdec_tile, 1, 0, BW_COMP_NONE);
 	mm_qos_set_request(&vdec_vld, emi_bw_input, 0, BW_COMP_NONE);
-	mm_qos_set_request(&vdec_vld2, 0, 0, BW_COMP_NONE);
+	mm_qos_set_request(&vdec_vld2, emi_bw_input, 0, BW_COMP_NONE);
 	mm_qos_set_request(&vdec_avc_mv, emi_bw_input * 2, 0, BW_COMP_NONE);
-	mm_qos_set_request(&vdec_rg_ctrl_dma, 0, 0, BW_COMP_NONE);
+	mm_qos_set_request(&vdec_rg_ctrl_dma, 1, 0, BW_COMP_NONE);
 	mm_qos_update_all_request(&vdec_rlist);
 #endif
 }
