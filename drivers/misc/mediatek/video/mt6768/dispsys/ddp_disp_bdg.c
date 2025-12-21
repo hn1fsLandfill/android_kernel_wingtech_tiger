@@ -87,7 +87,7 @@ struct lcm_setting_table {
 	unsigned char para_list[256];
 };
 
-#define MM_CLK			405 //fpga=26
+#define MM_CLK			270 //fpga=26
 #define NS_TO_CYCLE(n, c)	((n) / (c) + (((n) % (c)) ? 1 : 0))
 
 #define DSI_MODULE_to_ID(x)	(x == DISP_BDG_DSI0 ? 0 : 1)
@@ -1570,27 +1570,8 @@ int bdg_tx_vdo_timing_set(enum DISP_BDG_ENUM module,
 					tx_params->vertical_sync_active);
 		DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_VBP_NL,
 					(tx_params->vertical_backporch));
-
-#ifdef CONFIG_MTK_HIGH_FRAME_RATE
-		if (!pgc->vfp_chg_sync_bdg) {
-			int j;
-
-			/* keep 6382's vfp in 90hz level as default */
-			for (j = 0; j < DFPS_LEVELS; j++) {
-				if (tx_params->dfps_params[j].fps == 9000) {
-					DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_VFP_NL,
-						(tx_params->dfps_params[j].vertical_frontporch));
-					break;
-				}
-			}
-		} else {
-			DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_VFP_NL,
-						(tx_params->vertical_frontporch));
-		}
-#else
 		DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_VFP_NL,
 					(tx_params->vertical_frontporch));
-#endif
 
 		DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_HSA_WC, hsa_byte);
 		DSI_OUTREG32(cmdq, TX_REG[i]->DSI_TX_HBP_WC, hbp_byte);
@@ -4662,7 +4643,7 @@ void output_debug_signal(void)
 	//GPIO Mode
 	mtk_spi_write(0x00007300, 0x77701111);
 #endif
-	mtk_spi_write(0x00007310, 0x31111111);
+	mtk_spi_write(0x00007310, 0x11111111);
 
 }
 void bdg_first_init(void)
@@ -4707,9 +4688,8 @@ int bdg_common_init(enum DISP_BDG_ENUM module,
 
 	DISPFUNCSTART();
 	clk_buf_disp_ctrl(true);
-	mdelay(2);
 	bdg_tx_pull_6382_reset_pin();
-	mdelay(2);
+	mdelay(1);
 	spislv_init();
 	spislv_switch_speed_hz(SPI_TX_LOW_SPEED_HZ, SPI_RX_LOW_SPEED_HZ);
 
