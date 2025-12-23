@@ -1368,4 +1368,15 @@ config TOUCHSCREEN_MTK_TOUCH
 
 	  To compile this dirver for used touch IC.
 
+# prize diliwu add tp 20191222 start
+config TOUCHSCREEN_CHIPONE
+        tristate "Chipone TDDI touchscreen for Mediatek package"
+        depends on I2C
+        default n
+        help
+          Say y here if you have chipone TDDI touch panel.
+          If unsure, say N.
+          To compile this driver as a module, choose M here: the
+          module will be called chipone-tddi.
+# prize diliwu add tp 20191222 end
 endif
