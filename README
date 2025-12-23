@@ -1,3 +1,36 @@
+WIP kernel for the T-Mobile Revvl 6 Pro/T-Phone Pro 2023
+
+(may not reflect current commit and your device)
+
+What works:
+Battery gauge
+GPU
+CPU
+Most of the sensors
+
+What partially works:
+Audio (Headphone jack, earpiece speaker, Main speaker doesn't work.)
+Display (If display turns off it can't turn on; BOE panel not tested.)
+Touchscreen (Touch is all wonky)
+Modem (Mobile data, calls and SMS aren't tested.)
+Side buttons (Volume up and power don't work)
+USB (OTG doesn't work)
+
+What doesn't:
+Fingerprint
+Camera
+Connectivity (Wi-Fi, Bluetooth)
+Hardware decoding
+Hardware encoding
+
+TODO for camera image sensors: 
+[ ] dt2_main_xl_hi5021_mipi_raw (Bare minimum!)
+[ ] dt2_front_qt_hi1634_mipi_raw
+[ ] dt2_front_dc_gc16b3c_mipi_raw
+[ ] dt2_wide_txd_hi556_mipi_raw
+[ ] dt2_depth_lh_sc201cs_mipi_raw
+[ ] dt2_macro_cxt_gc02m2_mipi_raw
+
 Linux kernel
 ============
 
