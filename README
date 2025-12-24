@@ -7,17 +7,17 @@ Battery gauge
 GPU
 CPU
 Most of the sensors
+Side buttons
 
 What partially works:
 Audio (Headphone jack, earpiece speaker, Main speaker doesn't work.)
 Display (If display turns off it can't turn on; BOE panel not tested.)
 Touchscreen (Touch is all wonky)
 Modem (Mobile data, calls and SMS aren't tested.)
-Side buttons (Volume up and power don't work)
 USB (OTG doesn't work)
 
 What doesn't:
-Fingerprint
+Side fingerprint scanner
 Camera
 Connectivity (Wi-Fi, Bluetooth)
 Hardware decoding
