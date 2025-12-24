@@ -21,6 +21,9 @@ struct mtk_spk_i2c_ctrl {
 #define MTK_SPK_MEDIATEK_MT6660_STR "MTK_SPK_MEDIATEK_MT6660"
 #define MTK_SPK_MEDIATEK_RT5512_STR "MTK_SPK_MEDIATEK_RT5512"
 #define MTK_SPK_NXP_TFA98XX_STR "MTK_SPK_NXP_TFAXXXX"
+/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 begin */
+#define MTK_SPK_AWINIC_AW883XX_STR "MTK_SPK_AWINIC_AW883XX"
+/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 end */
 
 #define MTK_SPK_I2S_0_STR "MTK_SPK_I2S_0"
 #define MTK_SPK_I2S_1_STR "MTK_SPK_I2S_1"
@@ -39,6 +42,9 @@ enum mtk_spk_type {
 	MTK_SPK_MEDIATEK_MT6660,
 	MTK_SPK_NXP_TFA98XX,
 	MTK_SPK_MEDIATEK_RT5512,
+/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 begin */
+	MTK_SPK_AWINIC_AW883XX,
+/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 end */
 	MTK_SPK_TYPE_NUM
 };
 

@@ -545,6 +545,9 @@ obj-$(CONFIG_SND_SOC_ZX_AUD96P22) += snd-soc-zx-aud96p22.o
 obj-$(CONFIG_SND_SOC_TFA9874)	+= tfa98xx/
 obj-$(CONFIG_SND_SOC_CS35L43)	+= cs35l43/
 
+#for AWINIC AW883XXSmart PA
+obj-$(CONFIG_SND_SMARTPA_AW883XX)	+= aw883xx/
+
 # Amp
 obj-$(CONFIG_SND_SOC_MAX9877)	+= snd-soc-max9877.o
 obj-$(CONFIG_SND_SOC_MAX98504)	+= snd-soc-max98504.o
@@ -557,8 +560,6 @@ obj-$(CONFIG_SND_SOC_SMARTPAINFO)	+= snd-soc-smartpa-info.o
 obj-$(CONFIG_SND_SOC_AW87339)	+= aw87339/
 obj-$(CONFIG_SND_SOC_FS16XX_KERNEL) +=foursemi/
 obj-$(CONFIG_SND_SOC_AW882XX_KERNEL) +=aw8882xx/
-obj-$(CONFIG_SND_SMARTPA_AW883XX) += aw883xx/
-obj-$(CONFIG_SND_SMARTPA_AW883XX_AUSTIN) += aw883xx_dlkm/
 
 ifneq (, $(filter y,$(CONFIG_SND_SOC_MT6358) $(CONFIG_SND_SOC_MT6366)))
   MTK_PLATFORM := $(subst ",,$(CONFIG_MTK_PLATFORM))
