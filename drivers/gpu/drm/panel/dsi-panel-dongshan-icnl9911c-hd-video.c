@@ -457,7 +457,7 @@ static int lcm_enable(struct drm_panel *panel)
 #define HSA (4)
 #define HBP (48)
 // 1000 seems to work fine?
-#define VFP_60HZ (150)
+#define VFP_60HZ (100)
 #define VSA (4)
 #define VBP (32)
 #define VAC (1640)
