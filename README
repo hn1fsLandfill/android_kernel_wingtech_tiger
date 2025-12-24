@@ -12,7 +12,7 @@ Hardware decoding
 Hardware encoding
 
 What partially works:
-Audio (Headphone jack, earpiece speaker, Main speaker doesn't work.)
+Audio (Headphone jack, microphone and earpiece speaker works; Main speaker doesn't work.)
 Display (If display turns off it can't turn on; BOE panel not tested.)
 Touchscreen (Touch is all wonky)
 Modem (Mobile data, calls and SMS aren't tested.)
