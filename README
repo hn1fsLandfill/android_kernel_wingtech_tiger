@@ -8,6 +8,8 @@ GPU
 CPU
 Most of the sensors
 Side buttons
+Hardware decoding
+Hardware encoding
 
 What partially works:
 Audio (Headphone jack, earpiece speaker, Main speaker doesn't work.)
@@ -20,8 +22,6 @@ What doesn't:
 Side fingerprint scanner
 Camera
 Connectivity (Wi-Fi, Bluetooth)
-Hardware decoding
-Hardware encoding
 
 TODO for camera image sensors: 
 [ ] dt2_main_xl_hi5021_mipi_raw (Bare minimum!)

@@ -57,6 +57,7 @@ enum venc_get_param_type {
 	VENC_GET_PARAM_ROI_RC_QP,
 	VENC_GET_PARAM_RESOLUTION_CHANGE,
 	VENC_GET_PARAM_REFBUF_FRAME_NUM,
+	VENC_GET_PARAM_LOG,
 };
 
 /*
@@ -406,6 +407,7 @@ struct venc_vcu_config {
 	__u32 p_qp;
 	__u32 b_qp;
 	__u32 svp_mode;
+	__u32 svp_is_hal_secure_handle;
 	__u32 tsvc;
 	__u32 max_qp;
 	__u32 min_qp;
