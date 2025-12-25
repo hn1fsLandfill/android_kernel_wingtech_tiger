@@ -214,7 +214,7 @@ const uint16_t tkipSBOX2[256] = {
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void tkipMicB(uint32_t *pu4L, uint32_t *pu4R)
+void tkipMicB(IN OUT uint32_t *pu4L, IN OUT uint32_t *pu4R)
 {
 	*pu4R = *pu4R ^ ROTL32(*pu4L, 17);	/* r <- r ^ (l<<<17)    */
 	*pu4L = (*pu4L + *pu4R);	/* l <- (l+r) mod 2^32  */
@@ -242,10 +242,10 @@ void tkipMicB(uint32_t *pu4L, uint32_t *pu4R)
  */
 /*----------------------------------------------------------------------------*/
 void
-tkipMicGen(uint8_t *pucMickey,
-	   uint8_t *pucData,
-	   uint32_t u4DataLen, uint8_t *pucSa, uint8_t *pucDa,
-	   uint8_t ucPriority, uint8_t *pucMic)
+tkipMicGen(IN uint8_t *pucMickey,
+	   IN uint8_t *pucData,
+	   IN uint32_t u4DataLen, IN uint8_t *pucSa, IN uint8_t *pucDa,
+	   IN uint8_t ucPriority, OUT uint8_t *pucMic)
 {
 
 	uint32_t i;
@@ -334,11 +334,11 @@ tkipMicGen(uint8_t *pucMickey,
  */
 /*----------------------------------------------------------------------------*/
 void
-tkipMicEncapsulate(uint8_t *pucDa,
-		   uint8_t *pucSa,
-		   uint8_t ucPriority,
-		   uint16_t u2PayloadLen, uint8_t *pucPayload,
-		   uint8_t *pucMic, uint8_t *pucMicKey)
+tkipMicEncapsulate(IN uint8_t *pucDa,
+		   IN uint8_t *pucSa,
+		   IN uint8_t ucPriority,
+		   IN uint16_t u2PayloadLen, IN uint8_t *pucPayload,
+		   IN uint8_t *pucMic, IN uint8_t *pucMicKey)
 {
 	uint8_t aucMic[8];	/* MIC' */
 
@@ -362,8 +362,8 @@ tkipMicEncapsulate(uint8_t *pucDa,
 }				/* tkipSwMsduEncapsulate */
 
 /*----------------------------------------------------------------------------*/
-u_int8_t tkipMicDecapsulate(struct SW_RFB *prSwRfb,
-			    uint8_t *pucMicKey)
+u_int8_t tkipMicDecapsulate(IN struct SW_RFB *prSwRfb,
+			    IN uint8_t *pucMicKey)
 {
 	uint8_t *pucMic1;		/* MIC  */
 	uint8_t aucMic2[8];	/* MIC' */
@@ -449,10 +449,8 @@ u_int8_t tkipMicDecapsulate(struct SW_RFB *prSwRfb,
 
 
 /*----------------------------------------------------------------------------*/
-
 u_int8_t tkipMicDecapsulateInRxHdrTransMode(
-	struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb, uint8_t *pucMicKey)
+	IN struct SW_RFB *prSwRfb, IN uint8_t *pucMicKey)
 {
 	uint8_t *pucMic1;		/* MIC  */
 	uint8_t aucMic2[8];	/* MIC' */
@@ -460,9 +458,7 @@ u_int8_t tkipMicDecapsulateInRxHdrTransMode(
 	/* PUCHAR              pucMickey; */
 	uint8_t *pucFrameBody;
 	uint16_t u2FrameBodyLen;
-	void *pvPacket;
-	uint8_t *pucBuff = NULL;
-
+	struct sk_buff *prSkb = NULL;
 #if 0
 	struct WLAN_MAC_HEADER *prMacHeader;
 	uint8_t *pucSa, *pucDa;
@@ -486,32 +482,31 @@ u_int8_t tkipMicDecapsulateInRxHdrTransMode(
 	DBGLOG(RSN, LOUD, "Before TKIP MSDU Decapsulate:\n");
 	DBGLOG(RSN, LOUD, "MIC key:\n");
 	/* DBGLOG_MEM8(RSN, LOUD, pucMicKey, 8); */
-	pvPacket = kalPacketAlloc(prAdapter->prGlueInfo,
-					u2FrameBodyLen + ETHERNET_HEADER_SZ * 4,
-					FALSE, &pucBuff);
-	if (pvPacket) {
+
+	prSkb = dev_alloc_skb(u2FrameBodyLen + ETHERNET_HEADER_SZ *
+			      4);
+	if (prSkb) {
 		/* copy to etherhdr + payload to skb data */
-		kalMemCopy(pucBuff, prSwRfb->pvHeader,
+		kalMemCopy(prSkb->data, prSwRfb->pvHeader,
 			   u2FrameBodyLen + ETHERNET_HEADER_SZ);
-		*(pucBuff + 6) = ETH_LLC_DSAP_SNAP;
-		*(pucBuff + 7) = ETH_LLC_SSAP_SNAP;
-		*(pucBuff + 8) = ETH_LLC_CONTROL_UNNUMBERED_INFORMATION;
-		*(pucBuff + 9) = 0x00;
-		*(pucBuff + 10) = 0x00;
-		*(pucBuff + 11) = 0x00;
-		*(pucBuff + 12) = *(uint8_t *)
-			((uintptr_t)prSwRfb->pvHeader + 12);
-		*(pucBuff + 13) = *(uint8_t *)
-			((uintptr_t)prSwRfb->pvHeader + 13);
+		*(prSkb->data + 6) = ETH_LLC_DSAP_SNAP;
+		*(prSkb->data + 7) = ETH_LLC_SSAP_SNAP;
+		*(prSkb->data + 8) = ETH_LLC_CONTROL_UNNUMBERED_INFORMATION;
+		*(prSkb->data + 9) = 0x00;
+		*(prSkb->data + 10) = 0x00;
+		*(prSkb->data + 11) = 0x00;
+		*(prSkb->data + 12) = *(uint8_t *)(prSwRfb->pvHeader + 12);
+		*(prSkb->data + 13) = *(uint8_t *)(prSwRfb->pvHeader + 13);
 
 		tkipMicGen(pucMicKey,
-			   pucBuff + 6,
+			   prSkb->data + 6,
 			   u2FrameBodyLen - WLAN_MAC_MIC_LEN + 8,
-			   (uint8_t *)((uintptr_t)prSwRfb->pvHeader + 6),
+			   prSwRfb->pvHeader + 6,
 			   prSwRfb->pvHeader,
 			   prSwRfb->ucTid, aucMic2);
 
-		kalKfreeSkb(pvPacket, TRUE);
+		if (prSkb)
+			kfree_skb((struct sk_buff *)prSkb);
 	} else {
 		DBGLOG(RX, ERROR, "MIC SW DEC1\n");
 		return fgStatus;

@@ -118,22 +118,20 @@
  * \retval NONE
  */
 /*----------------------------------------------------------------------------*/
-void secInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
+void secInit(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex)
 {
 	uint8_t i;
+	struct CONNECTION_SETTINGS *prConnSettings;
 	struct BSS_INFO *prBssInfo;
 	struct AIS_SPECIFIC_BSS_INFO *prAisSpecBssInfo;
 	struct IEEE_802_11_MIB *prMib;
 
 	DEBUGFUNC("secInit");
 
+	prConnSettings = aisGetConnSettings(prAdapter, ucBssIndex);
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(RSN, ERROR, "prBssInfo is null\n");
-		return;
-	}
-
-	prAisSpecBssInfo = aisGetAisSpecBssInfo(prAdapter, ucBssIndex);
+	prAisSpecBssInfo =
+		aisGetAisSpecBssInfo(prAdapter, ucBssIndex);
 	prMib = aisGetMib(prAdapter, ucBssIndex);
 
 	prBssInfo->u4RsnSelectedGroupCipher = 0;
@@ -208,28 +206,25 @@ void secInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
 	    [4].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_802_1X;
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
 	    [5].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_PSK;
+
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
 	    [6].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_FT_802_1X;
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
 	    [7].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_FT_PSK;
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
 	    [8].dot11RSNAConfigAuthenticationSuite = WFA_AKM_SUITE_OSEN;
-	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [9].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_SAE;
-	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [10].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_OWE;
-	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [11].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_DPP;
+
 #if CFG_SUPPORT_802_11W
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [12].dot11RSNAConfigAuthenticationSuite =
+	    [9].dot11RSNAConfigAuthenticationSuite =
 	    RSN_AKM_SUITE_802_1X_SHA256;
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [13].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_PSK_SHA256;
-#endif
+	    [10].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_PSK_SHA256;
 	prMib->dot11RSNAConfigAuthenticationSuitesTable
-	    [14].dot11RSNAConfigAuthenticationSuite =
-		RSN_AKM_SUITE_8021X_SUITE_B_192;
+	    [11].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_SAE;
+	prMib->dot11RSNAConfigAuthenticationSuitesTable
+	    [12].dot11RSNAConfigAuthenticationSuite = RSN_AKM_SUITE_OWE;
+#endif
 
 	for (i = 0; i < MAX_NUM_SUPPORTED_AKM_SUITES; i++) {
 		prMib->dot11RSNAConfigAuthenticationSuitesTable
@@ -240,7 +235,7 @@ void secInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
 	cnmTimerInitTimer(prAdapter,
 			  &prAisSpecBssInfo->rSaQueryTimer,
 			  (PFN_MGMT_TIMEOUT_FUNC) rsnStartSaQueryTimer,
-			  (uintptr_t)ucBssIndex);
+			  (unsigned long)ucBssIndex);
 #endif
 
 	prAisSpecBssInfo->fgCounterMeasure = FALSE;
@@ -270,9 +265,9 @@ void secInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
  * \return FALSE                Class Error
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secCheckClassError(struct ADAPTER *prAdapter,
-			    struct SW_RFB *prSwRfb,
-			    struct STA_RECORD *prStaRec)
+u_int8_t secCheckClassError(IN struct ADAPTER *prAdapter,
+			    IN struct SW_RFB *prSwRfb,
+			    IN struct STA_RECORD *prStaRec)
 {
 	void *prRxStatus;
 	struct RX_DESC_OPS_T *prRxDescOps;
@@ -347,8 +342,8 @@ u_int8_t secCheckClassError(struct ADAPTER *prAdapter,
  *
  */
 /*----------------------------------------------------------------------------*/
-void secSetPortBlocked(struct ADAPTER *prAdapter,
-		       struct STA_RECORD *prSta, u_int8_t fgPortBlock)
+void secSetPortBlocked(IN struct ADAPTER *prAdapter,
+		       IN struct STA_RECORD *prSta, IN u_int8_t fgPortBlock)
 {
 #if 0				/* Marked for MT6630 */
 	if (prSta == NULL)
@@ -376,9 +371,9 @@ void secSetPortBlocked(struct ADAPTER *prAdapter,
  *
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secGetPortStatus(struct ADAPTER *prAdapter,
-			  struct STA_RECORD *prSta,
-			  u_int8_t *pfgPortStatus)
+u_int8_t secGetPortStatus(IN struct ADAPTER *prAdapter,
+			  IN struct STA_RECORD *prSta,
+			  OUT u_int8_t *pfgPortStatus)
 {
 	if (prSta == NULL)
 		return FALSE;
@@ -400,9 +395,9 @@ u_int8_t secGetPortStatus(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 u_int8_t			/* ENUM_PORT_CONTROL_RESULT */
-secTxPortControlCheck(struct ADAPTER *prAdapter,
-		      struct MSDU_INFO *prMsduInfo,
-		      struct STA_RECORD *prStaRec)
+secTxPortControlCheck(IN struct ADAPTER *prAdapter,
+		      IN struct MSDU_INFO *prMsduInfo,
+		      IN struct STA_RECORD *prStaRec)
 {
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
@@ -450,8 +445,8 @@ secTxPortControlCheck(struct ADAPTER *prAdapter,
  * \retval FALSE Refuse the MSDU packet due port control
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secRxPortControlCheck(struct ADAPTER *prAdapter,
-			       struct SW_RFB *prSWRfb)
+u_int8_t secRxPortControlCheck(IN struct ADAPTER *prAdapter,
+			       IN struct SW_RFB *prSWRfb)
 {
 	ASSERT(prSWRfb);
 
@@ -468,9 +463,9 @@ u_int8_t secRxPortControlCheck(struct ADAPTER *prAdapter,
  * \retval none
  */
 /*----------------------------------------------------------------------------*/
-void secSetCipherSuite(struct ADAPTER *prAdapter,
-		       uint32_t u4CipherSuitesFlags,
-		       uint8_t ucBssIndex)
+void secSetCipherSuite(IN struct ADAPTER *prAdapter,
+		       IN uint32_t u4CipherSuitesFlags,
+		       IN uint8_t ucBssIndex)
 {
 
 	uint32_t i;
@@ -604,8 +599,8 @@ void secSetCipherSuite(struct ADAPTER *prAdapter,
  * \retval BOOLEAN
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secEnabledInAis(struct ADAPTER *prAdapter,
-		uint8_t ucBssIndex)
+u_int8_t secEnabledInAis(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIndex)
 {
 	enum ENUM_WEP_STATUS eEncStatus;
 
@@ -630,6 +625,27 @@ u_int8_t secEnabledInAis(struct ADAPTER *prAdapter,
 
 }				/* secEnabledInAis */
 
+u_int8_t secIsProtected1xFrame(IN struct ADAPTER *prAdapter,
+			       IN struct STA_RECORD *prStaRec)
+{
+	struct BSS_INFO *prBssInfo;
+
+	if (prStaRec) {
+		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
+						  prStaRec->ucBssIndex);
+		if (prBssInfo && prBssInfo->eNetworkType == NETWORK_TYPE_AIS) {
+#if CFG_SUPPORT_WAPI
+			if (aisGetWapiMode(prAdapter,
+				prStaRec->ucBssIndex))
+				return FALSE;
+#endif
+		}
+
+		return prStaRec->fgTransmitKeyExist;
+	}
+	return FALSE;
+}
+
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief This routine is called to set the privacy bit at mac header for TxM
@@ -641,9 +657,9 @@ u_int8_t secEnabledInAis(struct ADAPTER *prAdapter,
  *            FALSE the privacy no need to set
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secIsProtectedFrame(struct ADAPTER *prAdapter,
-			     struct MSDU_INFO *prMsdu,
-			     struct STA_RECORD *prStaRec)
+u_int8_t secIsProtectedFrame(IN struct ADAPTER *prAdapter,
+			     IN struct MSDU_INFO *prMsdu,
+			     IN struct STA_RECORD *prStaRec)
 {
 #if CFG_SUPPORT_NAN
 	struct BSS_INFO *prBssInfo;
@@ -678,8 +694,8 @@ u_int8_t secIsProtectedFrame(struct ADAPTER *prAdapter,
 						       prMsdu->ucBssIndex));
 }
 
-u_int8_t secIsProtectedBss(struct ADAPTER *prAdapter,
-			   struct BSS_INFO *prBssInfo)
+u_int8_t secIsProtectedBss(IN struct ADAPTER *prAdapter,
+			   IN struct BSS_INFO *prBssInfo)
 {
 	uint8_t ucBssIndex = 0;
 
@@ -704,7 +720,7 @@ u_int8_t secIsProtectedBss(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t secIsRobustMgmtFrame(struct ADAPTER *prAdapter, void *prPacket)
+u_int8_t secIsRobustMgmtFrame(IN struct ADAPTER *prAdapter, IN void *prPacket)
 {
 	struct WLAN_MAC_HEADER *prWlanHeader = NULL;
 	uint16_t u2TxFrameCtrl;
@@ -713,7 +729,7 @@ u_int8_t secIsRobustMgmtFrame(struct ADAPTER *prAdapter, void *prPacket)
 		return FALSE;
 
 	prWlanHeader = (struct WLAN_MAC_HEADER *)
-		((uintptr_t) prPacket + MAC_TX_RESERVED_FIELD);
+		((unsigned long) prPacket + MAC_TX_RESERVED_FIELD);
 	u2TxFrameCtrl = prWlanHeader->u2FrameCtrl & MASK_FRAME_TYPE;
 	if (u2TxFrameCtrl == MAC_FRAME_DISASSOC
 	    || u2TxFrameCtrl == MAC_FRAME_DEAUTH)
@@ -721,7 +737,7 @@ u_int8_t secIsRobustMgmtFrame(struct ADAPTER *prAdapter, void *prPacket)
 	return FALSE;
 }
 
-u_int8_t secIsRobustActionFrame(struct ADAPTER *prAdapter, void *prPacket)
+u_int8_t secIsRobustActionFrame(IN struct ADAPTER *prAdapter, IN void *prPacket)
 {
 	struct WLAN_MAC_HEADER *prWlanHeader = NULL;
 	struct WLAN_ACTION_FRAME *prActFrame = NULL;
@@ -732,7 +748,7 @@ u_int8_t secIsRobustActionFrame(struct ADAPTER *prAdapter, void *prPacket)
 		return FALSE;
 
 	prWlanHeader = (struct WLAN_MAC_HEADER *)
-		((uintptr_t) prPacket + MAC_TX_RESERVED_FIELD);
+		((unsigned long) prPacket + MAC_TX_RESERVED_FIELD);
 	u2TxFrameCtrl = prWlanHeader->u2FrameCtrl & MASK_FRAME_TYPE;
 	if (u2TxFrameCtrl != MAC_FRAME_ACTION)
 		return FALSE;
@@ -758,14 +774,15 @@ u_int8_t secIsRobustActionFrame(struct ADAPTER *prAdapter, void *prPacket)
 	       ? TRUE : FALSE;
 }
 
-u_int8_t secIsWepBss(struct ADAPTER *prAdapter,
-		     struct BSS_INFO *prBssInfo)
+u_int8_t secIsWepBss(IN struct ADAPTER *prAdapter,
+		     IN struct BSS_INFO *prBssInfo)
 {
 	enum ENUM_WEP_STATUS eEncStatus;
 
+	eEncStatus = aisGetEncStatus(prAdapter,
+		prBssInfo->ucBssIndex);
+
 	if (prBssInfo->eNetworkType == NETWORK_TYPE_AIS) {
-		eEncStatus = aisGetEncStatus(prAdapter,
-			prBssInfo->ucBssIndex);
 		if (eEncStatus ==
 		    ENUM_ENCRYPTION1_ENABLED)
 			return TRUE;
@@ -794,8 +811,8 @@ u_int8_t secIsWepBss(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 u_int8_t secPrivacySeekForEntry(
-				struct ADAPTER *prAdapter,
-				struct STA_RECORD *prSta)
+				IN struct ADAPTER *prAdapter,
+				IN struct STA_RECORD *prSta)
 {
 	struct BSS_INFO *prP2pBssInfo;
 	uint8_t ucEntry = WTBL_RESERVED_ENTRY;
@@ -810,20 +827,12 @@ u_int8_t secPrivacySeekForEntry(
 	}
 
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prSta->ucBssIndex);
-	if (!prP2pBssInfo) {
-		DBGLOG(RSN, ERROR, "prP2pBssInfo is null\n");
-		return FALSE;
-	}
 	ucRoleIdx = prP2pBssInfo->u4PrivateData;
 
 	prWtbl = prAdapter->rWifiVar.arWtbl;
 
-#if (CFG_WIFI_IGTK_GTK_SEPARATE == 1)
 	/* reserve wtbl IDX 0~3 for BIP*/
 	ucStartIDX = 4;
-#else
-	ucStartIDX = 0;
-#endif
 	ucMaxIDX = prAdapter->ucTxDefaultWlanIndex - 1;
 
 	for (i = ucStartIDX; i <= ucMaxIDX; i++) {
@@ -925,7 +934,7 @@ u_int8_t secPrivacySeekForEntry(
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void secPrivacyFreeForEntry(struct ADAPTER *prAdapter, uint8_t ucEntry)
+void secPrivacyFreeForEntry(IN struct ADAPTER *prAdapter, IN uint8_t ucEntry)
 {
 	struct WLAN_TABLE *prWtbl;
 
@@ -957,8 +966,8 @@ void secPrivacyFreeForEntry(struct ADAPTER *prAdapter, uint8_t ucEntry)
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void secPrivacyFreeSta(struct ADAPTER *prAdapter,
-		       struct STA_RECORD *prStaRec)
+void secPrivacyFreeSta(IN struct ADAPTER *prAdapter,
+		       IN struct STA_RECORD *prStaRec)
 {
 	uint32_t entry;
 	struct WLAN_TABLE *prWtbl;
@@ -995,15 +1004,15 @@ void secPrivacyFreeSta(struct ADAPTER *prAdapter,
  * \note
  */
 /*----------------------------------------------------------------------------*/
-void secRemoveBssBcEntry(struct ADAPTER *prAdapter,
-			 struct BSS_INFO *prBssInfo, u_int8_t fgRoam)
+void secRemoveBssBcEntry(IN struct ADAPTER *prAdapter,
+			 IN struct BSS_INFO *prBssInfo, IN u_int8_t fgRoam)
 {
 	int i;
 
 	if (!prBssInfo)
 		return;
 
-	DBGLOG(RSN, TRACE, "remove all the key related with BSS!");
+	DBGLOG_LIMITED(RSN, TRACE, "remove all the key related with BSS!");
 
 	if (fgRoam) {
 		struct CONNECTION_SETTINGS *prConnSettings =
@@ -1060,10 +1069,10 @@ void secRemoveBssBcEntry(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint8_t
-secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
-			 uint8_t ucBssIndex,
-			 uint8_t *pucAddr, uint8_t ucStaIdx,
-			 uint8_t ucAlg, uint8_t ucKeyId)
+secPrivacySeekForBcEntry(IN struct ADAPTER *prAdapter,
+			 IN uint8_t ucBssIndex,
+			 IN uint8_t *pucAddr, IN uint8_t ucStaIdx,
+			 IN uint8_t ucAlg, IN uint8_t ucKeyId)
 {
 	uint8_t ucEntry = WTBL_ALLOC_FAIL;
 	uint8_t ucStartIDX = 0, ucMaxIDX = 0;
@@ -1073,10 +1082,6 @@ secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
 	struct BSS_INFO *prBSSInfo =
 	    GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
-	if (!prBSSInfo) {
-		DBGLOG(RSN, ERROR, "prBssInfo is null\n");
-		return ucEntry;
-	}
 	prWtbl = prAdapter->rWifiVar.arWtbl;
 
 	if (ucAlg == CIPHER_SUITE_WPI ||	/* CIPHER_SUITE_GCM_WPI || */
@@ -1085,28 +1090,19 @@ secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
 	    || ucAlg == CIPHER_SUITE_WEP128 || ucAlg == CIPHER_SUITE_NONE)
 		fgCheckKeyId = FALSE;
 
-	if (ucKeyId == 0xFF ||
-	    ucAlg == CIPHER_SUITE_BIP ||
-	    ucAlg == CIPHER_SUITE_BIP_GMAC_256)
+	if (ucKeyId == 0xFF || ucAlg == CIPHER_SUITE_BIP)
 		fgCheckKeyId = FALSE;
 
 	if (prBSSInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT)
 		fgCheckKeyId = FALSE;
 
-#if (CFG_WIFI_IGTK_GTK_SEPARATE == 1)
 	/* reserve wtbl IDX 0~3 for BIP*/
 	ucStartIDX = 4;
-#else
-	ucStartIDX = 0;
-#endif
 	ucMaxIDX = prAdapter->ucTxDefaultWlanIndex - 1;
 
-#if (CFG_WIFI_IGTK_GTK_SEPARATE == 1)
-	if (ucAlg == CIPHER_SUITE_BIP || ucAlg == CIPHER_SUITE_BIP_GMAC_256)
+	if (ucAlg == CIPHER_SUITE_BIP) {
 		ucEntry = ucBssIndex;
-	else
-#endif
-	{
+	} else {
 		for (i = ucStartIDX; i <= ucMaxIDX; i++) {
 
 			if (prWtbl[i].ucUsed && !prWtbl[i].ucPairwise
@@ -1146,13 +1142,6 @@ secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
 	}
 
 	if (ucEntry < prAdapter->ucTxDefaultWlanIndex) {
-#if (CFG_WIFI_IGTK_GTK_SEPARATE == 0)
-		if (ucAlg == CIPHER_SUITE_BIP ||
-		    ucAlg == CIPHER_SUITE_BIP_GMAC_256) {
-			/* BIP no need to dump secCheckWTBLAssign */
-			return ucEntry;
-		}
-#endif
 		prWtbl[ucEntry].ucUsed = TRUE;
 		prWtbl[ucEntry].ucKeyId = ucKeyId;
 		prWtbl[ucEntry].ucBssIndex = ucBssIndex;
@@ -1161,7 +1150,7 @@ secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
 				MAC_ADDR_LEN);
 		prWtbl[ucEntry].ucStaIndex = ucStaIdx;
 
-		DBGLOG(RSN, TRACE,
+		DBGLOG_LIMITED(RSN, INFO,
 		       "[Wlan index] BSS#%d keyid#%d P=%d use WlanIndex#%d STAIdx=%d "
 		       MACSTR
 		       " (OpMode:%d, NetworkType:%d, CheckKeyId:%d)\n",
@@ -1196,7 +1185,7 @@ secPrivacySeekForBcEntry(struct ADAPTER *prAdapter,
  * \note
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t secCheckWTBLAssign(struct ADAPTER *prAdapter)
+u_int8_t secCheckWTBLAssign(IN struct ADAPTER *prAdapter)
 {
 	secPrivacyDumpWTBL(prAdapter);
 	return TRUE;
@@ -1234,27 +1223,6 @@ uint8_t secGetStaIdxByWlanIdx(struct ADAPTER *prAdapter, uint8_t ucWlanIdx)
 
 /*----------------------------------------------------------------------------*/
 /*!
- * \brief  Got the wlan index by STA record index
- *
- * \param[in] prAdapter Pointer to the Adapter structure
- * \param[in] ucStaIndex The sta record index
- *
- * \return The wlan index, WTBL_SIZE for invalid sta index
- */
-/*----------------------------------------------------------------------------*/
-uint8_t secGetWlanIdxByStaIdx(struct ADAPTER *prAdapter, uint8_t ucStaIndex)
-{
-	struct STA_RECORD *prStaRec =
-		cnmGetStaRecByIndex(prAdapter, ucStaIndex);
-
-	if (prStaRec != NULL)
-		return prStaRec->ucWlanIndex;
-
-	return WTBL_SIZE;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
  * \brief  At Sw wlan table, got the BSS index by wlan index
  *
  * \param[in] prAdapter Pointer to the Adapter structure
@@ -1278,14 +1246,10 @@ uint8_t secGetBssIdxByWlanIdx(struct ADAPTER *prAdapter, uint8_t ucWlanIdx)
 		return WTBL_RESERVED_ENTRY;
 }
 
-uint8_t secGetBssIdxByRfb(struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb)
-{
+uint8_t secGetBssIdxByRfb(IN struct ADAPTER *prAdapter,
+	IN struct SW_RFB *prSwRfb) {
 
-	if (!prAdapter)
-		return AIS_DEFAULT_BSS_INDEX;
-
-	if (prSwRfb) {
+	if (prAdapter && prSwRfb) {
 		uint8_t	ucBssIndex =
 			secGetBssIdxByWlanIdx(prAdapter,
 			prSwRfb->ucWlanIdx);
@@ -1308,21 +1272,7 @@ uint8_t secGetBssIdxByRfb(struct ADAPTER *prAdapter,
 
 	DBGLOG(RSN, LOUD, "Return default index\n");
 
-	return aisGetDefaultLinkBssIndex(prAdapter);
-}
-
-struct BSS_INFO *secGetBssByRfb(struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb)
-{
-	if (prAdapter && prSwRfb) {
-		uint8_t ucBssIndex = secGetBssIdxByWlanIdx(prAdapter,
-			prSwRfb->ucWlanIdx);
-
-		if (ucBssIndex != WTBL_RESERVED_ENTRY)
-			return GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	}
-
-	return NULL;
+	return AIS_DEFAULT_INDEX;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -1363,7 +1313,7 @@ uint8_t secLookupStaRecIndexFromTA(
  * \note
  */
 /*----------------------------------------------------------------------------*/
-void secPrivacyDumpWTBL(struct ADAPTER *prAdapter)
+void secPrivacyDumpWTBL(IN struct ADAPTER *prAdapter)
 {
 	struct WLAN_TABLE *prWtbl;
 	uint8_t i;
@@ -1392,8 +1342,8 @@ void secPrivacyDumpWTBL(struct ADAPTER *prAdapter)
  * \note
  */
 /*----------------------------------------------------------------------------*/
-void secPostUpdateAddr(struct ADAPTER *prAdapter,
-		       struct BSS_INFO *prBssInfo)
+void secPostUpdateAddr(IN struct ADAPTER *prAdapter,
+		       IN struct BSS_INFO *prBssInfo)
 {
 	struct WLAN_TABLE *prWtbl;
 
@@ -1489,8 +1439,8 @@ enum ENUM_EAPOL_KEY_TYPE_T secGetEapolKeyType(uint8_t *pucPkt)
 	return EAPOL_KEY_NOT_KEY;
 }
 
-void secHandleNoWtbl(struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb)
+void secHandleNoWtbl(IN struct ADAPTER *prAdapter,
+	IN struct SW_RFB *prSwRfb)
 {
 	/* Wtbl error handling. if no Wtbl */
 	struct WLAN_ACTION_FRAME *prMgmtHdr =

@@ -175,7 +175,7 @@ mt7668ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 	}
 }
 
-void mt7668CapInit(struct ADAPTER *prAdapter)
+void mt7668CapInit(IN struct ADAPTER *prAdapter)
 {
 	struct GLUE_INFO *prGlueInfo;
 	struct mt66xx_chip_info *prChipInfo;
@@ -208,8 +208,13 @@ void mt7668CapInit(struct ADAPTER *prAdapter)
 	switch (prGlueInfo->u4InfType) {
 #if defined(_HIF_PCIE)
 	case MT_DEV_INF_PCIE:
-		prChipInfo->u2TxInitCmdPort = TX_RING_FWDL;
-		prChipInfo->u2TxFwDlPort = TX_RING_FWDL;
+#if CFG_TRI_TX_RING
+		prChipInfo->u2TxInitCmdPort = TX_RING_FWDL_IDX_5;
+		prChipInfo->u2TxFwDlPort = TX_RING_FWDL_IDX_5;
+#else
+		prChipInfo->u2TxInitCmdPort = TX_RING_FWDL_IDX_4;
+		prChipInfo->u2TxFwDlPort = TX_RING_FWDL_IDX_4;
+#endif
 		break;
 #endif /* _HIF_PCIE */
 #if defined(_HIF_USB)
@@ -334,8 +339,8 @@ void mt7668PdmaConfig(struct GLUE_INFO *prGlueInfo, u_int8_t enable,
 
 }
 
-void mt7668LowPowerOwnRead(struct ADAPTER *prAdapter,
-	u_int8_t *pfgResult)
+void mt7668LowPowerOwnRead(IN struct ADAPTER *prAdapter,
+	OUT u_int8_t *pfgResult)
 {
 	uint32_t u4RegValue;
 
@@ -343,7 +348,7 @@ void mt7668LowPowerOwnRead(struct ADAPTER *prAdapter,
 	*pfgResult = ((u4RegValue & WPDMA_FW_CLR_OWN_INT) ? TRUE : FALSE);
 }
 
-void mt7668LowPowerOwnSet(struct ADAPTER *prAdapter, u_int8_t *pfgResult)
+void mt7668LowPowerOwnSet(IN struct ADAPTER *prAdapter, OUT u_int8_t *pfgResult)
 {
 	uint32_t u4RegValue;
 
@@ -352,8 +357,8 @@ void mt7668LowPowerOwnSet(struct ADAPTER *prAdapter, u_int8_t *pfgResult)
 	*pfgResult = (u4RegValue == 0);
 }
 
-void mt7668LowPowerOwnClear(struct ADAPTER *prAdapter,
-	u_int8_t *pfgResult)
+void mt7668LowPowerOwnClear(IN struct ADAPTER *prAdapter,
+	OUT u_int8_t *pfgResult)
 {
 	uint32_t u4RegValue;
 
@@ -361,7 +366,7 @@ void mt7668LowPowerOwnClear(struct ADAPTER *prAdapter,
 	HAL_MCR_RD(prAdapter, CFG_PCIE_LPCR_HOST, &u4RegValue);
 	*pfgResult = (u4RegValue == 0);
 }
-void mt7668EnableInterrupt(struct ADAPTER *prAdapter)
+void mt7668EnableInterrupt(IN struct ADAPTER *prAdapter)
 {
 	struct BUS_INFO *prBusInfo = prAdapter->chip_info->bus_info;
 	union WPDMA_INT_MASK IntMask;
@@ -385,7 +390,7 @@ void mt7668EnableInterrupt(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, TRACE, "%s [0x%08x]\n", __func__, IntMask.word);
 }
 
-void mt7668DisableInterrupt(struct ADAPTER *prAdapter)
+void mt7668DisableInterrupt(IN struct ADAPTER *prAdapter)
 {
 	union WPDMA_INT_MASK IntMask;
 
@@ -399,7 +404,7 @@ void mt7668DisableInterrupt(struct ADAPTER *prAdapter)
 	DBGLOG(HAL, TRACE, "%s\n", __func__);
 }
 
-void mt7668WakeUpWiFi(struct ADAPTER *prAdapter)
+void mt7668WakeUpWiFi(IN struct ADAPTER *prAdapter)
 {
 	u_int8_t fgResult;
 
@@ -433,11 +438,6 @@ struct BUS_INFO mt7668_bus_info = {
 	.tx_ring_cmd_idx = 2,
 	.tx_ring0_data_idx = 0,
 	.tx_ring1_data_idx = 0,
-	.rx_data_ring_num = 1,
-	.rx_evt_ring_num = 1,
-	.rx_data_ring_size = 256,
-	.rx_evt_ring_size = 16,
-	.rx_data_ring_prealloc_size = 256,
 	.fw_own_clear_addr = WPDMA_INT_STA,
 	.fw_own_clear_bit = WPDMA_FW_CLR_OWN_INT,
 	.max_static_map_addr = 0x00040000,
@@ -445,8 +445,6 @@ struct BUS_INFO mt7668_bus_info = {
 	.u4DmaMask = 32,
 
 	.pdmaSetup = mt7668PdmaConfig,
-	.pdmaStop = NULL,
-	.pdmaPollingIdle = NULL,
 	.updateTxRingMaxQuota = NULL,
 	.enableInterrupt = mt7668EnableInterrupt,
 	.disableInterrupt = mt7668DisableInterrupt,
@@ -463,7 +461,6 @@ struct BUS_INFO mt7668_bus_info = {
 	.hifRst = NULL,
 	.initPcieInt = NULL,
 	.DmaShdlInit = NULL,
-	.DmaShdlReInit = NULL,
 #endif /* _HIF_PCIE */
 #if defined(_HIF_USB)
 	.u4UdmaWlCfg_0_Addr = UDMA_WLCFG_0,
@@ -478,11 +475,6 @@ struct BUS_INFO mt7668_bus_info = {
 	.asicUsbEventEpDetected = NULL,
 	.asicUsbRxByteCount = NULL,
 	.DmaShdlInit = NULL,
-	.DmaShdlReInit = NULL,
-	.asicUdmaRxFlush = NULL,
-#if CFG_CHIP_RESET_SUPPORT
-	.asicUsbEpctlRstOpt = NULL,
-#endif
 #endif /* _HIF_USB */
 #if defined(_HIF_SDIO)
 	.halTxGetFreeResource = NULL,
@@ -532,7 +524,6 @@ struct CHIP_DBG_OPS mt7668_debug_ops = {
 	.showWtblInfo = NULL,
 	.showHifInfo = NULL,
 	.printHifDbgInfo = NULL,
-	.show_mcu_debug_info = NULL,
 };
 
 /* Litien code refine to support multi chip */

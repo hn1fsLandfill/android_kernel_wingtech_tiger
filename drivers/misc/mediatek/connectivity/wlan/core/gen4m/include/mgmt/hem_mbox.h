@@ -247,31 +247,9 @@ enum ENUM_MSG_ID {
 	MID_TWT_REQ_IND_INFOFRM,
 	MID_TWT_PARAMS_SET,
 #endif
-#if (CFG_SUPPORT_802_11AX == 1)
-	/* SM Power Save Requester Support */
-	MID_SMPS_ACTION_SET,
-#endif
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-	MID_TWT_RESP_PARAMS_SET,
-	MID_TWT_RESP_SETUP_AGRT_TO_FW,
-	MID_TWT_RESP_TEARDOWN_TO_FW,
-#endif
-#if (CFG_SUPPORT_BTWT == 1)
-	MID_BTWT_REQ_FSM_START,
-	MID_BTWT_REQ_FSM_TEARDOWN,
-	MID_BTWT_REQ_IND_TEARDOWN_DONE,
-#endif
-#if (CFG_SUPPORT_802_11BE_ML_TWT == 1)
-	MID_ML_TWT_REQ_FSM_START_ALL_LINKS,
-	MID_ML_TWT_REQ_FSM_START_ONE_BY_ONE,
-#endif
 #if (CFG_SUPPORT_NAN == 1)
 	MID_CNM_NAN_CH_GRANT,
 #endif
-	MID_MNY_P2P_GC_CSA,
-#if ARP_MONITER_ENABLE
-	MID_QM_ARP_MONITOR,
-#endif /* ARP_MONITER_ENABLE */
 	MID_TOTAL_NUM
 };
 
@@ -407,21 +385,6 @@ struct _MSG_TWT_PARAMS_SET_T {
 	struct MSG_HDR rMsgHdr;	/* Must be the first member */
 	struct _TWT_CTRL_T rTWTCtrl;
 };
-
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-struct _MSG_TWT_HOTSPOT_PARAMS_SET_T {
-	struct MSG_HDR rMsgHdr;	/* Must be the first member */
-	struct _TWT_HOTSPOT_CTRL_T rTWTCtrl;
-};
-#endif
-
-#endif
-
-#if (CFG_SUPPORT_802_11AX == 1)
-struct _MSG_SMPS_PARAMS_SET_T {
-	struct MSG_HDR rMsgHdr;	/* Must be the first member */
-	struct _SMPS_CTRL_T rSMPSCtrl;
-};
 #endif
 
 struct MSG_CANCEL_TX_WAIT_REQUEST {
@@ -466,22 +429,22 @@ struct MSG_SAA_EXTERNAL_AUTH_DONE {
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-void mboxSetup(struct ADAPTER *prAdapter,
-	       enum ENUM_MBOX_ID eMboxId);
+void mboxSetup(IN struct ADAPTER *prAdapter,
+	       IN enum ENUM_MBOX_ID eMboxId);
 
 void
-mboxSendMsg(struct ADAPTER *prAdapter,
-	    enum ENUM_MBOX_ID eMboxId, struct MSG_HDR *prMsg,
-	    enum EUNM_MSG_SEND_METHOD eMethod);
+mboxSendMsg(IN struct ADAPTER *prAdapter,
+	    IN enum ENUM_MBOX_ID eMboxId, IN struct MSG_HDR *prMsg,
+	    IN enum EUNM_MSG_SEND_METHOD eMethod);
 
-void mboxRcvAllMsg(struct ADAPTER *prAdapter,
-		   enum ENUM_MBOX_ID eMboxId);
+void mboxRcvAllMsg(IN struct ADAPTER *prAdapter,
+		   IN enum ENUM_MBOX_ID eMboxId);
 
-void mboxInitialize(struct ADAPTER *prAdapter);
+void mboxInitialize(IN struct ADAPTER *prAdapter);
 
-void mboxDestroy(struct ADAPTER *prAdapter);
+void mboxDestroy(IN struct ADAPTER *prAdapter);
 
-void mboxDummy(struct ADAPTER *prAdapter,
+void mboxDummy(IN struct ADAPTER *prAdapter,
 	       struct MSG_HDR *prMsgHdr);
 
 /*******************************************************************************

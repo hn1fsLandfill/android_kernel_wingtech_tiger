@@ -34,9 +34,6 @@ static s_int32 mt_serv_init_op(struct test_operation *ops)
 	ops->op_set_antswap = mt_op_set_antswap;
 	ops->op_set_rx_filter_pkt_len = mt_op_set_rx_filter_pkt_len;
 	ops->op_set_freq_offset = mt_op_set_freq_offset;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	ops->op_set_freq_offset_C2 = mt_op_set_freq_offset_C2;
-#endif
 	ops->op_set_phy_counter = mt_op_set_phy_counter;
 	ops->op_set_rxv_index = mt_op_set_rxv_index;
 	ops->op_set_fagc_path = mt_op_set_fagc_path;
@@ -78,9 +75,6 @@ static s_int32 mt_serv_init_op(struct test_operation *ops)
 	ops->op_get_tx_pwr = mt_op_get_tx_pwr;
 	ops->op_set_tx_pwr = mt_op_set_tx_pwr;
 	ops->op_get_freq_offset = mt_op_get_freq_offset;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	ops->op_get_freq_offset_C2 = mt_op_get_freq_offset_C2;
-#endif
 	ops->op_get_cfg_on_off = mt_op_get_cfg_on_off;
 	ops->op_get_tx_tone_pwr = mt_op_get_tx_tone_pwr;
 	ops->op_get_recal_cnt = mt_op_get_recal_cnt;
@@ -90,9 +84,6 @@ static s_int32 mt_serv_init_op(struct test_operation *ops)
 	ops->op_get_thermal_val = mt_op_get_thermal_val;
 	ops->op_set_cal_bypass = mt_op_set_cal_bypass;
 	ops->op_set_dpd = mt_op_set_dpd;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	ops->op_set_max_pac_ext = mt_op_set_max_pac_ext;
-#endif
 	ops->op_set_tssi = mt_op_set_tssi;
 	ops->op_set_rdd_test = mt_op_set_rdd_test;
 	ops->op_get_wf_path_comb = mt_op_get_wf_path_comb;
@@ -120,10 +111,6 @@ static s_int32 mt_serv_init_op(struct test_operation *ops)
 	ops->op_write_bulk_rf_reg = mt_op_write_bulk_rf_reg;
 	ops->op_read_bulk_eeprom = mt_op_read_bulk_eeprom;
 	ops->op_listmode_cmd = mt_op_listmode_cmd;
-	ops->op_set_efem_mode = mt_op_set_efem_mode;
-	ops->op_set_tx_gain = mt_op_set_tx_gain;
-	ops->op_set_etssi_gain = mt_op_set_etssi_gain;
-	ops->op_get_tssi_meas_dbv = mt_op_get_tssi_meas_dbv;
 
 	return SERV_STATUS_SUCCESS;
 }
@@ -379,13 +366,7 @@ s_int32 mt_serv_init_test(struct service_test *serv_test)
 		sys_ad_zero_mem(&serv_test->test_bstat,
 			sizeof(struct test_band_state));
 	} else {
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-		serv_test->test_winfo->dbdc_mode = TEST_DBDC_ENABLE;
-#else
 		serv_test->test_winfo->dbdc_mode = TEST_DBDC_DISABLE;
-#endif /* (CFG_SUPPORT_CONNAC3X == 1) */
-
 		serv_test->test_winfo->hw_tx_enable = TEST_HWTX_DISABLE;
 	}
 	ret = mt_serv_init_op(serv_test->test_op);
@@ -499,7 +480,6 @@ s_int32 mt_serv_set_channel(struct service_test *serv_test)
 	const s_int8 bw40_sel[] = { -2, 2};
 	const s_int8 bw80_sel[] = { -6, -2, 2, 6};
 	const s_int8 bw160_sel[] = { -14, -10, -6, -2, 2, 6, 10, 14};
-    const s_int8 bw320_sel[] = { -30, -26, -22, -18, -14, -10, -6, -2, 2, 6, 10, 14, 18, 22, 26, 30};
 
 	configs = &serv_test->test_config[ctrl_band_idx];
 
@@ -582,12 +562,6 @@ s_int32 mt_serv_set_channel(struct service_test *serv_test)
 
 				ch_offset = bw160_sel[pri_sel];
 				break;
-            case TEST_BW_320:
-  				if (pri_sel >= 16)
-  					goto error;
-
-  				ch_offset = bw320_sel[pri_sel];
-  				break;
 			default: /* BW_40 */
 				if (pri_sel > 1)
 					goto error;
@@ -649,14 +623,6 @@ s_int32 mt_serv_set_channel(struct service_test *serv_test)
 		ch_offset = bw160_sel[pri_sel];
 
 		break;
-    case TEST_BW_320:
-  		if (pri_sel >= 16)
-  			goto error;
-
-  		configs->ctrl_ch = channel + bw320_sel[pri_sel];
-  		ch_offset = bw320_sel[pri_sel];
-
-  		break;
 
 	default:
 		goto error3;
@@ -969,7 +935,7 @@ s_int32 mt_serv_stop_rx(struct service_test *serv_test)
 	return ret;
 }
 
-s_int32 mt_serv_set_freq_offset(struct service_test *serv_test, u_int32 type)
+s_int32 mt_serv_set_freq_offset(struct service_test *serv_test)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	u_char ctrl_band_idx = serv_test->ctrl_band_idx;
@@ -981,19 +947,10 @@ s_int32 mt_serv_set_freq_offset(struct service_test *serv_test, u_int32 type)
 
 	rf_freq_offset = configs->rf_freq_offset;
 
-	if (type == SERV_FREQ_C1) {
-		ret = ops->op_set_freq_offset(
+	ret = ops->op_set_freq_offset(
 			serv_test->test_winfo,
 			rf_freq_offset,
 			ctrl_band_idx);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	} else if (type == SERV_FREQ_C2) {
-		ret = ops->op_set_freq_offset_C2(
-			serv_test->test_winfo,
-			rf_freq_offset,
-			ctrl_band_idx);
-#endif
-	}
 
 	if (ret)
 		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
@@ -1063,27 +1020,17 @@ error:
 }
 
 s_int32 mt_serv_get_freq_offset(
-	struct service_test *serv_test, u_int32 type, u_int32 *freq_offset)
+	struct service_test *serv_test, u_int32 *freq_offset)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	u_char ctrl_band_idx = serv_test->ctrl_band_idx;
 	struct test_operation *ops;
 
 	ops = serv_test->test_op;
-
-	if (type == SERV_FREQ_C1) {
-		ret = ops->op_get_freq_offset(
+	ret = ops->op_get_freq_offset(
 			serv_test->test_winfo,
 			ctrl_band_idx,
 			freq_offset);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	} else if (type == SERV_FREQ_C2) {
-		ret = ops->op_get_freq_offset_C2(
-			serv_test->test_winfo,
-			ctrl_band_idx,
-			freq_offset);
-#endif
-	}
 
 	if (ret)
 		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
@@ -1095,19 +1042,17 @@ s_int32 mt_serv_get_freq_offset(
 s_int32 mt_serv_get_cfg_on_off(
 	struct service_test *serv_test,
 	u_int32 type,
-	u_int32 band_idx,
-	u_int32 ch_band,
 	u_int32 *result)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
+	u_char ctrl_band_idx = serv_test->ctrl_band_idx;
 	struct test_operation *ops;
 
 	ops = serv_test->test_op;
 	ret = ops->op_get_cfg_on_off(
 			serv_test->test_winfo,
+			ctrl_band_idx,
 			type,
-			band_idx,
-			ch_band,
 			result);
 
 	if (ret)
@@ -1210,27 +1155,6 @@ s_int32 mt_serv_set_dpd(
 
 	return ret;
 }
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-s_int32 mt_serv_set_max_pac_ext(
-	struct service_test *serv_test,
-	u_int32 max_pac_ext)
-{
-	s_int32 ret = SERV_STATUS_SUCCESS;
-	struct test_operation *ops;
-
-	ops = serv_test->test_op;
-	ret = ops->op_set_max_pac_ext(
-			serv_test->test_winfo,
-			max_pac_ext);
-
-	if (ret)
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
-			("%s: err=0x%08x\n", __func__, ret));
-
-	return ret;
-}
-#endif
 
 s_int32 mt_serv_set_tssi(
 	struct service_test *serv_test,
@@ -1786,32 +1710,7 @@ s_int32 mt_serv_get_band_mode(
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
 	u_char ctrl_band_idx = serv_test->ctrl_band_idx;
-	u_int32 band_type = TEST_BAND_TYPE_UNUSE;
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	struct test_capability capability;
-
-	/* get content */
-	ret = mt_serv_get_capability(serv_test, &capability);
-
-	if (ret == SERV_STATUS_SUCCESS) {
-		switch (ctrl_band_idx) {
-		case TEST_DBDC_BAND0:
-			band_type = capability.ph_cap.channel_band_dbdc & 0xFF;
-			break;
-		case TEST_DBDC_BAND1:
-			band_type = (capability.ph_cap.channel_band_dbdc >> 16) & 0xFF;
-			break;
-		case TEST_DBDC_BAND2:
-			band_type = capability.ph_cap.channel_band_dbdc_ext & 0xFF;
-			break;
-		case TEST_DBDC_BAND3:
-			band_type = (capability.ph_cap.channel_band_dbdc_ext >> 16) & 0xFF;
-			break;
-		}
-	}
-#else
-
+	u_int32 band_type;
 	struct test_operation *ops;
 
 	ops = serv_test->test_op;
@@ -1858,8 +1757,6 @@ s_int32 mt_serv_get_band_mode(
 		serv_test->test_winfo->chip_cap.support_6g)
 		band_type |= TEST_BAND_TYPE_6G;
 
-#endif /*(CFG_SUPPORT_CONNAC3X == 1)*/
-
 	SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
 		("%s: band_type=%u\n", __func__, band_type));
 
@@ -1890,23 +1787,23 @@ s_int32 mt_serv_log_on_off(
 	return ret;
 }
 
+
 s_int32 mt_serv_set_cfg_on_off(
-	struct service_test *serv_test,
-	u_int32 type,
-	u_int32 enable,
-	u_int32 band_idx,
-	u_int32 ch_band)
+	struct service_test *serv_test)
 {
 	s_int32 ret = SERV_STATUS_SUCCESS;
+	struct test_configuration *configs;
+	u_char ctrl_band_idx = serv_test->ctrl_band_idx;
 	struct test_operation *ops;
+
+	configs = &serv_test->test_config[ctrl_band_idx];
 
 	ops = serv_test->test_op;
 	ret = ops->op_set_cfg_on_off(
 			serv_test->test_winfo,
-			type,
-			enable,
-			band_idx,
-			ch_band);
+			(u_int8)configs->log_type,
+			(u_int8)configs->log_enable,
+			ctrl_band_idx);
 
 	if (ret)
 		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
@@ -1961,9 +1858,6 @@ s_int32 mt_serv_get_antswap_capability(
 
 	ret = ops->op_get_antswap_capability(
 			serv_test->test_winfo,
-#if (CFG_SUPPORT_CONNAC3X == 1)
-			serv_test->ctrl_band_idx,
-#endif /* (CFG_SUPPORT_CONNAC3X == 1) */
 			antswap_support);
 
 	return ret;
@@ -2603,113 +2497,4 @@ s_int32 mt_serv_listmode_cmd(struct service_test *serv_test,
 
 	return ret;
 }
-
-s_int32 mt_serv_set_efem_mode(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 mode,
-	u_int32 level)
-{
-	s_int32 ret = SERV_STATUS_SUCCESS;
-	struct test_operation *ops;
-
-	ops = serv_test->test_op;
-	ret = ops->op_set_efem_mode(
-		serv_test->test_winfo,
-		band_idx,
-		ch_band,
-		wf_path,
-		enable,
-		mode,
-		level);
-
-	if (ret)
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
-			("%s: err=0x%08x\n", __func__, ret));
-
-	return ret;
-}
-
-s_int32 mt_serv_set_tx_gain(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_type,
-	u_int32 value)
-{
-	s_int32 ret = SERV_STATUS_SUCCESS;
-	struct test_operation *ops;
-
-	ops = serv_test->test_op;
-	ret = ops->op_set_tx_gain(
-		serv_test->test_winfo,
-		band_idx,
-		ch_band,
-		wf_path,
-		enable,
-		gain_type,
-		value);
-
-	if (ret)
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
-			("%s: err=0x%08x\n", __func__, ret));
-
-	return ret;
-}
-
-s_int32 mt_serv_set_etssi_gain(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_value)
-{
-	s_int32 ret = SERV_STATUS_SUCCESS;
-	struct test_operation *ops;
-
-	ops = serv_test->test_op;
-	ret = ops->op_set_etssi_gain(
-		serv_test->test_winfo,
-		band_idx,
-		ch_band,
-		wf_path,
-		enable,
-		gain_value);
-
-	if (ret)
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
-			("%s: err=0x%08x\n", __func__, ret));
-
-	return ret;
-}
-
-s_int32 mt_serv_get_tssi_meas_dbv(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 wf_path,
-	u_int32 *dbv_value)
-{
-	s_int32 ret = SERV_STATUS_SUCCESS;
-	struct test_operation *ops;
-
-	ops = serv_test->test_op;
-	ret = ops->op_get_tssi_meas_dbv(
-		serv_test->test_winfo,
-		band_idx,
-		wf_path,
-		dbv_value);
-
-	if (ret)
-		SERV_LOG(SERV_DBG_CAT_TEST, SERV_DBG_LVL_ERROR,
-			("%s: err=0x%08x\n", __func__, ret));
-
-	return ret;
-}
-
 

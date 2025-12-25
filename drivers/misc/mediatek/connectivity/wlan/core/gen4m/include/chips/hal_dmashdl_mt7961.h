@@ -68,7 +68,6 @@
 *                    E X T E R N A L   R E F E R E N C E S
 ********************************************************************************
 */
-extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 
 /*******************************************************************************
 *                              C O N S T A N T S
@@ -87,7 +86,7 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
  */
 #define MT7961_DMASHDL_PKT_PSE_MAX_PAGE                (0x0)
 #define MT7961_DMASHDL_GROUP_0_REFILL_EN               (1)
-#define MT7961_DMASHDL_GROUP_1_REFILL_EN               (1)
+#define MT7961_DMASHDL_GROUP_1_REFILL_EN               (0)
 #define MT7961_DMASHDL_GROUP_2_REFILL_EN               (0)
 #define MT7961_DMASHDL_GROUP_3_REFILL_EN               (0)
 #define MT7961_DMASHDL_GROUP_4_REFILL_EN               (0)
@@ -103,7 +102,7 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 #define MT7961_DMASHDL_GROUP_14_REFILL_EN              (0)
 #define MT7961_DMASHDL_GROUP_15_REFILL_EN              (0)
 #define MT7961_DMASHDL_GROUP_0_MAX_QUOTA               (0xFFF)
-#define MT7961_DMASHDL_GROUP_1_MAX_QUOTA               (0xFFF)
+#define MT7961_DMASHDL_GROUP_1_MAX_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_2_MAX_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_3_MAX_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_4_MAX_QUOTA               (0x0)
@@ -119,7 +118,7 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 #define MT7961_DMASHDL_GROUP_14_MAX_QUOTA              (0x0)
 #define MT7961_DMASHDL_GROUP_15_MAX_QUOTA              (0x0)
 #define MT7961_DMASHDL_GROUP_0_MIN_QUOTA               (0x3)
-#define MT7961_DMASHDL_GROUP_1_MIN_QUOTA               (0x3)
+#define MT7961_DMASHDL_GROUP_1_MIN_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_2_MIN_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_3_MIN_QUOTA               (0x0)
 #define MT7961_DMASHDL_GROUP_4_MIN_QUOTA               (0x0)
@@ -138,10 +137,10 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 #define MT7961_DMASHDL_QUEUE_1_TO_GROUP                (0x0)   /* LMAC AC01 */
 #define MT7961_DMASHDL_QUEUE_2_TO_GROUP                (0x0)   /* LMAC AC02 */
 #define MT7961_DMASHDL_QUEUE_3_TO_GROUP                (0x0)   /* LMAC AC03 */
-#define MT7961_DMASHDL_QUEUE_4_TO_GROUP                (0x1)   /* LMAC AC10 */
-#define MT7961_DMASHDL_QUEUE_5_TO_GROUP                (0x1)   /* LMAC AC11 */
-#define MT7961_DMASHDL_QUEUE_6_TO_GROUP                (0x1)   /* LMAC AC12 */
-#define MT7961_DMASHDL_QUEUE_7_TO_GROUP                (0x1)   /* LMAC AC13 */
+#define MT7961_DMASHDL_QUEUE_4_TO_GROUP                (0x0)   /* LMAC AC10 */
+#define MT7961_DMASHDL_QUEUE_5_TO_GROUP                (0x0)   /* LMAC AC11 */
+#define MT7961_DMASHDL_QUEUE_6_TO_GROUP                (0x0)   /* LMAC AC12 */
+#define MT7961_DMASHDL_QUEUE_7_TO_GROUP                (0x0)   /* LMAC AC13 */
 #define MT7961_DMASHDL_QUEUE_8_TO_GROUP                (0x0)   /* LMAC AC20 */
 #define MT7961_DMASHDL_QUEUE_9_TO_GROUP                (0x0)   /* LMAC AC21 */
 #define MT7961_DMASHDL_QUEUE_10_TO_GROUP               (0x0)   /* LMAC AC22 */
@@ -182,17 +181,6 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 #define MT7961_DMASHDL_PRIORITY13_GROUP                (0xD)
 #define MT7961_DMASHDL_PRIORITY14_GROUP                (0xE)
 #define MT7961_DMASHDL_PRIORITY15_GROUP                (0xF)
-#ifdef MT7922
-/* PLE Quota 0x3D0*/
-#define MT7961_DMASHDL_DBDC_5G_MAX_QUOTA               (0x1E8)
-#define MT7961_DMASHDL_DBDC_2G_MAX_QUOTA               (0x1E8)
-#define MT7961_DMASHDL_DBDC_5G_6G_MAX_QUOTA            (0x1E8)
-#else
-/*TODO: fine tune*/
-#define MT7961_DMASHDL_DBDC_5G_MAX_QUOTA               (0xFFF)
-#define MT7961_DMASHDL_DBDC_2G_MAX_QUOTA               (0xFFF)
-#define MT7961_DMASHDL_DBDC_5G_6G_MAX_QUOTA            (0xFFF)
-#endif
 
 #elif defined(_HIF_USB)
 
@@ -301,21 +289,8 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 #define MT7961_DMASHDL_PRIORITY13_GROUP                (0xD)
 #define MT7961_DMASHDL_PRIORITY14_GROUP                (0xE)
 #define MT7961_DMASHDL_PRIORITY15_GROUP                (0xF)
-#if (CFG_WIFI_FWDL_UMAC_RESERVE_SIZE_PARA == 128)
-/* PSE quota 169*/
-#define MT7961_DMASHDL_DBDC_5G_MAX_QUOTA               (0x38)
-#define MT7961_DMASHDL_DBDC_2G_MAX_QUOTA               (0x1C)
-#define MT7961_DMASHDL_DBDC_5G_6G_MAX_QUOTA            (0x2A)
-#else
-/* PSE quota 212*/
-#define MT7961_DMASHDL_DBDC_5G_MAX_QUOTA               (0x46)
-#define MT7961_DMASHDL_DBDC_2G_MAX_QUOTA               (0x24)
-#define MT7961_DMASHDL_DBDC_5G_6G_MAX_QUOTA            (0x35)
-#endif
-#endif /* defined(_HIF_PCIE) || defined(_HIF_AXI) */
 
-#define MT7961_DMASHDL_QUEUE_NUM        32
-#define MT7961_DMASHDL_PRIORITY_NUM     16
+#endif /* defined(_HIF_PCIE) || defined(_HIF_AXI) */
 
 /*******************************************************************************
 *                         D A T A   T Y P E S
@@ -358,8 +333,6 @@ struct MT7961_DMASHDL_CFG {
 ********************************************************************************
 */
 
-extern struct DMASHDL_CFG rMT7961DmashdlCfg;
-
 /*******************************************************************************
 *                           P R I V A T E   D A T A
 ********************************************************************************
@@ -380,15 +353,24 @@ extern struct DMASHDL_CFG rMT7961DmashdlCfg;
 ********************************************************************************
 */
 
+void mt7961HalDmashdlSetPlePktMaxPage(struct ADAPTER *prAdapter,
+				      uint16_t u2MaxPage);
+
+void mt7961HalDmashdlSetPsePktMaxPage(struct ADAPTER *prAdapter,
+				      uint16_t u2MaxPage);
+
+void mt7961HalDmashdlSetRefill(struct ADAPTER *prAdapter, uint8_t ucGroup,
+			       u_int8_t fgEnable);
+
+void mt7961HalDmashdlSetMaxQuota(struct ADAPTER *prAdapter, uint8_t ucGroup,
+				 uint16_t u2MaxQuota);
+
+void mt7961HalDmashdlSetMinQuota(struct ADAPTER *prAdatper, uint8_t ucGroup,
+				 uint16_t u2MinQuota);
+
+void mt7961HalDmashdlSetQueueMapping(struct ADAPTER *prAdapter, uint8_t ucQueue,
+				     uint8_t ucGroup);
+
 void mt7961DmashdlInit(struct ADAPTER *prAdapter);
 
-void mt7961DmashdlReInit(struct ADAPTER *prAdapter);
-
-#if defined(_HIF_PCIE) || defined(_HIF_AXI) || defined(_HIF_USB)
-uint32_t mt7961UpdateDmashdlQuota(struct ADAPTER *prAdapter,
-			uint8_t ucWmmIndex, uint32_t u4MaxQuota);
-
-uint32_t mt7961dmashdlQuotaDecision(struct ADAPTER *prAdapter,
-			uint8_t ucWmmIndex);
-#endif
 #endif /* _HAL_DMASHDL_MT7961_H */

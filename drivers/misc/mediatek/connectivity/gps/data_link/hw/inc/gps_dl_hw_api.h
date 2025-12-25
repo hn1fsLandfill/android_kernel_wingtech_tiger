@@ -35,7 +35,6 @@ void gps_dl_hw_gps_dump_top_rf_temp_cr(void);
 
 int gps_dl_hw_gps_common_on(void);
 int gps_dl_hw_gps_common_off(void);
-void gps_dl_hw_may_set_link_power_flag(enum gps_dl_link_id_enum link_id, bool power_ctrl);
 bool gps_dl_hw_gps_force_wakeup_conninfra_top_off(bool enable);
 void gps_dl_hw_gps_sw_request_emi_usage(bool request);
 void gps_dl_hw_gps_sw_request_peri_usage(bool request);
@@ -53,12 +52,10 @@ enum GDL_RET_STATUS gps_dl_hw_mcub_dsp_read_request(
 
 void gps_dl_hw_set_gps_emi_remapping(unsigned int _20msb_of_36bit_phy_addr);
 unsigned int gps_dl_hw_get_gps_emi_remapping(void);
-
 #if GPS_DL_USE_PERI_REMAP
 void gps_dl_hw_set_gps_peri_remapping(unsigned int _20msb_of_36bit_phy_addr);
 unsigned int gps_dl_hw_get_gps_peri_remapping(void);
 #endif
-
 void gps_dl_hw_set_dma_start(enum gps_dl_hal_dma_ch_index channel,
 	struct gdl_hw_dma_transfer *p_transfer);
 
@@ -67,6 +64,18 @@ void gps_dl_hw_set_dma_stop(enum gps_dl_hal_dma_ch_index channel);
 bool gps_dl_hw_get_dma_int_status(enum gps_dl_hal_dma_ch_index channel);
 
 unsigned int gps_dl_hw_get_dma_left_len(enum gps_dl_hal_dma_ch_index channel);
+
+struct gps_dl_hw_dma_status_struct {
+	unsigned int wrap_count;
+	unsigned int wrap_to_addr;
+	unsigned int total_count;
+	unsigned int config;
+	unsigned int start_flag;
+	unsigned int intr_flag;
+	unsigned int left_count;
+	unsigned int curr_addr;
+	unsigned int state;
+};
 
 void gps_dl_hw_save_dma_status_struct(
 	enum gps_dl_hal_dma_ch_index ch, struct gps_dl_hw_dma_status_struct *p);
@@ -102,14 +111,6 @@ struct gps_dl_hw_link_status_struct {
 	bool usrt_has_nodata;
 	bool rx_dma_done;
 	bool tx_dma_done;
-};
-
-struct gps_dl_hw_mvcd_gps_bootup_info {
-	unsigned int code_size;
-	unsigned int start_addr;
-	unsigned int exec_addr;
-	unsigned int cipher_key;
-	unsigned int frag_num;
 };
 
 void gps_dl_hw_get_link_status(
@@ -160,9 +161,6 @@ void gps_dl_hw_disclaim_pta_used_by_gps(void);
 void gps_dl_hw_set_pta_blanking_parameter(bool use_direct_path);
 
 unsigned int gps_dl_hw_get_mcub_a2d1_cfg(enum gps_dl_link_id_enum link_id, bool is_1byte_mode);
-bool gps_dl_hw_gps_get_bootup_info(enum gps_dl_link_id_enum link_id,
-	bool is_cw_dsp, struct gps_dl_hw_mvcd_gps_bootup_info *bootup_info);
-bool gps_dl_hw_gps_send_dsp_fragement_num(enum gps_dl_link_id_enum link_id, bool is_cw_dsp, unsigned int fragement_num);
 
 #endif /* _GPS_DL_HW_API_H */
 

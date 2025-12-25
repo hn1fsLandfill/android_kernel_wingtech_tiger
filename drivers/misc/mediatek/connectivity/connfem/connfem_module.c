@@ -41,12 +41,11 @@ static int connfem_plat_probe(struct platform_device *pdev);
 static int connfem_plat_remove(struct platform_device *pdev);
 
 static long connfem_dev_unlocked_ioctl(struct file *filp, unsigned int cmd,
-					unsigned long arg);
+				       unsigned long arg);
 #ifdef CONFIG_COMPAT
 static long connfem_dev_compat_ioctl(struct file *filp, unsigned int cmd,
-					unsigned long arg);
+				     unsigned long arg);
 #endif
-
 /*******************************************************************************
  *			    P U B L I C   D A T A
  ******************************************************************************/
@@ -70,11 +69,8 @@ struct connfem_context connfem_ctx_mt6879 = {
 struct connfem_context connfem_ctx_mt6895 = {
 	.id = 0x6895
 };
-struct connfem_context connfem_ctx_mt6985 = {
-	.id = 0x6985
-};
-struct connfem_context connfem_ctx_mt6886 = {
-	.id = 0x6886
+struct connfem_context connfem_ctx_mt6877 = {
+	.id = 0x6877
 };
 
 static const struct of_device_id connfem_of_ids[] = {
@@ -95,12 +91,8 @@ static const struct of_device_id connfem_of_ids[] = {
 		.data = (void *)&connfem_ctx_mt6895
 	},
 	{
-		.compatible = "mediatek,mt6985-connfem",
-		.data = (void *)&connfem_ctx_mt6985
-	},
-	{
-		.compatible = "mediatek,mt6886-connfem",
-		.data = (void *)&connfem_ctx_mt6886
+		.compatible = "mediatek,mt6877-connfem",
+		.data = (void *)&connfem_ctx_mt6877
 	},
 	{}
 };
@@ -131,7 +123,6 @@ static const struct file_operations connfem_dev_fops = {
 /* Module Parameters */
 static unsigned int connfem_major;
 static unsigned int epa_elna_hwid = CFM_PARAM_EPAELNA_HWID_INVALID;
-static char *config_file;
 
 /*******************************************************************************
  *			      F U N C T I O N S
@@ -181,55 +172,11 @@ static int cfm_ioc_is_available_hdlr(unsigned long usr_arg)
 	return 0;
 }
 
-static int cfm_ioc_epa_cont_empty(uint64_t usr_cont)
-{
-	struct cfm_container empty;
-
-	empty.cnt = 0;
-	empty.entry_sz = 0;
-
-	if (copy_to_user((void *)usr_cont, &empty, sizeof(empty)) != 0) {
-		pr_info("%s, copy_to_user failed", __func__);
-		return -EINVAL;
-	}
-	return 0;
-}
-
-static int cfm_ioc_epa_cont_trans(struct cfm_container *cont,
-				  unsigned int usr_cnt,
-				  unsigned int usr_entry_sz,
-				  uint64_t usr_cont)
-{
-	unsigned int sz;
-
-	if (!cont) {
-		pr_info("%s, no cont, set container size to 0", __func__);
-		return cfm_ioc_epa_cont_empty(usr_cont);
-	}
-
-	if (usr_cnt < cont->cnt || usr_entry_sz != cont->entry_sz) {
-		pr_info("%s, not enough space, user(%d*%d) < need(%d*%d)",
-			__func__,
-			usr_cnt, usr_entry_sz,
-			cont->cnt, cont->entry_sz);
-		return -ENOMEM;
-	}
-
-	sz = sizeof(struct cfm_container) + (cont->cnt * cont->entry_sz);
-	if (copy_to_user((void *)usr_cont, cont, sz) != 0) {
-		pr_info("%s, copy_to_user failed", __func__);
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-
 static int cfm_ioc_epa_fn_stat_hdlr(unsigned long usr_arg)
 {
 	int err = 0;
 	struct cfm_ioc_epa_fn_stat data;
-	struct cfm_container *pairs = NULL;
+	struct cfm_container *names = NULL;
 
 	if (!usr_arg) {
 		pr_info("%s, invalid parameter", __func__);
@@ -244,7 +191,8 @@ static int cfm_ioc_epa_fn_stat_hdlr(unsigned long usr_arg)
 	data.cnt = 0;
 	data.entry_sz = 0;
 
-	if (data.subsys >= CONNFEM_SUBSYS_NUM) {
+	if (data.subsys != CONNFEM_SUBSYS_WIFI &&
+	    data.subsys != CONNFEM_SUBSYS_BT) {
 		pr_info("%s, unsupported subsys %d", __func__, data.subsys);
 		err = -EINVAL;
 		goto fn_stat_done;
@@ -257,15 +205,15 @@ static int cfm_ioc_epa_fn_stat_hdlr(unsigned long usr_arg)
 		goto fn_stat_done;
 	}
 
-	pairs = connfem_ctx->epaelna.flags_cfg[data.subsys].pairs;
-	if (!pairs) {
+	names = connfem_ctx->epaelna.flags_cfg[data.subsys].names;
+	if (!names) {
 		pr_info("%s, %d '%s', no flags",
 			__func__,
 			data.subsys,
 			cfm_subsys_name[data.subsys]);
 	} else {
-		data.cnt = pairs->cnt;
-		data.entry_sz = CONNFEM_FLAG_NAME_SIZE;
+		data.cnt = names->cnt;
+		data.entry_sz = names->entry_sz;
 	}
 
 	pr_info("%s, %d '%s', return cnt:%d, entry_sz:%d",
@@ -281,21 +229,56 @@ fn_stat_done:
 	return err;
 }
 
+static int cfm_ioc_epa_fn_empty(uint64_t usr_names)
+{
+	struct cfm_container empty;
+
+	empty.cnt = 0;
+	empty.entry_sz = 0;
+
+	if (copy_to_user((void *)usr_names, &empty, sizeof(empty)) != 0) {
+		pr_info("%s, copy_to_user failed", __func__);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int cfm_ioc_epa_fn_trans(struct cfm_container *names,
+				unsigned int usr_cnt,
+				unsigned int usr_entry_sz,
+				uint64_t usr_names)
+{
+	unsigned int sz;
+
+	if (!names) {
+		pr_info("%s, no flags, set container size to 0", __func__);
+		return cfm_ioc_epa_fn_empty(usr_names);
+	}
+
+	if (usr_cnt < names->cnt || usr_entry_sz < names->entry_sz) {
+		pr_info("%s, not enough space, user(%d*%d) < need(%d*%d)",
+			__func__,
+			usr_cnt, usr_entry_sz,
+			names->cnt, names->entry_sz);
+		return -ENOMEM;
+	}
+
+	sz = sizeof(struct cfm_container) + (names->cnt * names->entry_sz);
+	if (copy_to_user((void *)usr_names, names, sz) != 0) {
+		pr_info("%s, copy_to_user failed #2", __func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int cfm_ioc_epa_fn_hdlr(unsigned long usr_arg)
 {
-	/* status & control variables */
 	int err = 0;
-	unsigned int i;
 
-	/* user data variables */
 	struct cfm_ioc_epa_fn data;
-	struct cfm_container names_hdr;
-	struct cfm_container *names;
-	char *name;
-
-	/* kernel data variables */
-	struct cfm_container *subsys_pairs;
-	struct connfem_epaelna_flag_pair *pair;
+	struct cfm_container names;
+	struct cfm_container *subsys_names;
 
 	if (!usr_arg) {
 		pr_info("%s, invalid parameter", __func__);
@@ -313,15 +296,16 @@ static int cfm_ioc_epa_fn_hdlr(unsigned long usr_arg)
 		return -EINVAL;
 	}
 
-	if (copy_from_user(&names_hdr, (void *)data.names,
+	if (copy_from_user(&names, (void *)data.names,
 			   sizeof(struct cfm_container)) != 0) {
 		pr_info("%s, copy_from_user failed", __func__);
 		return -EINVAL;
 	}
 
-	if (data.subsys >= CONNFEM_SUBSYS_NUM) {
+	if (data.subsys != CONNFEM_SUBSYS_WIFI &&
+	    data.subsys != CONNFEM_SUBSYS_BT) {
 		pr_info("%s, unsupported subsys %d", __func__, data.subsys);
-		cfm_ioc_epa_cont_empty(data.names);
+		cfm_ioc_epa_fn_empty(data.names);
 		return -EINVAL;
 	}
 
@@ -334,45 +318,11 @@ static int cfm_ioc_epa_fn_hdlr(unsigned long usr_arg)
 	pr_info("%s, %d '%s'",
 		__func__, data.subsys, cfm_subsys_name[data.subsys]);
 
-	subsys_pairs = connfem_ctx->epaelna.flags_cfg[data.subsys].pairs;
-
-	if (names_hdr.cnt < subsys_pairs->cnt ||
-	    names_hdr.entry_sz != CONNFEM_FLAG_NAME_SIZE) {
-		pr_info("%s, not enough space, user(%d*%d) < need(%d*%d)",
-			__func__,
-			names_hdr.cnt, names_hdr.entry_sz,
-			subsys_pairs->cnt, CONNFEM_FLAG_NAME_SIZE);
-		return -ENOMEM;
-	}
-
-	names = cfm_container_alloc(subsys_pairs->cnt, CONNFEM_FLAG_NAME_SIZE);
-	if (!names)
-		return -ENOMEM;
-
-	for (i = 0; i < subsys_pairs->cnt; i++) {
-		pair = (struct connfem_epaelna_flag_pair*)
-				cfm_container_entry(subsys_pairs, i);
-		name = (char*)cfm_container_entry(names, i);
-
-		if (!pair || !name) {
-			pr_info("%s, unexpected %d/%d pair %p, name %p",
-				__func__,
-				i,
-				subsys_pairs->cnt,
-				pair,
-				name);
-			break;
-		}
-		memcpy(name, pair->name, CONNFEM_FLAG_NAME_SIZE);
-	}
-
-	err = cfm_ioc_epa_cont_trans(names,
-				     names_hdr.cnt,
-				     names_hdr.entry_sz,
-				     data.names);
-	cfm_container_free(names);
-	names = NULL;
-	return err;
+	subsys_names = connfem_ctx->epaelna.flags_cfg[data.subsys].names;
+	return cfm_ioc_epa_fn_trans(subsys_names,
+				    names.cnt,
+				    names.entry_sz,
+				    data.names);
 }
 
 static int cfm_ioc_epa_info_hdlr(unsigned long usr_arg)
@@ -399,114 +349,6 @@ static int cfm_ioc_epa_info_hdlr(unsigned long usr_arg)
 	return 0;
 }
 
-static int cfm_ioc_epa_flags_stat_hdlr(unsigned long usr_arg)
-{
-	int err = 0;
-	struct cfm_ioc_epa_flags_stat data;
-	struct cfm_container *pairs = NULL;
-
-	if (!usr_arg) {
-		pr_info("%s, invalid parameter", __func__);
-		return -EINVAL;
-	}
-
-	if (copy_from_user(&data, (void *)usr_arg, sizeof(data)) != 0) {
-		pr_info("%s, copy_from_user failed", __func__);
-		return -EINVAL;
-	}
-
-	data.cnt = 0;
-	data.entry_sz = 0;
-
-	if (data.subsys >= CONNFEM_SUBSYS_NUM) {
-		pr_info("%s, unsupported subsys %d", __func__, data.subsys);
-		err = -EINVAL;
-		goto flags_stat_done;
-	}
-
-	if (!connfem_ctx) {
-		pr_info("[WARN] %s, %d '%s', No ConnFem context",
-			__func__, data.subsys, cfm_subsys_name[data.subsys]);
-		err = -EOPNOTSUPP;
-		goto flags_stat_done;
-	}
-
-	pairs = connfem_ctx->epaelna.flags_cfg[data.subsys].pairs;
-	if (!pairs) {
-		pr_info("%s, %d '%s', no flags",
-			__func__,
-			data.subsys,
-			cfm_subsys_name[data.subsys]);
-	} else {
-		data.cnt = pairs->cnt;
-		data.entry_sz = pairs->entry_sz;
-	}
-
-	pr_info("%s, %d '%s', return cnt:%d, entry_sz:%d",
-		__func__, data.subsys, cfm_subsys_name[data.subsys],
-		data.cnt, data.entry_sz);
-
-flags_stat_done:
-	if (copy_to_user((void *)usr_arg, &data, sizeof(data)) != 0) {
-		pr_info("%s, copy_to_user failed", __func__);
-		return -EINVAL;
-	}
-
-	return err;
-}
-
-static int cfm_ioc_epa_flags_hdlr(unsigned long usr_arg)
-{
-	int err = 0;
-	struct cfm_ioc_epa_flags data;
-	struct cfm_container pairs;
-	struct cfm_container *subsys_pairs;
-
-	if (!usr_arg) {
-		pr_info("%s, invalid parameter", __func__);
-		return -EINVAL;
-	}
-
-	err = copy_from_user(&data, (void *)usr_arg, sizeof(data));
-	if (err != 0) {
-		pr_info("%s, copy_from_user failed", __func__);
-		return -EINVAL;
-	}
-
-	if (!data.pairs) {
-		pr_info("%s, invalid parameter, pairs is NULL", __func__);
-		return -EINVAL;
-	}
-
-	if (copy_from_user(&pairs, (void *)data.pairs,
-			   sizeof(struct cfm_container)) != 0) {
-		pr_info("%s, copy_from_user failed", __func__);
-		return -EINVAL;
-	}
-
-	if (data.subsys >= CONNFEM_SUBSYS_NUM) {
-		pr_info("%s, unsupported subsys %d", __func__, data.subsys);
-		cfm_ioc_epa_cont_empty(data.pairs);
-		return -EINVAL;
-	}
-
-	if (!connfem_ctx) {
-		pr_info("[WARN] %s, %d '%s', No ConnFem context",
-			__func__, data.subsys, cfm_subsys_name[data.subsys]);
-		return -EOPNOTSUPP;
-	}
-
-	pr_info("%s, %d '%s'",
-		__func__, data.subsys, cfm_subsys_name[data.subsys]);
-
-	/* Updating flags pairs */
-	subsys_pairs = connfem_ctx->epaelna.flags_cfg[data.subsys].pairs;
-	return cfm_ioc_epa_cont_trans(subsys_pairs,
-				      pairs.cnt,
-				      pairs.entry_sz,
-				      data.pairs);
-}
-
 static long connfem_dev_unlocked_ioctl(struct file *filp, unsigned int cmd,
 				       unsigned long arg)
 {
@@ -527,14 +369,6 @@ static long connfem_dev_unlocked_ioctl(struct file *filp, unsigned int cmd,
 
 	case CFM_IOC_EPA_INFO:
 		err = cfm_ioc_epa_info_hdlr(arg);
-		break;
-
-	case CFM_IOC_EPA_FLAGS_STAT:
-		err = cfm_ioc_epa_flags_stat_hdlr(arg);
-		break;
-
-	case CFM_IOC_EPA_FLAGS:
-		err = cfm_ioc_epa_flags_hdlr(arg);
 		break;
 
 	default:
@@ -559,11 +393,6 @@ static int connfem_plat_probe(struct platform_device *pdev)
 {
 	struct connfem_context *cfm = NULL;
 	int err = 0;
-
-	if (connfem_ctx && connfem_ctx->epaelna.available == true) {
-		pr_info("Config file parse done, no need to parse from device tree");
-		goto probe_end;
-	}
 
 	cfm = (struct connfem_context *)of_device_get_match_data(&pdev->dev);
 	if (!cfm) {
@@ -604,8 +433,6 @@ static int connfem_plat_probe(struct platform_device *pdev)
 		 *   // goto probe_end;
 		 */
 	}
-
-	cfm->src = CFM_SRC_DEVICE_TREE;
 
 	if (connfem_ctx) {
 		pr_info("Failed to register '%s' context, '%s' exists",
@@ -653,13 +480,8 @@ static int __init connfem_mod_init(void)
 
 	pr_info("Internal load: %d", connfem_is_internal());
 
-	cfm_cfg_process(config_file);
-
 	/* Init global context */
 	memset(&connfem_cdev_ctx, 0, sizeof(struct connfem_cdev_context));
-
-	if (connfem_ctx && connfem_ctx->epaelna.available == true)
-		connfem_cdev_ctx.cfm = connfem_ctx;
 
 	/* Platform device */
 	ret = platform_driver_register(&connfem_plat_drv);
@@ -763,4 +585,3 @@ MODULE_AUTHOR("Dennis Lin <dennis.lin@mediatek.com>");
 MODULE_AUTHOR("Brad Chou <brad.chou@mediatek.com>");
 module_param(connfem_major, uint, 0644);
 module_param(epa_elna_hwid, uint, 0644);
-module_param(config_file, charp, 0644);

@@ -18,15 +18,13 @@
 /* Service DBDC configuration */
 #define TEST_DBDC_BAND0		0
 #define TEST_DBDC_BAND1		1
-#define TEST_DBDC_BAND2		2	/* CFG_SUPPORT_CONNAC3X */
-#define TEST_DBDC_BAND3		3
 
 /* #ifdef DBDC_MODE  */
 #if 1
 #define SET_TEST_DBDC(_test_winfo, _boolean)	\
 	(_test_winfo->dbdc_mode = _boolean)
 #define IS_TEST_DBDC(_test_winfo)	_test_winfo->dbdc_mode
-#define TEST_DBDC_BAND_NUM		4	/* CFG_SUPPORT_CONNAC3X */
+#define TEST_DBDC_BAND_NUM		2
 #else
 #define IS_TEST_DBDC(_test_winfo)	FALSE
 #define TEST_DBDC_BAND_NUM		1
@@ -151,10 +149,6 @@
 #else
 #define MAX_MULTI_TX_STA 2
 #endif
-#define NET_UNI_TM_MAX_BAND_NUM 4
-#define NET_UNI_TM_MAX_ANT_NUM 8
-#define NET_UNI_TM_MAX_USER_NUM 16
-
 
 /*****************************************************************************
  *	Enum value definition
@@ -285,12 +279,6 @@ enum test_bw_type {
 	TEST_BW_5,
 	TEST_BW_160C,
 	TEST_BW_160NC,
-	TEST_BW_0_5,
-	TEST_BW_1,
-	TEST_BW_6,
-	TEST_BW_7,
-	TEST_BW_8,
-	TEST_BW_320,
 	TEST_BW_NUM
 };
 
@@ -322,12 +310,6 @@ enum test_phy_mode_type {
 	TEST_MODE_HE_TB,
 	TEST_MODE_HE_MU,
 	TEST_MODE_VHT_MIMO,
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	TEST_MODE_EHT_MU_DL_SU,
-	TEST_MODE_EHT_MU_UL_SU,
-	TEST_MODE_EHT_MU_DL_OFDMA = 15,
-	TEST_MODE_EHT_TB_UL_OFDMA,
-#endif
 	TEST_MODE_NUM
 };
 
@@ -575,10 +557,6 @@ struct test_rx_stat_band_info {
 	u_int32 phy_rx_tag_err_ofdm;
 	u_int32 phy_rx_mdrdy_cnt_cck;
 	u_int32 phy_rx_mdrdy_cnt_ofdm;
-#if (CFG_SUPPORT_CONNAC3X == 1) /* band info v1*/
-	u_int32 aci_hit_low;
-	u_int32 aci_hit_high;
-#endif
 };
 
 /* Test rx stat path info */
@@ -589,9 +567,6 @@ struct test_rx_stat_path_info {
 	u_int32 fagc_wb_rssi;
 	u_int32 inst_ib_rssi;
 	u_int32 inst_wb_rssi;
-#if (CFG_SUPPORT_CONNAC3X == 1) /* path_info v1 */
-	u_int32 adc_rssi;
-#endif
 };
 
 /* Test rx stat user info */
@@ -604,17 +579,12 @@ struct test_rx_stat_user_info {
 /* Test rx stat comm info */
 struct test_rx_stat_comm_info {
 	u_int32 rx_fifo_full;
-#if (CFG_SUPPORT_CONNAC3X == 0) /* comm_info v0 */
 	u_int32 aci_hit_low;
 	u_int32 aci_hit_high;
-#endif
 	u_int32 mu_pkt_count;
 	u_int32 sig_mcs;
 	u_int32 sinr;
 	u_int32 driver_rx_count;
-#if (CFG_SUPPORT_CONNAC3X == 1) /* comm_info v1 */
-	u_int32 ne_var_db;
-#endif
 };
 
 /* Test rx stat */
@@ -700,107 +670,6 @@ struct GNU_PACKED test_rx_stat_leg {
 	u_int32 fcs_error_cnt[TEST_USER_NUM];
 };
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-
-struct GNU_PACKED hqa_rx_band_info
-{
-	/* mac part */
-	u_int32 u4MacRxFcsErrCnt;
-	u_int32 u4MacRxLenMisMatch;
-	u_int32 u4MacRxFcsOkCnt;
-	u_int32 u4Reserved1[2];
-	u_int32 u4MacRxMdrdyCnt;
-
-	/* phy part */
-	u_int32 u4PhyRxFcsErrCntCck;
-	u_int32 u4PhyRxFcsErrCntOfdm;
-	u_int32 u4PhyRxPdCck;
-	u_int32 u4PhyRxPdOfdm;
-	u_int32 u4PhyRxSigErrCck;
-	u_int32 u4PhyRxSfdErrCck;
-	u_int32 u4PhyRxSigErrOfdm;
-	u_int32 u4PhyRxTagErrOfdm;
-	u_int32 u4PhyRxMdrdyCntCck;
-	u_int32 u4PhyRxMdrdyCntOfdm;
-};
-
-struct GNU_PACKED hqa_rx_user_info
-{
-	u_int32 u4FreqOffsetFromRx;
-	u_int32 u4Snr;
-	u_int32 u4FcsErrorCnt;
-};
-
-struct GNU_PACKED hqa_rx_comm_info
-{
-	u_int32 u4MacRxFifoFull;
-	u_int32 u4Reserved1[2];
-
-	u_int32 u4AciHitLow;
-	u_int32 u4AciHitHigh;
-};
-
-struct GNU_PACKED hqa_rx_rxv_info
-{
-	u_int32 u4Rcpi;
-	u_int32 u4Rssi;
-	u_int32 u4Snr;
-	u_int32 u4AdcRssi;
-};
-
-struct GNU_PACKED hqa_rx_rssi_info
-{
-	u_int32 u4RssiIb;
-	u_int32 u4RssiWb;
-	u_int32 u4Reserved1[2];
-};
-
-struct GNU_PACKED hqa_rx_band_info_ext1
-{
-	/* mac part */
-	u_int32 u4RxU2MMpduCnt;
-
-	/* phy part */
-	u_int32 u4Reserved[4];
-};
-
-struct GNU_PACKED hqa_rx_comm_info_ext1
-{
-	u_int32 u4DrvRxCnt;
-	u_int32 u4Sinr;
-	u_int32 u4MuRxCnt;
-	/* mac part */
-	u_int32 u4Reserved0[4];
-
-	/* phy part */
-	u_int32 u4EhtSigMcs;
-	u_int32 u4Reserved1[3];
-};
-
-struct GNU_PACKED hqa_rx_user_info_ext1
-{
-	u_int32 u4NeVarDbAllUser;
-	u_int32 u4Reserved1[3];
-};
-
-struct GNU_PACKED hqa_m_rx_stat {
-	struct hqa_rx_band_info rInfoBand[NET_UNI_TM_MAX_BAND_NUM];
-	struct hqa_rx_band_info_ext1 rInfoBandExt1[NET_UNI_TM_MAX_BAND_NUM];
-	struct hqa_rx_comm_info rInfoComm[NET_UNI_TM_MAX_BAND_NUM];
-	struct hqa_rx_comm_info_ext1 rInfoCommExt1[NET_UNI_TM_MAX_BAND_NUM];
-
-	/* rxv part */
-	struct hqa_rx_rxv_info rInfoRXV[NET_UNI_TM_MAX_ANT_NUM];
-
-	/* RSSI */
-	struct hqa_rx_rssi_info rInfoFagc[NET_UNI_TM_MAX_ANT_NUM];
-	struct hqa_rx_rssi_info rInfoInst[NET_UNI_TM_MAX_ANT_NUM];
-
-	/* User */
-	struct hqa_rx_user_info rInfoUser[NET_UNI_TM_MAX_USER_NUM];
-	struct hqa_rx_user_info_ext1 rInfoUserExt1[NET_UNI_TM_MAX_USER_NUM];
-};
-#else
 /* For mobile temp use */
 struct GNU_PACKED hqa_m_rx_stat {
 	u_int32 mac_rx_fcs_err_cnt;
@@ -887,8 +756,6 @@ struct GNU_PACKED hqa_m_rx_stat {
 	u_int32 per1;
 };
 
-#endif
-
 struct GNU_PACKED hqa_comm_rx_stat {
 	union {
 		struct hqa_m_rx_stat r_test_m_hqa_rx_stat;
@@ -898,9 +765,8 @@ struct GNU_PACKED hqa_comm_rx_stat {
 /* Test capability */
 /* VER 0x0001: Init version */
 /* VER 0x0002: Add hw_tx support, channel_band_dbdc */
-/* VER 0x0003: CFG_SUPPORT_CONNAC3X: Add little core support, channel_band_dbdc_ext  */
 
-#define GET_CAPABILITY_VER		0x0003
+#define GET_CAPABILITY_VER		0x0002
 #define GET_CAPABILITY_TAG_NUM	2
 
 /* phy capability */
@@ -935,18 +801,13 @@ struct test_capability_ph_cap {
 
 	/* BIT0: BW20, BIT1: BW40, BIT2: BW80 */
 	/* BIT3: BW160C, BIT4: BW80+80(BW160NC) */
-	/* BIT5: BW320*/
 	u_int32 bandwidth;
 
-	/* BIT0: Band0 2.4G, BIT1: Band0 5G, BIT2: Band0 6G */
+	/* BIT0: Band0 2.4G, BIT1: Band1 5G, BIT2: Band0 6G */
 	/* BIT16: Band1 2.4G, BIT17: Band1 5G, BIT18: Band1 6G */
 	u_int32 channel_band_dbdc;
 
-	/* BIT0: Band2 2.4G, BIT1: Band2 5G, BIT2: Band2 6G */
-	/* BIT16: Band3 2.4G, BIT17: Band3 5G, BIT18: Band3 6G */
-	u_int32 channel_band_dbdc_ext;	/* CFG_SUPPORT_CONNAC3X */
-
-	u_int32 reserved[8];
+	u_int32 reserved[9];
 };
 
 struct test_capability_ext_cap {
@@ -958,8 +819,6 @@ struct test_capability_ext_cap {
 
 	/* BIT0: AntSwap */
 	/* BIT1: HW TX support */
-	/* BIT2: Little core support */
-	/* BIT3: XTAL trim support */
 	u_int32 feature1;
 	u_int32 reserved[15];
 };
@@ -1086,10 +945,6 @@ struct test_ru_info {
 	u_int8 pe_disamb;
 	s_int16 punc;
 	u_int32 l_len;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	u_int8 ps160;
-	u_int8 isEHT;
-#endif
 };
 
 struct test_tx_info {
@@ -1215,9 +1070,6 @@ struct test_configuration {
 	u_int64 hetb_rx_csd;
 	u_int8 user_idx;
 
-    /* 11be */
-	u_int16 puncture;
-
 	/* Tx power */
 	struct test_txpwr_param pwr_param;
 	s_int8 tx_pwr[TEST_ANT_NUM];
@@ -1241,8 +1093,9 @@ struct test_configuration {
 	u_int32 rate;
 	u_int32 tx_fd_mode;
 
-	/* Set log type */
+	/* Set Cfg on off */
 	u_char log_type;
+	u_char log_enable;
 
 	/* MPS related */
 	struct test_mps_cb mps_cb;
@@ -1439,9 +1292,6 @@ struct test_operation {
 		u_int8 enable, u_char band_idx, u_int32 rx_pkt_len);
 	s_int32 (*op_get_antswap_capability)(
 			struct test_wlan_info *winfos,
-#if (CFG_SUPPORT_CONNAC3X == 1)
-			u_char band_idx,
-#endif /* (CFG_SUPPORT_CONNAC3X == 1) */
 			u_int32 *antswap_support);
 	s_int32 (*op_set_antswap)(
 			struct test_wlan_info *winfos,
@@ -1449,11 +1299,6 @@ struct test_operation {
 	s_int32 (*op_set_freq_offset)(
 		struct test_wlan_info *winfos,
 		u_int32 freq_offset, u_char band_idx);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	s_int32 (*op_set_freq_offset_C2)(
-		struct test_wlan_info *winfos,
-		u_int32 freq_offset, u_char band_idx);
-#endif
 	s_int32 (*op_set_phy_counter)(
 		struct test_wlan_info *winfos,
 		s_int32 control, u_char band_idx);
@@ -1619,17 +1464,10 @@ struct test_operation {
 		struct test_wlan_info *winfos,
 		u_char band_idx,
 		u_int32 *freq_offset);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	s_int32 (*op_get_freq_offset_C2)(
-		struct test_wlan_info *winfos,
-		u_char band_idx,
-		u_int32 *freq_offset);
-#endif
 	s_int32 (*op_get_cfg_on_off)(
 		struct test_wlan_info *winfos,
+		u_char band_idx,
 		u_int32 type,
-		u_int32 band_idx,
-		u_int32 ch_band,
 		u_int32 *result);
 	s_int32 (*op_get_tx_tone_pwr)(
 		struct test_wlan_info *winfos,
@@ -1670,19 +1508,11 @@ struct test_operation {
 		u_int32 cal_item);
 	s_int32 (*op_set_cfg_on_off)(
 		struct test_wlan_info *winfos,
-		u_int32 type,
-		u_int32 enable,
-		u_int32 band_idx,
-		u_int32 ch_band);
+		u_int8 type, u_int8 enable, u_char band_idx);
 	s_int32 (*op_set_dpd)(
 		struct test_wlan_info *winfos,
 		u_int32 on_off,
 		u_int32 wf_sel);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	s_int32 (*op_set_max_pac_ext)(
-		struct test_wlan_info *winfos,
-		u_int32 mac_pac_ext);
-#endif
 	s_int32 (*op_set_tssi)(
 		struct test_wlan_info *winfos,
 		u_int32 on_off,
@@ -1771,35 +1601,8 @@ struct test_operation {
 		u_int16 para_len,
 		u_int32 *rsp_len,
 		void *rsp_data);
-	s_int32 (*op_set_efem_mode)(
-		struct test_wlan_info *winfos,
-		u_int32 band_idx,
-		u_int32 ch_band,
-		u_int32 wf_path,
-		u_int32 enable,
-		u_int32 mode,
-		u_int32 level);
-	s_int32 (*op_set_tx_gain)(
-		struct test_wlan_info *winfos,
-		u_int32 band_idx,
-		u_int32 ch_band,
-		u_int32 wf_path,
-		u_int32 enable,
-		u_int32 gain_type,
-		u_int32 value);
-	s_int32 (*op_set_etssi_gain)(
-		struct test_wlan_info *winfos,
-		u_int32 band_idx,
-		u_int32 ch_band,
-		u_int32 wf_path,
-		u_int32 enable,
-		u_int32 gain_value);
-	s_int32 (*op_get_tssi_meas_dbv)(
-		struct test_wlan_info *winfos,
-		u_int32 band_idx,
-		u_int32 wf_path,
-		u_int32 *dbv_value);
 };
+
 
 /* Test tmr for service */
 struct test_tmr_info {

@@ -65,11 +65,9 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
-#if (CFG_SUPPORT_CONNAC3X == 0)
+
 extern uint32_t u4RxStatSeqNum;
-#else
-extern uint16_t u2RxStatSeqNum;
-#endif
+
 #if CFG_SUPPORT_TX_BF
 extern union PFMU_PROFILE_TAG1 g_rPfmuTag1;
 extern union PFMU_PROFILE_TAG2 g_rPfmuTag2;
@@ -97,7 +95,6 @@ struct STA_REC_BF_UPD_ARGUMENT {
 	uint32_t u4PfmuId;
 	uint32_t u4SuMu;
 	uint32_t u4eTxBfCap;
-	uint32_t u4SoundingPhy;
 	uint32_t u4NdpaRate;
 	uint32_t u4NdpRate;
 	uint32_t u4ReptPollRate;
@@ -105,27 +102,11 @@ struct STA_REC_BF_UPD_ARGUMENT {
 	uint32_t u4Nc;
 	uint32_t u4Nr;
 	uint32_t u4Bw;
+	uint32_t u4SpeIdx;
 	uint32_t u4TotalMemReq;
 	uint32_t u4MemReq20M;
 	uint32_t au4MemRow[4];
 	uint32_t au4MemCol[4];
-	uint32_t u4SmartAnt;
-	uint32_t u4SpeIdx;
-	uint32_t u4iBfTimeOut;
-	uint32_t u4iBfDBW;
-	uint32_t u4iBfNcol;
-	uint32_t u4iBfNrow;
-	uint32_t u4NrBw160;
-	uint32_t u4NcBw160;
-	uint32_t u4RuStartIdx;
-	uint32_t u4RuEndIdx;
-	uint32_t u4TriggerSu;
-	uint32_t u4TriggerMu;
-	uint32_t u4Ng16Su;
-	uint32_t u4Ng16Mu;
-	uint32_t u4Codebook42Su;
-	uint32_t u4Codebook75Mu;
-	uint32_t u4HeLtf;
 };
 
 struct ATE_OPS_T {
@@ -147,12 +128,7 @@ struct ATE_OPS_T {
 				 uint32_t u4IQType,
 				 uint32_t u4WFNum);
 	void (*getRbistDataDumpEvent)(struct ADAPTER *prAdapter,
-					uint8_t *pucEventBuf);
-#if (CFG_SUPPORT_ICAP_SOLICITED_EVENT == 1)
-	void (*getICapDataDumpCmdEvent)(struct ADAPTER *prAdapter,
-					struct CMD_INFO *prCmdInfo,
-					uint8_t *pucEventBuf);
-#endif
+				      uint8_t *pucEventBuf);
 	void (*icapRiseVcoreClockRate)(void);
 	void (*icapDownVcoreClockRate)(void);
 	uint32_t u4EnBitWidth;/* 0:32bit, 1:96bit, 2:128bit, 3:64bit*/
@@ -239,10 +215,6 @@ int Set_TxBfProfileTag_DesiredNc(struct net_device
 				 *prNetDev, uint8_t *prInBuf);
 int Set_TxBfProfileTag_DesiredNr(struct net_device
 				 *prNetDev, uint8_t *prInBuf);
-int Set_TxBfProfileTagPartialBw(struct net_device *prNetDev,
-			    uint8_t *prInBuf);
-int Set_TxBfProfileTag_BandIdx(struct net_device *prNetDev,
-			    uint8_t *prInBuf);
 int Set_TxBfProfileTagRead(struct net_device *prNetDev,
 			   uint8_t *prInBuf);
 int Set_TxBfProfileTagWrite(struct net_device *prNetDev,
@@ -250,10 +222,6 @@ int Set_TxBfProfileTagWrite(struct net_device *prNetDev,
 int Set_StaRecCmmUpdate(struct net_device *prNetDev,
 			uint8_t *prInBuf);
 int Set_StaRecBfUpdate(struct net_device *prNetDev,
-		       uint8_t *prInBuf);
-int Set_StaRecBfRead(struct net_device *prNetDev,
-		       uint8_t *prInBuf);
-int Set_StaRecBfHeUpdate(struct net_device *prNetDev,
 		       uint8_t *prInBuf);
 
 int Set_DevInfoUpdate(struct net_device *prNetDev,

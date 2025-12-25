@@ -22,10 +22,6 @@
  *                              C O N S T A N T S
  *******************************************************************************
  */
-static uint32_t soc2_2x2_McuInit(struct ADAPTER *prAdapter);
-static void soc2_2x2_McuDeInit(struct ADAPTER *prAdapter);
-
-
 uint8_t *apucSoc2_2x2FwName[] = {
 	(uint8_t *) CFG_FW_FILENAME "_soc2_0",
 	(uint8_t *) CFG_FW_FILENAME "_soc2_2",
@@ -83,7 +79,7 @@ struct PCIE_CHIP_CR_MAPPING soc2_2x2_bus2chip_cr_mapping[] = {
 };
 #endif /* _HIF_PCIE || _HIF_AXI */
 
-void soc2_2x2ShowHifInfo(struct ADAPTER *prAdapter)
+void soc2_2x2ShowHifInfo(IN struct ADAPTER *prAdapter)
 {
 	uint32_t u4Value = 0;
 
@@ -139,10 +135,11 @@ void soc2_2x2ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 		/* Type 1. WIFI_RAM_CODE_soc1_0_1_1.bin */
 		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
 				CFG_FW_NAME_MAX_LEN,
-				"%s_%u%s_1.bin",
+				"%s_%u%s_%u.bin",
 				apucSoc2_2x2FwName[ucIdx],
 				CFG_WIFI_IP_SET,
-				aucFlavor);
+				aucFlavor,
+				1);
 		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
 			(*pucNameIdx) += 1;
 		else
@@ -153,10 +150,11 @@ void soc2_2x2ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 		/* Type 2. WIFI_RAM_CODE_soc1_0_1_1 */
 		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
 				CFG_FW_NAME_MAX_LEN,
-				"%s_%u%s_1",
+				"%s_%u%s_%u",
 				apucSoc2_2x2FwName[ucIdx],
 				CFG_WIFI_IP_SET,
-				aucFlavor);
+				aucFlavor,
+				1);
 		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
 			(*pucNameIdx) += 1;
 		else
@@ -205,7 +203,7 @@ void soc2_2x2wlanCalDebugCmd(uint32_t cmd, uint32_t para)
 	DBGLOG(RFTEST, INFO, "Cal CMD: (%d, %d) -> WMT reset\n", cmd, para);
 	mtk_wcn_wmt_do_reset_only(WMTDRV_TYPE_WIFI);
 	/* wait for reset done */
-	glResetUpdateFlag(TRUE);
+	fgIsResetting = TRUE;
 	do {
 		kalMsleep(500);
 	} while (kalIsResetting());
@@ -229,11 +227,6 @@ struct BUS_INFO soc2_2x2_bus_info = {
 	.tx_ring_fwdl_idx = 3,
 	.tx_ring_cmd_idx = 15,
 	.tx_ring0_data_idx = 0,
-	.rx_data_ring_num = 1,
-	.rx_evt_ring_num = 1,
-	.rx_data_ring_size = 512,
-	.rx_evt_ring_size = 16,
-	.rx_data_ring_prealloc_size = 512,
 	/* Make sure your HIF_TX_MSDU_TOKEN_NUM is larger enough
 	 * to support max HW(or SW) AMSDU number.
 	 */
@@ -259,9 +252,7 @@ struct BUS_INFO soc2_2x2_bus_info = {
 	.tx_ring_ext_ctrl = asicPdmaTxRingExtCtrl,
 	.rx_ring_ext_ctrl = asicPdmaRxRingExtCtrl,
 	.hifRst = NULL,
-#if defined(_HIF_PCIE)
 	.initPcieInt = NULL,
-#endif
 	.DmaShdlInit = asicPcieDmaShdlInit,
 	.setDmaIntMask = asicPdmaIntMaskConfig,
 #endif /* _HIF_PCIE || _HIF_AXI */
@@ -294,9 +285,6 @@ struct FWDL_OPS_T soc2_2x2_fw_dl_ops = {
 	.getFwInfo = wlanGetConnacFwInfo,
 	.getFwDlInfo = asicGetFwDlInfo,
 	.phyAction = NULL,
-	.downloadEMI = wlanDownloadEMISection,
-	.mcu_init = soc2_2x2_McuInit,
-	.mcu_deinit = soc2_2x2_McuDeInit,
 };
 
 struct TX_DESC_OPS_T soc2_2x2TxDescOps = {
@@ -347,7 +335,6 @@ struct CHIP_DBG_OPS soc2_2x2_debug_ops = {
 #ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 	.get_rx_rate_info = connac_get_rx_rate_info,
 #endif
-	.dumpPhyInfo = haldumpPhyInfo
 };
 
 struct mt66xx_chip_info mt66xx_chip_info_soc2_2x2 = {
@@ -404,26 +391,10 @@ struct mt66xx_chip_info mt66xx_chip_info_soc2_2x2 = {
 #if CFG_SUPPORT_MDDP_AOR
 	.isSupportMddpAOR = true,
 #endif
-#if CFG_MTK_ANDROID_WMT
-	.rEmiInfo = {
-		.type = EMI_ALLOC_TYPE_WMT,
-	},
-#endif
 };
 
 struct mt66xx_hif_driver_data mt66xx_driver_data_soc2_2x2 = {
 	.chip_info = &mt66xx_chip_info_soc2_2x2,
 };
-
-static uint32_t soc2_2x2_McuInit(struct ADAPTER *prAdapter)
-{
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(1);
-	return WLAN_STATUS_SUCCESS;
-}
-
-static void soc2_2x2_McuDeInit(struct ADAPTER *prAdapter)
-{
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(0);
-}
 
 #endif /* SOC2_2X2 */

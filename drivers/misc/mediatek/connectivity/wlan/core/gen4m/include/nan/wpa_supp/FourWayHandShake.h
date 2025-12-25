@@ -54,6 +54,7 @@
 
 extern unsigned char g_EnableHostPrintWpa;
 
+extern struct net_device *gPrDev;
 extern struct ADAPTER *g_prAdapter;
 
 /*typedef long os_time_t;*/

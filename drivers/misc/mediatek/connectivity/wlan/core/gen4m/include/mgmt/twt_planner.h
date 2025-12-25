@@ -71,25 +71,11 @@
 *                             D A T A   T Y P E S
 ********************************************************************************
 */
-#if (CFG_SUPPORT_BTWT == 1)
-enum _ENUM_BTWT_FLOW_STATE_T {
-	ENUM_BTWT_FLOW_STATE_DEFAULT = 0,
-	ENUM_BTWT_FLOW_STATE_REQUESTING,
-	ENUM_BTWT_FLOW_STATE_ACTIVATED,
-};
-#endif
 
 struct _TWT_FLOW_T {
 	struct _TWT_PARAMS_T rTWTParams;
 	struct _TWT_PARAMS_T rTWTPeerParams;
 	u_int64_t u8NextTWT;
-#if (CFG_SUPPORT_BTWT == 1)
-	uint8_t fgIsBTWT;
-	enum _ENUM_BTWT_FLOW_STATE_T eBtwtState;
-#endif
-#if (CFG_SUPPORT_802_11BE_ML_TWT == 1)
-	uint8_t fgIsMLTWT;
-#endif
 };
 
 struct _TWT_AGRT_T {
@@ -133,13 +119,6 @@ enum {
 	TWT_PARAM_ACTION_DEL = 5,
 	TWT_PARAM_ACTION_SUSPEND = 6,
 	TWT_PARAM_ACTION_RESUME = 7,
-	TWT_PARAM_ACTION_TESTBED_CONFIG = 8,
-	TWT_PARAM_ACTION_ADD_BTWT = 9,
-	TWT_PARAM_ACTION_ENABLE_ITWT = 10,
-	TWT_PARAM_ACTION_ENABLE_BTWT = 11,
-	TWT_PARAM_ACTION_ENABLE_INF_FRAME = 12,
-	TWT_PARAM_ACTION_ADD_ML_TWT_ALL_LINKS = 13,
-	TWT_PARAM_ACTION_ADD_ML_TWT_ONE_BY_ONE = 14,
 	TWT_PARAM_ACTION_MAX
 };
 
@@ -157,20 +136,6 @@ enum {
 	((ucCtrlAction) == TWT_PARAM_ACTION_SUSPEND)
 #define IS_TWT_PARAM_ACTION_RESUME(ucCtrlAction) \
 	((ucCtrlAction) == TWT_PARAM_ACTION_RESUME)
-#define IS_TWT_PARAM_ACTION_TESTBED_CONFIG(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_TESTBED_CONFIG)
-#define IS_TWT_PARAM_ACTION_ADD_BTWT(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ADD_BTWT)
-#define IS_TWT_PARAM_ACTION_ENABLE_ITWT(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ENABLE_ITWT)
-#define IS_TWT_PARAM_ACTION_ENABLE_BTWT(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ENABLE_BTWT)
-#define IS_TWT_PARAM_ACTION_ENABLE_INF_FRAME(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ENABLE_INF_FRAME)
-#define IS_TWT_PARAM_ACTION_ADD_ML_TWT_ALL_LINKS(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ADD_ML_TWT_ALL_LINKS)
-#define IS_TWT_PARAM_ACTION_ADD_ML_TWT_ONE_BY_ONE(ucCtrlAction) \
-	((ucCtrlAction) == TWT_PARAM_ACTION_ADD_ML_TWT_ONE_BY_ONE)
 
 /*******************************************************************************
 *                  F U N C T I O N   D E C L A R A T I O N S
@@ -180,11 +145,6 @@ void twtPlannerSetParams(
 	struct ADAPTER *prAdapter,
 	struct MSG_HDR *prMsgHdr);
 
-uint32_t twtPlannerSendReqTeardown(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
 uint32_t twtPlannerReset(
 	struct ADAPTER *prAdapter,
 	struct BSS_INFO *prBssInfo);
@@ -193,8 +153,7 @@ uint32_t twtPlannerReset(
 void twtPlannerTearingdown(
 	struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec,
-	uint8_t ucFlowId,
-	uint8_t *p_fgByPassNego);
+	uint8_t ucFlowId);
 #endif
 
 void twtPlannerRxNegoResult(
@@ -213,132 +172,9 @@ void twtPlannerResumeDone(
 	struct ADAPTER *prAdapter,
 	struct MSG_HDR *prMsgHdr);
 
-void twtPlannerFillResumeData(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucFlowId,
-	uint64_t u8NextTWT);
-
-uint32_t
-twtPlannerResumeAgrtTbl(struct ADAPTER *prAdapter,
-			struct BSS_INFO *prBssInfo, struct STA_RECORD *prStaRec,
-			uint8_t ucFlowId, uint8_t fgIsOid,
-			PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-			PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler);
-
 void twtPlannerRxInfoFrm(
 	struct ADAPTER *prAdapter,
 	struct MSG_HDR *prMsgHdr);
-
-void twtPlannerGetTsfDone(
-	struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo,
-	uint8_t *pucEventBuf);
-
-#if (CFG_SUPPORT_TWT_STA_CNM == 1)
-void twtPlannerGetCnmGrantedDone(
-	struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo,
-	uint8_t *pucEventBuf);
-#endif
-
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-void twtHotspotPlannerSetParams(
-	struct ADAPTER *prAdapter,
-	struct MSG_HDR *prMsgHdr);
-
-void twtHotspotPlannerSetupAgrtToFW(
-	struct ADAPTER *prAdapter,
-	struct MSG_HDR *prMsgHdr);
-
-void twtHotspotPlannerTeardownToFW(
-	struct ADAPTER *prAdapter,
-	struct MSG_HDR *prMsgHdr);
-
-uint32_t twtHotspotPlannerGetCurrentTSF(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	void *pvSetBuffer,
-	uint32_t u4SetBufferLen);
-
-void twtHotspotPlannerGetTsfDone(
-	struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo,
-	uint8_t *pucEventBuf);
-
-uint32_t
-twtHotspotPlannerAddAgrtTbl(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucFlowId,
-	uint8_t fgIsOid,
-	PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-	PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler);
-
-uint32_t
-twtHotspotPlannerTeardownSta(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucFlowId,
-	uint8_t fgIsOid,
-	PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-	PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler);
-#endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-uint32_t btwtPlannerSendReqStart(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
-uint32_t btwtPlannerSendReqTeardown(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
-void btwtPlannerTeardownDone(
-	struct ADAPTER *prAdapter,
-	struct MSG_HDR *prMsgHdr);
-
-uint32_t btwtPlannerAddAgrtTbl(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	struct STA_RECORD *prStaRec,
-	struct _TWT_PARAMS_T *prTWTParams,
-	uint8_t ucFlowId,
-	uint8_t fgIsOid,
-	PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-	PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler);
-
-void btwtPlannerDelAgrtTbl(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucFlowId);
-
-#endif
-
-#if (CFG_SUPPORT_802_11BE_ML_TWT == 1)
-uint32_t mltwtPlannerSendReqStartAllLinks(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
-uint32_t mltwtPlannerSendReqStart(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
-void mltwtPlannerRxNegoResult(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-
-void mltwtPlannerDelAgrtTbl(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTWTFlowId);
-#endif
 
 /*******************************************************************************
 *                              F U N C T I O N S

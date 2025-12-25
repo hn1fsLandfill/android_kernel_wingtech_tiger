@@ -167,7 +167,6 @@ enum TDLS_FRM_ACTION_ID {
 /* 7.3.2.62 Link Identifier element */
 #define ELEM_ID_LINK_IDENTIFIER						101
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct IE_LINK_IDENTIFIER {
 	uint8_t ucId;
 	uint8_t ucLength;
@@ -338,12 +337,6 @@ struct TDLS_CMD_CORE {
 		struct TDLS_CMD_CORE_TEST_NULL_RCV rCmdNullRcv;
 		uint8_t Reserved[TDLS_CMD_CORE_RESERVED_SIZE];
 	} Content;
-};
-
-struct TDLS_EVENT {
-	uint32_t u4HostId;
-	uint32_t u4SubId;
-	uint32_t u4StaIdx;
 };
 
 enum TDLS_EVENT_HOST_ID {

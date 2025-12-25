@@ -42,20 +42,18 @@
 void connfem_test(void)
 {
 	struct connfem_epaelna_fem_info fem_info;
-	struct connfem_epaelna_fem_info bt_fem_info;
 	struct connfem_epaelna_pin_info pin_info;
 	struct connfem_epaelna_laa_pin_info laa_pin_info;
-	struct connfem_epaelna_flags_common cm_flags;
 	struct connfem_epaelna_flags_wifi wf_flags;
 	struct connfem_epaelna_flags_bt bt_flags;
 	void *flags = NULL;
+	unsigned int num_flags = 0;
+	char **flags_names = NULL;
 	int err = 0;
 
 	memset(&fem_info, 0, sizeof(fem_info));
-	memset(&bt_fem_info, 0, sizeof(bt_fem_info));
 	memset(&pin_info, 0, sizeof(pin_info));
 	memset(&laa_pin_info, 0, sizeof(laa_pin_info));
-	memset(&cm_flags, 0, sizeof(cm_flags));
 	memset(&wf_flags, 0, sizeof(wf_flags));
 	memset(&bt_flags, 0, sizeof(bt_flags));
 
@@ -83,10 +81,6 @@ void connfem_test(void)
 	pr_info("<<< err:%d", err);
 	cfm_epaelna_feminfo_dump(&fem_info);
 
-	pr_info("connfem_epaelna_get_bt_fem_info >>>");
-	err = connfem_epaelna_get_bt_fem_info(&bt_fem_info);
-	pr_info("<<< err:%d", err);
-	cfm_epaelna_feminfo_dump(&bt_fem_info);
 
 	pr_info("connfem_epaelna_get_pin_info >>>");
 	err = connfem_epaelna_get_pin_info(&pin_info);
@@ -101,9 +95,8 @@ void connfem_test(void)
 
 
 	pr_info("connfem_epaelna_get_flags(NONE) >>>");
-	err = connfem_epaelna_get_flags(CONNFEM_SUBSYS_NONE, &cm_flags);
+	err = connfem_epaelna_get_flags(CONNFEM_SUBSYS_NONE, flags);
 	pr_info("<<< err:%d", err);
-	cfm_epaelna_flags_obj_dump(CONNFEM_SUBSYS_NONE, &cm_flags);
 
 	pr_info("connfem_epaelna_get_flags(WIFI) >>>");
 	err = connfem_epaelna_get_flags(CONNFEM_SUBSYS_WIFI, &wf_flags);
@@ -118,6 +111,39 @@ void connfem_test(void)
 	pr_info("connfem_epaelna_get_flags(NUM) >>>");
 	err = connfem_epaelna_get_flags(CONNFEM_SUBSYS_NUM, flags);
 	pr_info("<<< err:%d", err);
+
+
+	num_flags = 0;
+	flags_names = NULL;
+	pr_info("connfem_epaelna_get_flags_names(NONE) >>>");
+	err = connfem_epaelna_get_flags_names(CONNFEM_SUBSYS_NONE,
+					      &num_flags, &flags_names);
+	pr_info("<<< err:%d, num:%d, names:%p", err, num_flags, flags_names);
+
+	num_flags = 0;
+	flags_names = NULL;
+	pr_info("connfem_epaelna_get_flags_names(WIFI) >>>");
+	err = connfem_epaelna_get_flags_names(CONNFEM_SUBSYS_WIFI,
+					      &num_flags, &flags_names);
+	pr_info("<<< err:%d, num:%d, names:%p", err, num_flags, flags_names);
+	cfm_epaelna_flags_name_entries_dump(CONNFEM_SUBSYS_WIFI,
+					    num_flags, flags_names);
+
+	num_flags = 0;
+	flags_names = NULL;
+	pr_info("connfem_epaelna_get_flags_names(BT) >>>");
+	err = connfem_epaelna_get_flags_names(CONNFEM_SUBSYS_BT,
+					      &num_flags, &flags_names);
+	pr_info("<<< err:%d, num:%d, names:%p", err, num_flags, flags_names);
+	cfm_epaelna_flags_name_entries_dump(CONNFEM_SUBSYS_BT,
+					    num_flags, flags_names);
+
+	num_flags = 0;
+	flags_names = NULL;
+	pr_info("connfem_epaelna_get_flags_names(NUM) >>>");
+	err = connfem_epaelna_get_flags_names(CONNFEM_SUBSYS_NUM,
+					      &num_flags, &flags_names);
+	pr_info("<<< err:%d, num:%d, names:%p", err, num_flags, flags_names);
 
 	pr_info("%s--", __func__);
 }

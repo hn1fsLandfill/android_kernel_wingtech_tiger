@@ -124,7 +124,6 @@ enum ENUM_USB_END_POINT {
 #define USB_EVENT_TYPE                  (EVENT_EP_TYPE_UNKONW)
 
 #define USB_CMD_EP_OUT                  (USB_DATA_BULK_OUT_EP8)
-#define USB_WDT_EP_IN                   (0x86)
 #define USB_EVENT_EP_IN                 (0x85)
 #define USB_DATA_EP_IN                  (0x84)
 
@@ -148,7 +147,6 @@ enum ENUM_USB_END_POINT {
 
 #define USB_REQ_TX_CMD_CNT              (CFG_TX_MAX_CMD_PKT_NUM)
 #define USB_REQ_RX_EVENT_CNT            (1)
-#define USB_REQ_RX_WDT_CNT              (1)
 #ifdef CFG_USB_REQ_RX_DATA_CNT
 #define USB_REQ_RX_DATA_CNT             (CFG_USB_REQ_RX_DATA_CNT)	/* platform specific USB_REQ_RX_DATA_CNT */
 #else
@@ -167,22 +165,16 @@ enum ENUM_USB_END_POINT {
 					 NIC_TX_MAX_SIZE_PER_FRAME + LEN_USB_UDMA_TX_TERMINATOR)
 #endif
 #define USB_RX_EVENT_BUF_SIZE           (CFG_RX_MAX_PKT_SIZE + 3 + LEN_USB_RX_PADDING_CSO + 4)
-#define USB_RX_WDT_BUF_SIZE             (1)
 #define USB_RX_DATA_BUF_SIZE            (CFG_RX_MAX_PKT_SIZE + \
 					 min(USB_RX_AGGREGTAION_LIMIT * 1024, \
 					     (USB_RX_AGGREGTAION_PKT_LIMIT * \
 					      (CFG_RX_MAX_PKT_SIZE + 3 + LEN_USB_RX_PADDING_CSO) + 4)))
 
 #define LEN_USB_UDMA_TX_TERMINATOR      (4)	/*HW design spec */
-#ifdef CFG_USB_RX_PADDING_CSO_LEN
-#define LEN_USB_RX_PADDING_CSO          (CFG_USB_RX_PADDING_CSO_LEN)
-#else
 #define LEN_USB_RX_PADDING_CSO          (4)	/*HW design spec */
-#endif
 
 #define USB_RX_EVENT_RFB_RSV_CNT        (0)
 #define USB_RX_DATA_RFB_RSV_CNT         (4)
-#define USB_RX_WDT_RFB_RSV_CNT          (0)
 
 #define DEVICE_VENDOR_REQUEST_IN        (0xc0)
 #define DEVICE_VENDOR_REQUEST_IN_CONNAC2       (0xdF)
@@ -193,8 +185,6 @@ enum ENUM_USB_END_POINT {
 #define INTERRUPT_TIMEOUT_MS            (1000)
 #define SW_RFB_RECHECK_MS               (10)
 #define SW_RFB_LOG_LIMIT_MS             (5000)
-#define DEVICE_VENDOR_REQUEST_UHW_IN    (0xDE)
-#define DEVICE_VENDOR_REQUEST_UHW_OUT   (0x5E)
 
 /* Vendor Request */
 #define VND_REQ_POWER_ON_WIFI           (0x4)
@@ -205,12 +195,6 @@ enum ENUM_USB_END_POINT {
 #define FEATURE_SET_WVALUE_RESUME       (0x5)
 #define FEATURE_SET_WVALUE_SUSPEND      (0x6)
 #define VND_REQ_BUF_SIZE                (16)
-#define VND_REQ_UHW_READ                (0x01)
-#define VND_REQ_UHW_WRITE               (0x02)
-/* When vendor requests keep fail over this TH, bypass subsequent vendor
- * requests since chip may not work and reset is required.
- */
-#define VND_REQ_FAIL_TH                 (0x3)
 
 #define USB_TX_CMD_QUEUE_MASK           (BITS(2, 4))   /* For H2CDMA Tx CMD mapping */
 
@@ -235,20 +219,20 @@ enum ENUM_USB_END_POINT {
 enum usb_state {
 	USB_STATE_WIFI_OFF, /* Hif power off wifi */
 	USB_STATE_LINK_DOWN,
-	USB_STATE_PRE_SUSPEND,
+	USB_STATE_PRE_SUSPEND_START,
+	USB_STATE_PRE_SUSPEND_DONE,
 	USB_STATE_PRE_SUSPEND_FAIL,
 	USB_STATE_SUSPEND,
 	USB_STATE_PRE_RESUME,
-	USB_STATE_TRX_FORBID,
-	USB_STATE_LINK_UP
+	USB_STATE_LINK_UP,
+	USB_STATE_READY
 };
 
 enum usb_submit_type {
 	SUBMIT_TYPE_TX_CMD,
 	SUBMIT_TYPE_TX_DATA,
 	SUBMIT_TYPE_RX_EVENT,
-	SUBMIT_TYPE_RX_DATA,
-	SUBMIT_TYPE_RX_WDT
+	SUBMIT_TYPE_RX_DATA
 };
 
 enum EVENT_EP_TYPE {
@@ -276,20 +260,11 @@ struct GL_HIF_INFO {
 
 	struct GLUE_INFO *prGlueInfo;
 	enum usb_state state;
-	/* Use stateSyncCtrl to determine if it's allowed to send synchronous
-	 * usb control such as usb_control_msg, usb_bulk_msg, etc.
-	 * On the other hand, use state to determine if it's allowed to send
-	 * asynchronous usb control such as usb_submit_urb.
-	 */
-	enum usb_state stateSyncCtrl;
 
 	spinlock_t rTxDataQLock;
 	spinlock_t rTxCmdQLock;
 	spinlock_t rRxEventQLock;
 	spinlock_t rRxDataQLock;
-#if CFG_CHIP_RESET_SUPPORT
-	spinlock_t rRxWdtQLock;
-#endif
 	spinlock_t rStateLock;
 
 	void *prTxCmdReqHead;
@@ -297,9 +272,6 @@ struct GL_HIF_INFO {
 	void *arTxDataReqHead[USB_TC_NUM];
 	void *prRxEventReqHead;
 	void *prRxDataReqHead;
-#if CFG_CHIP_RESET_SUPPORT
-	void *prRxWdtReqHead;
-#endif
 	struct list_head rTxCmdFreeQ;
 	spinlock_t rTxCmdFreeQLock;
 	struct list_head rTxCmdSendingQ;
@@ -326,11 +298,6 @@ struct GL_HIF_INFO {
 	/*spinlock_t rRxDataCompleteQLock;*/
 	struct list_head rTxCmdCompleteQ;
 	struct list_head rTxDataCompleteQ;
-#if CFG_CHIP_RESET_SUPPORT
-	struct list_head rRxWdtFreeQ;
-	struct usb_anchor rRxWdtAnchor;
-	struct list_head rRxWdtCompleteQ;
-#endif
 
 	struct BUF_CTRL rTxCmdBufCtrl[USB_REQ_TX_CMD_CNT];
 	struct BUF_CTRL rTxDataFfaBufCtrl[USB_REQ_TX_DATA_FFA_CNT];
@@ -341,9 +308,6 @@ struct GL_HIF_INFO {
 #endif
 	struct BUF_CTRL rRxEventBufCtrl[USB_REQ_RX_EVENT_CNT];
 	struct BUF_CTRL rRxDataBufCtrl[USB_REQ_RX_DATA_CNT];
-#if CFG_CHIP_RESET_SUPPORT
-	struct BUF_CTRL rRxWdtBufCtrl[USB_REQ_RX_WDT_CNT];
-#endif
 
 	struct mutex vendor_req_sem;
 	void *vendor_req_buf;
@@ -367,56 +331,23 @@ struct BUS_INFO {
 	const uint32_t u4UdmaWlCfg_0_Addr;
 	const uint32_t u4UdmaWlCfg_1_Addr;
 	const uint32_t u4UdmaTxQsel;
-	const uint32_t u4UdmaConnInfraStatusSelAddr;
-	const uint32_t u4UdmaConnInfraStatusAddr;
 	const uint32_t u4device_vender_request_in;
 	const uint32_t u4device_vender_request_out;
 	const uint32_t u4usb_tx_cmd_queue_mask;
 	uint32_t u4UdmaWlCfg_0;
 	uint32_t u4UdmaTxTimeout; /* UDMA Tx time out limit, unit: us */
 	uint32_t u4SuspendVer;
-	struct DMASHDL_CFG *prDmashdlCfg;
-	/* Is support USB Interrupt IN Endpoint for WDT? */
-	u_int8_t fgIsSupportWdtEp;
-	/* If vendor request is fail, then increment this field.
-	 * Otherwise, reset this field to zero.
-	 */
-	uint8_t ucVndReqToMcuFailCnt;
-
 	u_int8_t (*asicUsbSuspend)(
-		struct ADAPTER *prAdapter,
-		struct GLUE_INFO *prGlueInfo);
+		IN struct ADAPTER *prAdapter,
+		IN struct GLUE_INFO *prGlueInfo);
 	u_int8_t (*asicUsbResume)(
-		struct ADAPTER *prAdapter,
-		struct GLUE_INFO *prGlueInfo);
-	uint8_t (*asicUsbEventEpDetected)(struct ADAPTER *prAdapter);
-	uint16_t (*asicUsbRxByteCount)(struct ADAPTER *prAdapter,
-		struct BUS_INFO *prBusInfo,
-		uint8_t *pRXD);
-	/* Do DMASDHL init when WIFISYS is initialized at probe, L0.5 reset,
-	 * etc.
-	 */
-	void (*DmaShdlInit)(struct ADAPTER *prAdapter);
-	/* Although DMASHDL was init, we need to reinit it again due to falcon
-	 * L1 reset, etc. Take MT7961 as example. The difference between
-	 * mt7961DmashdlInit and mt7961DmashdlReInit is that we don't init CRs
-	 * such as refill, min_quota, max_quota in mt7961DmashdlReInit, which
-	 * are backup and restored in fw. The reason why some DMASHDL CRs are
-	 * reinit by driver and some by fw is
-	 *     1. Some DMASHDL CRs shall be inited before fw releases UMAC reset
-	 *        in L1 procedure. Then, these CRs are backup and restored by fw
-	 *     2. However, the backup and restore of each DMASHDL CR in fw needs
-	 *        wm DLM space. So, we save DLM space by reinit the remaining
-	 *        DMASHDL CRs in driver.
-	 */
-	void (*DmaShdlReInit)(struct ADAPTER *prAdapter);
-	void (*processAbnormalInterrupt)(struct ADAPTER *prAdapter);
-	void (*asicUdmaRxFlush)(struct ADAPTER *prAdapter, uint8_t bEnable);
-
-	uint32_t (*updateTxRingMaxQuota)(struct ADAPTER *prAdapter,
-		uint8_t ucWmmIndex, uint32_t u4MaxQuota);
-	u_int8_t (*asicUsbEpctlRstOpt)(struct ADAPTER *prAdapter,
-				       u_int8_t fgIsRstScopeIncludeToggleBit);
+		IN struct ADAPTER *prAdapter,
+		IN struct GLUE_INFO *prGlueInfo);
+	uint8_t (*asicUsbEventEpDetected)(IN struct ADAPTER *prAdapter);
+	uint16_t (*asicUsbRxByteCount)(IN struct ADAPTER *prAdapter,
+		IN struct BUS_INFO *prBusInfo,
+		IN uint8_t *pRXD);
+	void (*DmaShdlInit)(IN struct ADAPTER *prAdapter);
 };
 
 /* USB_REQ_T prPriv field for TxData */
@@ -454,8 +385,6 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie);
 
 void glClearHifInfo(struct GLUE_INFO *prGlueInfo);
 
-void glResetHifInfo(struct GLUE_INFO *prGlueInfo);
-
 u_int8_t glBusInit(void *pvData);
 
 void glBusRelease(void *pData);
@@ -464,81 +393,59 @@ int32_t glBusSetIrq(void *pvData, void *pfnIsr, void *pvCookie);
 
 void glBusFreeIrq(void *pvData, void *pvCookie);
 
-void glSetPowerState(struct GLUE_INFO *prGlueInfo, uint32_t ePowerMode);
+void glSetPowerState(IN struct GLUE_INFO *prGlueInfo, IN uint32_t ePowerMode);
 
 void glUdmaTxRxEnable(struct GLUE_INFO *prGlueInfo, u_int8_t enable);
 
 void glUdmaRxAggEnable(struct GLUE_INFO *prGlueInfo, u_int8_t enable);
 
-int32_t mtk_usb_vendor_request(struct GLUE_INFO *prGlueInfo,
-		uint8_t uEndpointAddress, uint8_t RequestType,
-	    uint8_t Request, uint16_t Value, uint16_t Index,
-	    void *TransferBuffer, uint32_t TransferBufferLength);
+int32_t mtk_usb_vendor_request(IN struct GLUE_INFO *prGlueInfo,
+		IN uint8_t uEndpointAddress, IN uint8_t RequestType,
+	    IN uint8_t Request, IN uint16_t Value, IN uint16_t Index,
+	    IN void *TransferBuffer, IN uint32_t TransferBufferLength);
 
 void glUsbEnqueueReq(struct GL_HIF_INFO *prHifInfo, struct list_head *prHead, struct USB_REQ *prUsbReq,
 		     spinlock_t *prLock, u_int8_t fgHead);
 struct USB_REQ *glUsbDequeueReq(struct GL_HIF_INFO *prHifInfo, struct list_head *prHead, spinlock_t *prLock);
 u_int8_t glUsbBorrowFfaReq(struct GL_HIF_INFO *prHifInfo, uint8_t ucTc);
 
-void glUsbSetState(struct GL_HIF_INFO *prHifInfo, enum usb_state state);
+void glUsbSetState(IN struct GL_HIF_INFO *prHifInfo, enum usb_state state);
 
-void glUsbSetStateSyncCtrl(struct GL_HIF_INFO *prHifInfo, enum usb_state state);
-
-int glUsbSubmitUrb(struct GL_HIF_INFO *prHifInfo, struct urb *urb,
+int glUsbSubmitUrb(IN struct GL_HIF_INFO *prHifInfo, struct urb *urb,
 			enum usb_submit_type type);
 
-uint32_t halTxUSBSendCmd(struct GLUE_INFO *prGlueInfo, uint8_t ucTc,
-		struct CMD_INFO *prCmdInfo);
+uint32_t halTxUSBSendCmd(IN struct GLUE_INFO *prGlueInfo, IN uint8_t ucTc, IN struct CMD_INFO *prCmdInfo);
 void halTxUSBSendCmdComplete(struct urb *urb);
-void halTxUSBProcessCmdComplete(struct ADAPTER *prAdapter,
-		struct USB_REQ *prUsbReq);
+void halTxUSBProcessCmdComplete(IN struct ADAPTER *prAdapter, struct USB_REQ *prUsbReq);
 
-uint32_t halTxUSBSendData(struct GLUE_INFO *prGlueInfo,
-		struct MSDU_INFO *prMsduInfo);
-uint32_t halTxUSBKickData(struct GLUE_INFO *prGlueInfo);
+uint32_t halTxUSBSendData(IN struct GLUE_INFO *prGlueInfo, IN struct MSDU_INFO *prMsduInfo);
+uint32_t halTxUSBKickData(IN struct GLUE_INFO *prGlueInfo);
 void halTxUSBSendDataComplete(struct urb *urb);
-void halTxUSBProcessMsduDone(struct GLUE_INFO *prGlueInfo,
-		struct USB_REQ *prUsbReq);
-void halTxUSBProcessDataComplete(struct ADAPTER *prAdapter,
-		struct USB_REQ *prUsbReq);
+void halTxUSBProcessMsduDone(IN struct GLUE_INFO *prGlueInfo, struct USB_REQ *prUsbReq);
+void halTxUSBProcessDataComplete(IN struct ADAPTER *prAdapter, struct USB_REQ *prUsbReq);
 
 uint32_t halRxUSBEnqueueRFB(
-	struct ADAPTER *prAdapter,
-	uint8_t *pucBuf,
-	uint32_t u4Length,
-	uint32_t u4MinRfbCnt,
-	struct list_head *prCompleteQ);
-uint32_t halRxUSBReceiveEvent(struct ADAPTER *prAdapter, u_int8_t fgFillUrb);
+	IN struct ADAPTER *prAdapter,
+	IN uint8_t *pucBuf,
+	IN uint32_t u4Length,
+	IN uint32_t u4MinRfbCnt,
+	IN struct list_head *prCompleteQ);
+uint32_t halRxUSBReceiveEvent(IN struct ADAPTER *prAdapter, IN u_int8_t fgFillUrb);
 void halRxUSBReceiveEventComplete(struct urb *urb);
-uint32_t halRxUSBReceiveWdt(struct ADAPTER *prAdapter);
-void halRxUSBReceiveWdtComplete(struct urb *urb);
-uint32_t halRxUSBReceiveData(struct ADAPTER *prAdapter);
+uint32_t halRxUSBReceiveData(IN struct ADAPTER *prAdapter);
 void halRxUSBReceiveDataComplete(struct urb *urb);
-void halRxUSBProcessEventDataComplete(struct ADAPTER *prAdapter,
-	struct list_head *prCompleteQ, struct list_head *prFreeQ,
-	uint32_t u4MinRfbCnt);
-void halRxUSBProcessWdtComplete(struct ADAPTER *prAdapter,
-				struct list_head *prCompleteQ,
-				struct list_head *prFreeQ,
-				uint32_t u4MinRfbCnt);
+void halRxUSBProcessEventDataComplete(IN struct ADAPTER *prAdapter,
+	struct list_head *prCompleteQ, struct list_head *prFreeQ, uint32_t u4MinRfbCnt);
 
-void halUSBPreSuspendCmd(struct ADAPTER *prAdapter);
-void halUSBPreResumeCmd(struct ADAPTER *prAdapter);
-void halUSBPreSuspendDone(struct ADAPTER *prAdapter, struct CMD_INFO *prCmdInfo,
-		uint8_t *pucEventBuf);
-void halUSBPreSuspendTimeout(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo);
+void halUSBPreSuspendCmd(IN struct ADAPTER *prAdapter);
+void halUSBPreResumeCmd(IN struct ADAPTER *prAdapter);
+void halUSBPreSuspendDone(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf);
+void halUSBPreSuspendTimeout(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo);
 
-uint32_t halSerGetMcuEvent(struct ADAPTER *prAdapter, u_int8_t fgClear);
-
-void glGetDev(void *ctx, void **dev);
+void glGetDev(void *ctx, struct device **dev);
 void glGetHifDev(struct GL_HIF_INFO *prHif, struct device **dev);
 
-struct mt66xx_hif_driver_data *get_platform_driver_data(void);
-
-void glGetChipInfo(void **prChipInfo);
-
-void halGetCompleteStatus(struct ADAPTER *prAdapter, uint32_t *pu4IntStatus);
+void halGetCompleteStatus(IN struct ADAPTER *prAdapter, OUT uint32_t *pu4IntStatus);
 
 uint16_t glGetUsbDeviceVendorId(struct usb_device *dev);
 uint16_t glGetUsbDeviceProductId(struct usb_device *dev);
@@ -546,15 +453,6 @@ uint16_t glGetUsbDeviceProductId(struct usb_device *dev);
 int32_t glGetUsbDeviceManufacturerName(struct usb_device *dev, uint8_t *buffer, uint32_t bufLen);
 int32_t glGetUsbDeviceProductName(struct usb_device *dev, uint8_t *buffer, uint32_t bufLen);
 int32_t glGetUsbDeviceSerialNumber(struct usb_device *dev, uint8_t *buffer, uint32_t bufLen);
-
-static inline int32_t glBusFuncOn(void)
-{
-	return 0;
-}
-
-static inline void glBusFuncOff(void)
-{
-}
 
 /*******************************************************************************
 *                              F U N C T I O N S

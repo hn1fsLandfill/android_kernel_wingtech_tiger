@@ -129,12 +129,6 @@
 #define AP_DEFAULT_CHANNEL_6G     5
 #endif
 
-#if (CFG_TX_MGMT_BY_DATA_Q == 1)
-#define DEFAULT_P2P_PROBERESP_RETRY_LIMIT (6)
-#else
-#define DEFAULT_P2P_PROBERESP_RETRY_LIMIT (2)
-#endif
-
 /******************************************************************************
  *                                 M A C R O S
  ******************************************************************************
@@ -253,7 +247,6 @@ struct P2P_SCAN_REQ_INFO {
 	uint32_t u4BufLength;
 	uint8_t aucIEBuf[MAX_IE_LENGTH];
 	uint8_t ucSsidNum;
-	uint8_t aucBSSID[MAC_ADDR_LEN];
 	enum ENUM_SCAN_REASON eScanReason;
 	/* Currently we can only take one SSID scan request */
 	struct P2P_SSID_STRUCT arSsidStruct[SCN_SSID_MAX_NUM];
@@ -326,7 +319,6 @@ struct P2P_CHNL_REQ_INFO {
 #if CFG_SUPPORT_NFC_BEAM_PLUS
 	uint32_t NFC_BEAM;	/*NFC Beam + Indication */
 #endif
-	uint8_t ucChReqNum;
 };
 
 /* Glubal Connection Settings. */
@@ -415,11 +407,6 @@ struct P2P_SPECIFIC_BSS_INFO {
 
 	uint16_t u2OweIeLen;
 	uint8_t aucOweIeBuffer[ELEM_HDR_LEN + ELEM_MAX_LEN_WPA];
-
-	u_int8_t fgIsRddOpchng;
-	struct WIFI_EVENT *prRddPostOpchng;
-	u_int8_t ucRddBw;
-	u_int8_t ucRddCh;
 };
 
 struct P2P_QUEUED_ACTION_FRAME {
@@ -433,12 +420,6 @@ struct P2P_MGMT_TX_REQ_INFO {
 	struct LINK rTxReqLink;
 	struct MSDU_INFO *prMgmtTxMsdu;
 	u_int8_t fgIsWaitRsp;
-};
-
-struct P2P_LINK_INFO {
-	struct BSS_INFO *prP2pBss;
-	struct BSS_DESC *prP2pTargetBssDesc;
-	struct STA_RECORD *prP2pTargetStaRec;
 };
 
 /******************************************************************************

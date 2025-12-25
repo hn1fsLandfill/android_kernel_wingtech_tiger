@@ -239,7 +239,6 @@ struct MSG_P2P_CSA_DONE {
 struct MSG_P2P_DEL_IFACE {
 	struct MSG_HDR rMsgHdr;
 	uint8_t ucRoleIdx;
-	enum ENUM_IFTYPE eIftype;
 };
 
 struct P2P_STATION_INFO {
@@ -278,7 +277,6 @@ enum ENUM_P2P_ROLE_STATE {
 	P2P_ROLE_STATE_DFS_CAC,
 	P2P_ROLE_STATE_SWITCH_CHANNEL,
 #endif
-	P2P_ROLE_STATE_WAIT_FOR_NEXT_REQ_CHNL,
 	P2P_ROLE_STATE_NUM
 };
 
@@ -333,9 +331,6 @@ struct P2P_CONNECTION_REQ_INFO {
 #define P2P_ROLE_INDEX_2_ROLE_FSM_INFO(_prAdapter, _RoleIndex) \
 	((_prAdapter)->rWifiVar.aprP2pRoleFsmInfo[_RoleIndex])
 
-#define P2P_MAIN_LINK_INDEX (0)
-#define P2P_MAIN_ROLE_INDEX (0)
-
 struct P2P_ROLE_FSM_INFO {
 	uint8_t ucRoleIndex;
 
@@ -370,14 +365,6 @@ struct P2P_ROLE_FSM_INFO {
 	struct TIMER rDfsShutDownTimer;
 #endif
 
-#if CFG_SUPPORT_802_11W
-	/* STA PMF: for encrypted deauth frame */
-	kal_completion rDeauthComp;
-	u_int8_t encryptedDeauthIsInProcess;
-#endif
-
-	struct TIMER rWaitNextReqChnlTimer;
-
 	/* Packet filter for P2P module. */
 	uint32_t u4P2pPacketFilter;
 
@@ -389,190 +376,152 @@ struct P2P_ROLE_FSM_INFO {
 
 	/* Beacon Information. */
 	struct P2P_BEACON_UPDATE_INFO rBeaconUpdateInfo;
-
-	struct P2P_LINK_INFO aprP2pLinkInfo[MLD_LINK_MAX];
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	struct MLD_BSS_INFO *prP2pMldBssInfo;
-#endif
 };
 
 /*========================= Initial ============================*/
 
-uint8_t p2pRoleFsmInit(struct ADAPTER *prAdapter, uint8_t ucRoleIdx);
+uint8_t p2pRoleFsmInit(IN struct ADAPTER *prAdapter, IN uint8_t ucRoleIdx);
 
-u_int8_t p2pRoleFsmNeedMlo(
-	struct ADAPTER *prAdapter,
-	uint8_t ucRoleIdx);
-
-void p2pRoleFsmUninit(struct ADAPTER *prAdapter, uint8_t ucRoleIdx);
-
-void p2pRoleFsmDelIface(
-	struct ADAPTER *prAdapter,
-	uint8_t ucRoleIdx);
-
-void p2pRoleFsmDelIfaceDone(
-	struct ADAPTER *prAdapter,
-	uint8_t ucRoleIdx);
+void p2pRoleFsmUninit(IN struct ADAPTER *prAdapter, IN uint8_t ucRoleIdx);
 
 /*================== Message Event ==================*/
 
-void p2pRoleFsmRunEventAbort(struct ADAPTER *prAdapter,
-		struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
+void p2pRoleFsmRunEventAbort(IN struct ADAPTER *prAdapter,
+		IN struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
 
-void p2pRoleFsmRunEventPreStartAP(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventPreStartAP(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventStartAP(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventStartAP(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventDelIface(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventDelIface(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventStopAP(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventStopAP(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)
-void p2pRoleFsmRunEventDfsCac(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventDfsCac(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventRadarDet(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventRadarDet(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventSetNewChannel(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventSetNewChannel(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventCsaDone(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventCsaDone(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventDfsShutDownTimeout(struct ADAPTER *prAdapter,
-		uintptr_t ulParamPtr);
+void p2pRoleFsmRunEventDfsShutDownTimeout(IN struct ADAPTER *prAdapter,
+		IN unsigned long ulParamPtr);
 #endif
 
-void p2pRoleFsmRunEventWaitNextReqChnlTimeout(struct ADAPTER *prAdapter,
-		uintptr_t ulParamPtr);
-
-void p2pRoleFsmRunEventScanRequest(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventScanRequest(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
 void
-p2pRoleFsmRunEventScanDone(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr,
-		struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
+p2pRoleFsmRunEventScanDone(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr,
+		IN struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
 
-void p2pRoleFsmRunEventJoinComplete(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventJoinComplete(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventTimeout(struct ADAPTER *prAdapter,
-		uintptr_t ulParamPtr);
+void p2pRoleFsmRunEventTimeout(IN struct ADAPTER *prAdapter,
+		IN unsigned long ulParamPtr);
 
-void p2pRoleFsmDeauthTimeout(struct ADAPTER *prAdapter,
-		uintptr_t ulParamPtr);
+void p2pRoleFsmDeauthTimeout(IN struct ADAPTER *prAdapter,
+		IN unsigned long ulParamPtr);
 
-void p2pRoleFsmRunEventBeaconTimeout(struct ADAPTER *prAdapter,
-		struct BSS_INFO *prP2pBssInfo);
+void p2pRoleFsmRunEventBeaconTimeout(IN struct ADAPTER *prAdapter,
+		IN struct BSS_INFO *prP2pBssInfo);
 
-void p2pRoleUpdateACLEntry(struct ADAPTER *prAdapter,
-		uint8_t ucBssIdx);
+void p2pRoleUpdateACLEntry(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIdx);
 
-u_int8_t p2pRoleProcessACLInspection(struct ADAPTER *prAdapter,
-		uint8_t *pMacAddr, uint8_t ucBssIdx);
-
-uint32_t
-p2pRoleFsmRunEventAAACompleteImpl(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
+u_int8_t p2pRoleProcessACLInspection(IN struct ADAPTER *prAdapter,
+		IN uint8_t *pMacAddr, IN uint8_t ucBssIdx);
 
 uint32_t
-p2pRoleFsmRunEventAAASuccessImpl(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
-
-void p2pRoleFsmRunEventAAATxFailImpl(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
+p2pRoleFsmRunEventAAAComplete(IN struct ADAPTER *prAdapter,
+		IN struct STA_RECORD *prStaRec,
+		IN struct BSS_INFO *prP2pBssInfo);
 
 uint32_t
-p2pRoleFsmRunEventAAAComplete(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
+p2pRoleFsmRunEventAAASuccess(IN struct ADAPTER *prAdapter,
+		IN struct STA_RECORD *prStaRec,
+		IN struct BSS_INFO *prP2pBssInfo);
 
-uint32_t
-p2pRoleFsmRunEventAAASuccess(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
+void p2pRoleFsmRunEventAAATxFail(IN struct ADAPTER *prAdapter,
+		IN struct STA_RECORD *prStaRec,
+		IN struct BSS_INFO *prP2pBssInfo);
 
-void p2pRoleFsmRunEventAAATxFail(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec,
-		struct BSS_INFO *prP2pBssInfo);
+void p2pRoleFsmRunEventConnectionRequest(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventConnectionRequest(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
-
-void p2pRoleFsmRunEventConnectionAbort(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventConnectionAbort(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
 void
-p2pRoleFsmRunEventChnlGrant(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr,
-		struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
+p2pRoleFsmRunEventChnlGrant(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr,
+		IN struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo);
 
 uint32_t
-p2pRoleFsmRunEventDeauthTxDone(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo,
-		enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+p2pRoleFsmRunEventDeauthTxDone(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo,
+		IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-void p2pRoleFsmRunEventRxDeauthentication(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec, struct SW_RFB *prSwRfb);
+void p2pRoleFsmRunEventRxDeauthentication(IN struct ADAPTER *prAdapter,
+		IN struct STA_RECORD *prStaRec, IN struct SW_RFB *prSwRfb);
 
-void p2pRoleFsmRunEventRxDisassociation(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec, struct SW_RFB *prSwRfb);
+void p2pRoleFsmRunEventRxDisassociation(IN struct ADAPTER *prAdapter,
+		IN struct STA_RECORD *prStaRec, IN struct SW_RFB *prSwRfb);
 
 /* //////////////////////// TO BE REFINE ///////////////////// */
-void p2pRoleFsmRunEventSwitchOPMode(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventSwitchOPMode(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventBeaconUpdate(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventBeaconUpdate(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventDissolve(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventDissolve(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
 void
-p2pProcessEvent_UpdateNOAParam(struct ADAPTER *prAdapter,
-		uint8_t ucBssIdx,
-		struct EVENT_UPDATE_NOA_PARAMS *prEventUpdateNoaParam);
+p2pProcessEvent_UpdateNOAParam(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIdx,
+		IN struct EVENT_UPDATE_NOA_PARAMS *prEventUpdateNoaParam);
 
 #if	CFG_ENABLE_PER_STA_STATISTICS_LOG
-void p2pRoleFsmGetStaStatistics(struct ADAPTER *prAdapter,
-		uintptr_t ulParamPtr);
+void p2pRoleFsmGetStaStatistics(IN struct ADAPTER *prAdapter,
+		IN unsigned long ulParamPtr);
 #endif
 
-void p2pRoleFsmNotifyEapolTxStatus(struct ADAPTER *prAdapter,
-		uint8_t ucBssIndex,
-		enum ENUM_EAPOL_KEY_TYPE_T rEapolKeyType,
-		enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+void p2pRoleFsmNotifyEapolTxStatus(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIndex,
+		IN enum ENUM_EAPOL_KEY_TYPE_T rEapolKeyType,
+		IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-void p2pRoleFsmNotifyDhcpDone(struct ADAPTER *prAdapter,
-		uint8_t ucBssIndex);
+void p2pRoleFsmNotifyDhcpDone(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIndex);
 
-void p2pRoleFsmStateTransition(struct ADAPTER *prAdapter,
-		struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo,
-		enum ENUM_P2P_ROLE_STATE eNextState);
+void p2pRoleFsmStateTransition(IN struct ADAPTER *prAdapter,
+		IN struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo,
+		IN enum ENUM_P2P_ROLE_STATE eNextState);
 
-void p2pRoleFsmRunEventMgmtTx(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventMgmtTx(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventTxCancelWait(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventTxCancelWait(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventAcs(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr);
+void p2pRoleFsmRunEventAcs(IN struct ADAPTER *prAdapter,
+		IN struct MSG_HDR *prMsgHdr);
 
-void p2pRoleFsmRunEventScanAbort(struct ADAPTER *prAdapter,
-		uint8_t ucBssIdx);
-
-#if (CFG_WOW_SUPPORT == 1)
-void p2pRoleProcessPreSuspendFlow(struct ADAPTER *prAdapter);
-#endif
+void p2pRoleFsmRunEventScanAbort(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIdx);
 
 #endif

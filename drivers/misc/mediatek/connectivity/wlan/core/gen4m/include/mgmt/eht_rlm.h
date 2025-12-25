@@ -56,10 +56,6 @@ u_int32_t ehtRlmCalculateCapIELen(
 	struct ADAPTER *prAdapter,
 	u_int8_t ucBssIndex,
 	struct STA_RECORD *prStaRec);
-void ehtRlmFillCapIE(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	struct MSDU_INFO *prMsduInfo);
 u_int32_t ehtRlmCalculateOpIELen(
 	struct ADAPTER *prAdapter,
 	u_int8_t ucBssIndex,
@@ -70,13 +66,7 @@ void ehtRlmReqGenerateCapIE(
 void ehtRlmRspGenerateCapIE(
 	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo);
-void ehtRlmRspGenerateCapIEImpl(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
 void ehtRlmRspGenerateOpIE(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
-void ehtRlmRspGenerateOpIEImpl(
 	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo);
 void ehtRlmRecCapInfo(
@@ -85,14 +75,9 @@ void ehtRlmRecCapInfo(
 	u_int8_t *pucIE);
 void ehtRlmRecOperation(
 	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
 	struct BSS_INFO *prBssInfo,
 	u_int8_t *pucIE);
-uint8_t ehtRlmGetVhtOpBwByEhtOpBw(
-	uint8_t ucBssOpBw);
 void ehtRlmInit(
-	struct ADAPTER *prAdapter);
-void ehtRlmInitHtcACtrlOM(
 	struct ADAPTER *prAdapter);
 #endif /* CFG_SUPPORT_802_11BE == 1 */
 #endif /* !_EHT_RLM_H */

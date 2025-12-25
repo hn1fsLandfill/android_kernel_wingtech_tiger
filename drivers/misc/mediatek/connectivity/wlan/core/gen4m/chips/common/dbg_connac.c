@@ -123,7 +123,7 @@ static char *BW_STATE_TBLE[] = {"UNCHANGED", "DOWN", "N/A"};
  *******************************************************************************
  */
 
-void halShowPseInfo(struct ADAPTER *prAdapter)
+void halShowPseInfo(IN struct ADAPTER *prAdapter)
 {
 #define BUF_SIZE 512
 
@@ -431,7 +431,7 @@ void halSetPleInt(struct ADAPTER *prAdapter, bool fgTrigger,
 	HAL_MCR_WR(prAdapter, PLE_TO_N9_INT, u4Val);
 }
 
-void halShowPleInfo(struct ADAPTER *prAdapter,
+void halShowPleInfo(IN struct ADAPTER *prAdapter,
 	u_int8_t fgDumpTxd)
 {
 #define BUF_SIZE 1024
@@ -658,7 +658,7 @@ void halShowPleInfo(struct ADAPTER *prAdapter,
 #undef BUF_SIZE
 }
 
-void halShowDmaschInfo(struct ADAPTER *prAdapter)
+void halShowDmaschInfo(IN struct ADAPTER *prAdapter)
 {
 	struct mt66xx_chip_info *prChipInfo;
 	uint32_t value = 0;
@@ -1189,6 +1189,179 @@ void haldumpMacInfo(struct ADAPTER *prAdapter)
 #undef BUF_SIZE
 }
 
+static char *q_idx_mcu_str[] = {"RQ0", "RQ1", "RQ2", "RQ3", "Invalid"};
+static char *pkt_ft_str[] = {"cut_through", "store_forward",
+	"cmd", "PDA_FW_Download"};
+static char *hdr_fmt_str[] = {
+	"Non-80211-Frame",
+	"Command-Frame",
+	"Normal-80211-Frame",
+	"enhanced-80211-Frame",
+};
+static char *p_idx_str[] = {"LMAC", "MCU"};
+static char *q_idx_lmac_str[] = {"WMM0_AC0", "WMM0_AC1", "WMM0_AC2", "WMM0_AC3",
+	"WMM1_AC0", "WMM1_AC1", "WMM1_AC2", "WMM1_AC3",
+	"WMM2_AC0", "WMM2_AC1", "WMM2_AC2", "WMM2_AC3",
+	"WMM3_AC0", "WMM3_AC1", "WMM3_AC2", "WMM3_AC3",
+	"Band0_ALTX", "Band0_BMC", "Band0_BNC", "Band0_PSMP",
+	"Band1_ALTX", "Band1_BMC", "Band1_BNC", "Band1_PSMP",
+	"Invalid"};
+
+void halDumpTxdInfo(IN struct ADAPTER *prAdapter, uint8_t *tmac_info)
+{
+	struct TMAC_TXD_S *txd_s;
+	struct TMAC_TXD_0 *txd_0;
+	struct TMAC_TXD_1 *txd_1;
+	uint8_t q_idx = 0;
+
+	txd_s = (struct TMAC_TXD_S *)tmac_info;
+	txd_0 = &txd_s->TxD0;
+	txd_1 = &txd_s->TxD1;
+
+	DBGLOG(HAL, INFO, "TMAC_TXD Fields:\n");
+	DBGLOG(HAL, INFO, "\tTMAC_TXD_0:\n");
+	DBGLOG(HAL, INFO, "\t\tPortID=%d(%s)\n",
+			txd_0->p_idx, p_idx_str[txd_0->p_idx]);
+
+	if (txd_0->p_idx == P_IDX_LMAC)
+		q_idx = txd_0->q_idx % 0x18;
+	else
+		q_idx = ((txd_0->q_idx == TxQ_IDX_MCU_PDA) ?
+			txd_0->q_idx : (txd_0->q_idx % 0x4));
+
+	DBGLOG(HAL, INFO, "\t\tQueID=0x%x(%s %s)\n", txd_0->q_idx,
+			 (txd_0->p_idx == P_IDX_LMAC ? "LMAC" : "MCU"),
+			 txd_0->p_idx == P_IDX_LMAC ?
+				q_idx_lmac_str[q_idx] : q_idx_mcu_str[q_idx]);
+	DBGLOG(HAL, INFO, "\t\tTxByteCnt=%d\n", txd_0->TxByteCount);
+	DBGLOG(HAL, INFO, "\t\tIpChkSumOffload=%d\n", txd_0->IpChkSumOffload);
+	DBGLOG(HAL, INFO, "\t\tUdpTcpChkSumOffload=%d\n",
+						txd_0->UdpTcpChkSumOffload);
+	DBGLOG(HAL, INFO, "\t\tEthTypeOffset=%d\n", txd_0->EthTypeOffset);
+
+	DBGLOG(HAL, INFO, "\tTMAC_TXD_1:\n");
+	DBGLOG(HAL, INFO, "\t\twlan_idx=%d\n", txd_1->wlan_idx);
+	DBGLOG(HAL, INFO, "\t\tHdrFmt=%d(%s)\n",
+			 txd_1->hdr_format, hdr_fmt_str[txd_1->hdr_format]);
+	DBGLOG(HAL, INFO, "\t\tHdrInfo=0x%x\n", txd_1->hdr_info);
+
+	switch (txd_1->hdr_format) {
+	case TMI_HDR_FT_NON_80211:
+		DBGLOG(HAL, INFO,
+			"\t\t\tMRD=%d, EOSP=%d, RMVL=%d, VLAN=%d, ETYP=%d\n",
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_MRD),
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_EOSP),
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_RMVL),
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_VLAN),
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_0_BIT_ETYP));
+		break;
+
+	case TMI_HDR_FT_CMD:
+		DBGLOG(HAL, INFO, "\t\t\tRsvd=0x%x\n", txd_1->hdr_info);
+		break;
+
+	case TMI_HDR_FT_NOR_80211:
+		DBGLOG(HAL, INFO, "\t\t\tHeader Len=%d(WORD)\n",
+				 txd_1->hdr_info & TMI_HDR_INFO_2_MASK_LEN);
+		break;
+
+	case TMI_HDR_FT_ENH_80211:
+		DBGLOG(HAL, INFO, "\t\t\tEOSP=%d, AMS=%d\n",
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_3_BIT_EOSP),
+			txd_1->hdr_info & (1 << TMI_HDR_INFO_3_BIT_AMS));
+		break;
+	}
+
+	DBGLOG(HAL, INFO, "\t\tTxDFormatType=%d(%s format)\n", txd_1->ft,
+		(txd_1->ft == TMI_FT_LONG ?
+		"Long - 8 DWORD" : "Short - 3 DWORD"));
+	DBGLOG(HAL, INFO, "\t\ttxd_len=%d page(%d DW)\n",
+		txd_1->txd_len == 0 ? 1 : 2, (txd_1->txd_len + 1) * 16);
+	DBGLOG(HAL, INFO,
+		"\t\tHdrPad=%d(Padding Mode: %s, padding bytes: %d)\n",
+		txd_1->hdr_pad,
+		((txd_1->hdr_pad & (TMI_HDR_PAD_MODE_TAIL << 1)) ?
+		"tail" : "head"), (txd_1->hdr_pad & 0x1 ? 2 : 0));
+	DBGLOG(HAL, INFO, "\t\tUNxV=%d\n", txd_1->UNxV);
+	DBGLOG(HAL, INFO, "\t\tamsdu=%d\n", txd_1->amsdu);
+	DBGLOG(HAL, INFO, "\t\tTID=%d\n", txd_1->tid);
+	DBGLOG(HAL, INFO, "\t\tpkt_ft=%d(%s)\n",
+			 txd_1->pkt_ft, pkt_ft_str[txd_1->pkt_ft]);
+	DBGLOG(HAL, INFO, "\t\town_mac=%d\n", txd_1->OwnMacAddr);
+
+	if (txd_s->TxD1.ft == TMI_FT_LONG) {
+		struct TMAC_TXD_L *txd_l = (struct TMAC_TXD_L *)tmac_info;
+		struct TMAC_TXD_2 *txd_2 = &txd_l->TxD2;
+		struct TMAC_TXD_3 *txd_3 = &txd_l->TxD3;
+		struct TMAC_TXD_4 *txd_4 = &txd_l->TxD4;
+		struct TMAC_TXD_5 *txd_5 = &txd_l->TxD5;
+		struct TMAC_TXD_6 *txd_6 = &txd_l->TxD6;
+
+		DBGLOG(HAL, INFO, "\tTMAC_TXD_2:\n");
+		DBGLOG(HAL, INFO, "\t\tsub_type=%d\n", txd_2->sub_type);
+		DBGLOG(HAL, INFO, "\t\tfrm_type=%d\n", txd_2->frm_type);
+		DBGLOG(HAL, INFO, "\t\tNDP=%d\n", txd_2->ndp);
+		DBGLOG(HAL, INFO, "\t\tNDPA=%d\n", txd_2->ndpa);
+		DBGLOG(HAL, INFO, "\t\tSounding=%d\n", txd_2->sounding);
+		DBGLOG(HAL, INFO, "\t\tRTS=%d\n", txd_2->rts);
+		DBGLOG(HAL, INFO, "\t\tbc_mc_pkt=%d\n", txd_2->bc_mc_pkt);
+		DBGLOG(HAL, INFO, "\t\tBIP=%d\n", txd_2->bip);
+		DBGLOG(HAL, INFO, "\t\tDuration=%d\n", txd_2->duration);
+		DBGLOG(HAL, INFO, "\t\tHE(HTC Exist)=%d\n", txd_2->htc_vld);
+		DBGLOG(HAL, INFO, "\t\tFRAG=%d\n", txd_2->frag);
+		DBGLOG(HAL, INFO, "\t\tReamingLife/MaxTx time=%d\n",
+			txd_2->max_tx_time);
+		DBGLOG(HAL, INFO, "\t\tpwr_offset=%d\n", txd_2->pwr_offset);
+		DBGLOG(HAL, INFO, "\t\tba_disable=%d\n", txd_2->ba_disable);
+		DBGLOG(HAL, INFO, "\t\ttiming_measure=%d\n",
+			txd_2->timing_measure);
+		DBGLOG(HAL, INFO, "\t\tfix_rate=%d\n", txd_2->fix_rate);
+		DBGLOG(HAL, INFO, "\tTMAC_TXD_3:\n");
+		DBGLOG(HAL, INFO, "\t\tNoAck=%d\n", txd_3->no_ack);
+		DBGLOG(HAL, INFO, "\t\tPF=%d\n", txd_3->protect_frm);
+		DBGLOG(HAL, INFO, "\t\ttx_cnt=%d\n", txd_3->tx_cnt);
+		DBGLOG(HAL, INFO, "\t\tremain_tx_cnt=%d\n",
+			txd_3->remain_tx_cnt);
+		DBGLOG(HAL, INFO, "\t\tsn=%d\n", txd_3->sn);
+		DBGLOG(HAL, INFO, "\t\tpn_vld=%d\n", txd_3->pn_vld);
+		DBGLOG(HAL, INFO, "\t\tsn_vld=%d\n", txd_3->sn_vld);
+		DBGLOG(HAL, INFO, "\tTMAC_TXD_4:\n");
+		DBGLOG(HAL, INFO, "\t\tpn_low=0x%x\n", txd_4->pn_low);
+		DBGLOG(HAL, INFO, "\tTMAC_TXD_5:\n");
+		DBGLOG(HAL, INFO, "\t\ttx_status_2_host=%d\n",
+			txd_5->tx_status_2_host);
+		DBGLOG(HAL, INFO, "\t\ttx_status_2_mcu=%d\n",
+			txd_5->tx_status_2_mcu);
+		DBGLOG(HAL, INFO, "\t\ttx_status_fmt=%d\n",
+			txd_5->tx_status_fmt);
+
+		if (txd_5->tx_status_2_host || txd_5->tx_status_2_mcu)
+			DBGLOG(HAL, INFO, "\t\tpid=%d\n", txd_5->pid);
+
+		if (txd_2->fix_rate)
+			DBGLOG(HAL, INFO,
+				"\t\tda_select=%d\n", txd_5->da_select);
+
+		DBGLOG(HAL, INFO, "\t\tpwr_mgmt=0x%x\n", txd_5->pwr_mgmt);
+		DBGLOG(HAL, INFO, "\t\tpn_high=0x%x\n", txd_5->pn_high);
+
+		if (txd_2->fix_rate) {
+			DBGLOG(HAL, INFO, "\tTMAC_TXD_6:\n");
+			DBGLOG(HAL, INFO, "\t\tfix_rate_mode=%d\n",
+				txd_6->fix_rate_mode);
+			DBGLOG(HAL, INFO, "\t\tGI=%d(%s)\n", txd_6->gi,
+				(txd_6->gi == 0 ? "LONG" : "SHORT"));
+			DBGLOG(HAL, INFO, "\t\tldpc=%d(%s)\n", txd_6->ldpc,
+				(txd_6->ldpc == 0 ? "BCC" : "LDPC"));
+			DBGLOG(HAL, INFO, "\t\tTxBF=%d\n", txd_6->TxBF);
+			DBGLOG(HAL, INFO, "\t\ttx_rate=0x%x\n", txd_6->tx_rate);
+			DBGLOG(HAL, INFO, "\t\tant_id=%d\n", txd_6->ant_id);
+			DBGLOG(HAL, INFO, "\t\tdyn_bw=%d\n", txd_6->dyn_bw);
+			DBGLOG(HAL, INFO, "\t\tbw=%d\n", txd_6->bw);
+		}
+	}
+}
+
 void halShowTxdInfo(
 	struct ADAPTER *prAdapter,
 	u_int32_t fid)
@@ -1204,7 +1377,7 @@ void halShowTxdInfo(
 }
 
 int32_t halShowStatInfo(struct ADAPTER *prAdapter,
-			char *pcCommand, int i4TotalLen,
+			IN char *pcCommand, IN int i4TotalLen,
 			struct PARAM_HW_WLAN_INFO *prHwWlanInfo,
 			struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics,
 			u_int8_t fgResetCnt, uint32_t u4StatGroup)
@@ -1239,7 +1412,7 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 	uint32_t u4RangeCtrl_0, u4RangeCtrl_1;
 	enum AGG_RANGE_TYPE_T eRangeType = ENUM_AGG_RANGE_TYPE_TX;
 #endif
-	uint8_t ucBssIndex;
+	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 	struct PARAM_LINK_SPEED_EX rLinkSpeed = {0};
 
 	ucSkipAr = prQueryStaStatistics->ucSkipAr;
@@ -1431,7 +1604,7 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 
 		rStatus = kalIoctlByBssIdx(prAdapter->prGlueInfo,
 				   wlanoidQueryRssi, &rLinkSpeed,
-				   sizeof(rLinkSpeed),
+				   sizeof(rLinkSpeed), TRUE, TRUE, TRUE,
 				   &u4BufLen, ucBssIndex);
 		if (rStatus != WLAN_STATUS_SUCCESS)
 			DBGLOG(REQ, WARN, "unable to retrieve rssi\n");
@@ -1443,7 +1616,8 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 #if (CFG_SUPPORT_RA_GEN == 0)
 		rStatus = kalIoctl(prAdapter->prGlueInfo,
 				   wlanoidQuerySwCtrlRead, &rSwCtrlInfo,
-				   sizeof(rSwCtrlInfo), &u4BufLen);
+				   sizeof(rSwCtrlInfo), TRUE, TRUE, TRUE,
+				   &u4BufLen);
 #endif
 		DBGLOG(REQ, LOUD, "rStatus %u, rSwCtrlInfo.u4Data 0x%x\n",
 		       rStatus, rSwCtrlInfo.u4Data);
@@ -1584,20 +1758,16 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 			" = ", u2LinkSpeed);
 
 		if (!prQueryStaStatistics->ucSkipAr) {
-#if (CFG_SUPPORT_RA_GEN == 1)
 			i4BytesWritten += kalScnprintf(
 				pcCommand + i4BytesWritten,
 				i4TotalLen - i4BytesWritten,
 				"%-20s%s%s\n", "RateTable", " = ",
+#if (CFG_SUPPORT_RA_GEN == 1)
 				prQueryStaStatistics->ucArTableIdx <
 				(ucRaTableNum - 1) ?
 				RATE_TBLE[prQueryStaStatistics->ucArTableIdx] :
 				RATE_TBLE[ucRaTableNum - 1]);
 #else
-			i4BytesWritten += kalScnprintf(
-				pcCommand + i4BytesWritten,
-				i4TotalLen - i4BytesWritten,
-				"%-20s%s%s\n", "RateTable", " = ",
 				prQueryStaStatistics->ucArTableIdx < 6 ?
 				RATE_TBLE[prQueryStaStatistics->ucArTableIdx] :
 				RATE_TBLE[6]);
@@ -1606,23 +1776,18 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 			if (wlanGetStaIdxByWlanIdx(prAdapter,
 				(uint8_t)(prHwWlanInfo->u4Index), &ucStaIdx) ==
 				WLAN_STATUS_SUCCESS) {
-#if (CFG_SUPPORT_RA_GEN == 1)
 				i4BytesWritten += kalScnprintf(
 					pcCommand + i4BytesWritten,
 					i4TotalLen - i4BytesWritten,
 					"%-20s%s%d\n", "2G Support 256QAM TX",
 					" = ",
+#if (CFG_SUPPORT_RA_GEN == 1)
 					((prAdapter->arStaRec[ucStaIdx].u4Flags
 					& MTK_SYNERGY_CAP_SUPPORT_24G_MCS89) ||
 					(prQueryStaStatistics->
 					ucDynamicGband256QAMState == 2)) ?
 					1 : 0);
 #else
-				i4BytesWritten += kalScnprintf(
-					pcCommand + i4BytesWritten,
-					i4TotalLen - i4BytesWritten,
-					"%-20s%s%d\n", "2G Support 256QAM TX",
-					" = ",
 					(prAdapter->arStaRec[ucStaIdx].u4Flags &
 					MTK_SYNERGY_CAP_SUPPORT_24G_MCS89) ?
 					1 : 0);
@@ -1980,23 +2145,52 @@ int32_t halShowStatInfo(struct ADAPTER *prAdapter,
 	return i4BytesWritten;
 }
 
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
-int connac_get_rx_rate_info(const uint32_t *prRxV,
-		struct RxRateInfo *prRxRateInfo)
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+int connac_get_rx_rate_info(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIdx,
+		OUT uint32_t *pu4Rate, OUT uint32_t *pu4Nss,
+		OUT uint32_t *pu4RxMode, OUT uint32_t *pu4FrMode,
+		OUT uint32_t *pu4Sgi)
 {
+	struct STA_RECORD *prStaRec;
 	uint32_t rxmode = 0, rate = 0, frmode = 0, sgi = 0, nsts = 0;
 	uint32_t groupid = 0, stbc = 0, nss = 0;
+	uint32_t u4RxVector0 = 0, u4RxVector1 = 0;
+	uint8_t ucWlanIdx, ucStaIdx;
 
-	if (!prRxRateInfo || !prRxV)
+	if ((!pu4Rate) || (!pu4Nss) || (!pu4RxMode) || (!pu4FrMode) ||
+		(!pu4Sgi))
 		return -1;
 
-	rate = (prRxV[0] & RX_VT_RX_RATE_MASK) >> RX_VT_RX_RATE_OFFSET;
-	nsts = (prRxV[1] & RX_VT_NSTS_MASK) >> RX_VT_NSTS_OFFSET;
-	stbc = (prRxV[0] & RX_VT_STBC_MASK) >> RX_VT_STBC_OFFSET;
-	rxmode = (prRxV[0] & RX_VT_RX_MODE_MASK) >> RX_VT_RX_MODE_OFFSET;
-	frmode = (prRxV[0] & RX_VT_FR_MODE_MASK) >> RX_VT_FR_MODE_OFFSET;
-	sgi = prRxV[0] & RX_VT_SHORT_GI;
-	groupid = (prRxV[1] & RX_VT_GROUP_ID_MASK) >> RX_VT_GROUP_ID_OFFSET;
+	prStaRec = aisGetStaRecOfAP(prAdapter, ucBssIdx);
+	if (prStaRec) {
+		ucWlanIdx = prStaRec->ucWlanIndex;
+	} else {
+		DBGLOG(SW4, ERROR, "prStaRecOfAP is null\n");
+		return -1;
+	}
+
+	if (wlanGetStaIdxByWlanIdx(prAdapter, ucWlanIdx, &ucStaIdx) ==
+		WLAN_STATUS_SUCCESS) {
+		u4RxVector0 = prAdapter->arStaRec[ucStaIdx].u4RxVector0;
+		u4RxVector1 = prAdapter->arStaRec[ucStaIdx].u4RxVector1;
+		if ((u4RxVector0 == 0) || (u4RxVector1 == 0)) {
+			DBGLOG_LIMITED(SW4, WARN,
+					"RxVector1 or RxVector2 is 0\n");
+			return -1;
+		}
+	} else {
+		DBGLOG(SW4, ERROR, "wlanGetStaIdxByWlanIdx fail\n");
+		return -1;
+	}
+
+	rate = (u4RxVector0 & RX_VT_RX_RATE_MASK) >> RX_VT_RX_RATE_OFFSET;
+	nsts = ((u4RxVector1 & RX_VT_NSTS_MASK) >> RX_VT_NSTS_OFFSET);
+	stbc = ((u4RxVector0 & RX_VT_STBC_MASK) >> RX_VT_STBC_OFFSET);
+	rxmode = (u4RxVector0 & RX_VT_RX_MODE_MASK) >> RX_VT_RX_MODE_OFFSET;
+	frmode = (u4RxVector0 & RX_VT_FR_MODE_MASK) >> RX_VT_FR_MODE_OFFSET;
+	sgi = u4RxVector0 & RX_VT_SHORT_GI;
+	groupid = (u4RxVector1 & RX_VT_GROUP_ID_MASK) >> RX_VT_GROUP_ID_OFFSET;
 
 	if ((groupid == 0) || (groupid == 63))
 		nsts += 1;
@@ -2010,11 +2204,11 @@ int connac_get_rx_rate_info(const uint32_t *prRxV,
 		return -1;
 	}
 
-	prRxRateInfo->u4Rate = rate;
-	prRxRateInfo->u4Nss = nss;
-	prRxRateInfo->u4Mode = rxmode;
-	prRxRateInfo->u4Bw = frmode;
-	prRxRateInfo->u4Gi = sgi;
+	*pu4Rate = rate;
+	*pu4Nss = nss;
+	*pu4RxMode = rxmode;
+	*pu4FrMode = frmode;
+	*pu4Sgi = sgi;
 
 	DBGLOG(SW4, TRACE,
 		   "rxmode=[%u], rate=[%u], bw=[%u], sgi=[%u], nss=[%u]\n",

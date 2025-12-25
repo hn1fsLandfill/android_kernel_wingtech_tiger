@@ -158,7 +158,7 @@ void nanSchedNegoInitDb(struct ADAPTER *prAdapter, uint32_t u4SchIdx,
 			enum _ENUM_NAN_NEGO_TYPE_T eType,
 			enum _ENUM_NAN_NEGO_ROLE_T eRole);
 void nanSchedNegoDispatchTimeout(struct ADAPTER *prAdapter,
-		uintptr_t ulParam);
+		unsigned long ulParam);
 uint32_t nanSchedNegoGenLocalCrbProposal(struct ADAPTER *prAdapter);
 uint32_t nanSchedNegoChkRmtCrbProposal(struct ADAPTER *prAdapter,
 				       uint32_t *pu4RejectCode);
@@ -285,32 +285,27 @@ uint32_t nanSchedConfigGetAllowedBw(struct ADAPTER *prAdapter,
 		uint8_t ucChannel);
 
 uint32_t
-nanSchedCmdUpdatePhySettigns(struct ADAPTER *prAdapter,
+nanSchedCmdUpdatePhySettigns(IN struct ADAPTER *prAdapter,
 			     struct _NAN_PHY_SETTING_T *pr2P4GPhySettings,
 			     struct _NAN_PHY_SETTING_T *pr5GPhySettings);
-uint32_t nanSchedCmdManagePeerSchRecord(struct ADAPTER *prAdapter,
+uint32_t nanSchedCmdManagePeerSchRecord(IN struct ADAPTER *prAdapter,
 			uint32_t u4SchIdx, unsigned char fgActivate);
 uint32_t nanSchedCmdUpdatePeerCapability(struct ADAPTER *prAdapter,
 					 uint32_t u4SchIdx);
-uint32_t nanSchedCmdUpdateCRB(struct ADAPTER *prAdapter, uint32_t u4SchIdx);
-uint32_t nanSchedCmdUpdateAvailability(struct ADAPTER *prAdapter);
-uint32_t nanSchedCmdUpdatePotentialChnlList(struct ADAPTER *prAdapter);
+uint32_t nanSchedCmdUpdateCRB(IN struct ADAPTER *prAdapter, uint32_t u4SchIdx);
+uint32_t nanSchedCmdUpdateAvailability(IN struct ADAPTER *prAdapter);
+uint32_t nanSchedCmdUpdatePotentialChnlList(IN struct ADAPTER *prAdapter);
 uint32_t nanSchedCmdUpdateAvailabilityCtrl(struct ADAPTER *prAdapter);
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-uint32_t nanSchedulerUniEventDispatch(struct ADAPTER *prAdapter,
-				   uint32_t u4SubEvent, uint8_t *pucBuf);
-#else
+
 uint32_t nanSchedulerEventDispatch(struct ADAPTER *prAdapter,
 				   uint32_t u4SubEvent, uint8_t *pucBuf);
-#endif
-uint32_t nanSchedSwDbg4(struct ADAPTER *prAdapter, uint32_t u4Data);
 
-uint32_t nanSchedCmdMapStaRecord(struct ADAPTER *prAdapter,
+uint32_t nanSchedSwDbg4(struct ADAPTER *prAdapter, IN uint32_t u4Data);
+
+uint32_t nanSchedCmdMapStaRecord(IN struct ADAPTER *prAdapter,
 				 uint8_t *pucNmiAddr,
 				 enum NAN_BSS_ROLE_INDEX eRoleIdx,
-				 uint8_t ucStaRecIdx,
-				 uint8_t ucNdpCxtId,
-				 uint8_t ucWlanIndex);
+				 uint8_t ucStaRecIdx, uint8_t ucNdpCxtId);
 
 unsigned char
 nanSchedPeerSchRecordIsValid(struct ADAPTER *prAdapter, uint32_t u4SchIdx);
@@ -333,28 +328,6 @@ enum ENUM_BAND
 nanSchedGetSchRecBandByMac(struct ADAPTER *prAdapter, uint8_t *pucNmiAddr);
 
 extern union _NAN_BAND_CHNL_CTRL g_rNullChnl;
-
-#if (CFG_NAN_SCHEDULER_VERSION == 1)
-union _NAN_BAND_CHNL_CTRL
-nanQueryNonNanChnlInfoBySlot(struct ADAPTER *prAdapter,
-	uint16_t u2SlotIdx, enum ENUM_BAND eBand);
-
-uint32_t
-nanSchedUpdateNonNanTimelineByAis(struct ADAPTER *prAdapter);
-
-uint32_t
-nanSchedSyncNonNanChnlToNan(struct ADAPTER *prAdapter);
-
-uint32_t
-nanSchedCommitNonNanChnlList(struct ADAPTER *prAdapter);
-
-#endif/* (CFG_NAN_SCHEDULER_VERSION == 1) */
-
-#if (CFG_SUPPORT_NAN_NDP_DUAL_BAND == 0)
-uint32_t
-nanSchedRemoveDiffBandChnlList(
-	struct ADAPTER *prAdapter, unsigned char fgCommitOrCond);
-#endif /* (CFG_SUPPORT_NAN_NDP_DUAL_BAND == 0) */
 
 #endif
 #endif /* _NAN_SCHEDULER_H_ */

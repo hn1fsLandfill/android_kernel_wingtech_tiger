@@ -145,7 +145,6 @@
 #define WIFI_FEATURE_P2P_RAND_MAC  (0x80000000)
 
 /* note: WIFI_FEATURE_GSCAN be enabled just for ACTS test item: scanner */
-#if CFG_SUPPORT_DYNAMIC_PWR_LIMIT
 #define WIFI_HAL_FEATURE_SET ((WIFI_FEATURE_P2P) |\
 			      (WIFI_FEATURE_SOFT_AP) |\
 			      (WIFI_FEATURE_PNO) |\
@@ -155,16 +154,6 @@
 			      (WIFI_FEATURE_SET_TX_POWER_LIMIT) |\
 			      (WIFI_FEATURE_P2P_RAND_MAC)\
 			      )
-#else
-#define WIFI_HAL_FEATURE_SET ((WIFI_FEATURE_P2P) |\
-			      (WIFI_FEATURE_SOFT_AP) |\
-			      (WIFI_FEATURE_PNO) |\
-			      (WIFI_FEATURE_TDLS) |\
-			      (WIFI_FEATURE_RSSI_MONITOR) |\
-			      (WIFI_FEATURE_CONTROL_ROAMING) |\
-			      (WIFI_FEATURE_P2P_RAND_MAC)\
-			      )
-#endif
 
 #define MAX_NUM_GROUP_ADDR		32 /* max number of group addresses */
 #define AUTO_RATE_NUM			8
@@ -186,12 +175,6 @@
 #define CSUM_OFFLOAD_EN_ALL	BITS(0, 6)
 
 /* TCP, UDP, IP Checksum */
-#define RX_CS_FLAG_UNKNOWN_NH	BIT(10)
-#define RX_CS_FLAG_FRAGMENT	BIT(9)
-#define RX_CS_FLAG_WRONG_IP_LEN	BIT(8)
-#define RX_CS_FLAG_NOT_DONE	\
-	(RX_CS_FLAG_UNKNOWN_NH | RX_CS_FLAG_FRAGMENT | RX_CS_FLAG_WRONG_IP_LEN)
-
 #define RX_CS_TYPE_UDP		BIT(7)
 #define RX_CS_TYPE_TCP		BIT(6)
 #define RX_CS_TYPE_IPv6		BIT(5)
@@ -199,7 +182,6 @@
 
 #define RX_CS_STATUS_UDP	BIT(3)
 #define RX_CS_STATUS_TCP	BIT(2)
-#define RX_CS_STATUS_RESERVED	BIT(1)
 #define RX_CS_STATUS_IP		BIT(0)
 
 #define CSUM_NOT_SUPPORTED	0x0
@@ -222,12 +204,15 @@
 #define WLAN_CFG_ARGV_MAX 20
 #endif
 #define WLAN_CFG_ARGV_MAX_LONG	22	/* for WOW, 2+20 */
-#define WLAN_CFG_ENTRY_NUM_MAX	430	/* 128 */
+#define WLAN_CFG_ENTRY_NUM_MAX	400	/* 128 */
 #define WLAN_CFG_KEY_LEN_MAX	32	/* include \x00  EOL */
 #define WLAN_CFG_VALUE_LEN_MAX	128	/* include \x00 EOL */
 #define WLAN_CFG_FLAG_SKIP_CB	BIT(0)
+#define WLAN_CFG_FILE_BUF_SIZE	2048
 
-#define WLAN_CFG_REC_ENTRY_NUM_MAX 430
+#define WLAN_CFG_REC_ENTRY_NUM_MAX 400
+
+
 
 #define WLAN_CFG_SET_CHIP_LEN_MAX 10
 #define WLAN_CFG_SET_DEBUG_LEVEL_LEN_MAX 10
@@ -259,9 +244,6 @@
 #define WLAN_LEGACY_MAX_BA_SIZE 64
 #define WLAN_HE_MAX_BA_SIZE 256
 #define WLAN_EHT_MAX_BA_SIZE 1024
-/* Add to the negotiated WinSize to cope with Ball Behind after Fall Ahead */
-#define WLAN_RX_BA_EXT_SIZE 64
-#define WLAN_RX_BA_EXT_MAX_SIZE 256
 
 /* Define for wifi path usage */
 #define WLAN_FLAG_2G4_WF0		BIT(0)	/*1: support, 0: NOT support */
@@ -288,7 +270,11 @@
 #define CFG_SUPPORT_TXPOWER_INFO		1
 #endif
 
-#if (CFG_SUPPORT_CONNAC2X == 1 || CFG_SUPPORT_CONNAC3X == 1)
+#if (CFG_SUPPORT_TXPOWER_INFO == 1)
+#define TXPOWER_INFO_DEBUG 0
+#endif
+
+#if (CFG_SUPPORT_CONNAC2X == 1)
 #define AGG_RANGE_SEL_NUM		15
 #else
 #define AGG_RANGE_SEL_NUM		7
@@ -340,25 +326,6 @@ struct TPENHANCE_PKT_MAP {
 };
 
 #endif /* CFG_SUPPORT_TPENHANCE_MODE */
-
-#if CFG_WOW_SUPPORT
-#define INVALID_WOW_WAKE_UP_REASON 255
-/* HIF suspend should wait for cfg80211 suspend done.
- * by experience, 5ms is enough, and worst case ~= 250ms.
- * if > 250 ms --> treat as no cfg80211 suspend
- */
-#define HIF_SUSPEND_MAX_WAIT_TIME 50 /* unit: 5ms */
-#endif
-
-#if (CFG_SUPPORT_DYNAMIC_EDCCA == 1)
-/* Default ED threshold -65 dBm */
-#define ED_CCA_BW20_2G_DEFAULT (-65)
-#define ED_CCA_BW20_5G_DEFAULT (-65)
-#endif
-
-#define WLAN_DRV_READY_CHECK_WLAN_ON       BIT(0)
-#define WLAN_DRV_READY_CHECK_HIF_SUSPEND   BIT(1)
-#define WLAN_DRV_READY_CHECK_RESET         BIT(2)
 
 enum CMD_VER {
 	CMD_VER_1,	/* Type[2]+String[32]+Value[32] */
@@ -497,9 +464,9 @@ struct CFG_SETTING {
  *                             D A T A   T Y P E S
  *******************************************************************************
  */
-typedef uint32_t(*PFN_OID_HANDLER_FUNC) (struct ADAPTER *prAdapter,
-					 void *pvBuf, uint32_t u4BufLen,
-					 uint32_t *pu4OutInfoLen);
+typedef uint32_t(*PFN_OID_HANDLER_FUNC) (IN struct ADAPTER *prAdapter,
+					 IN void *pvBuf, IN uint32_t u4BufLen,
+					 OUT uint32_t *pu4OutInfoLen);
 
 enum ENUM_CSUM_TYPE {
 	CSUM_TYPE_IPV4,
@@ -606,37 +573,6 @@ enum ENUM_FEATURE_OPTION_IN_CMD {
 	FEATURE_OPT_CMD_FORCE_ENABLED
 };
 
-enum ENUM_FEATURE_OPTION_IN_SER {
-	/* DISABLE means
-	 * 1. When driver init, driver will send fw CMD to disable the
-	 *    corresponding SER feature even if it was enabled in fw build time.
-	 * 2. driver will bypass the corresponding SER reset procedure when it
-	 *    receives the error notification from chip.
-	 */
-	FEATURE_OPT_SER_DISABLE = 0,
-	/* ENABLE means
-	 * 1. driver will execute the corresponding SER reset procedure when
-	 *    it receives the error notification from chip.
-	 */
-	FEATURE_OPT_SER_ENABLE,
-	/* Monitor means
-	 * 1. driver will bypass the corresponding SER reset procedure when it
-	 *    receives the error notification from chip.
-	 */
-	FEATURE_OPT_SER_MONITOR
-
-	/* Thus, the difference between disable and monitor is
-	 *   - In L0.5 reset, chip wfsys watchdog is disabled and enabled
-	 *     when feature options is disable and monitor respectively.
-	 *     So, in the former, driver won't receive watchdog timeout
-	 *     event even when mcu hangs and in the latter, driver will.
-	 *   - In L1 reset, chip MAC watchdog is disabled and enabled
-	 *     when feature option is disable and monitor respectively.
-	 *     So, in the former, driver won't receive hw error notification
-	 *     even when hw hangs and in the latter, driver will.
-	 */
-};
-
 #define DEBUG_MSG_SIZE_MAX 1200
 enum {
 	DEBUG_MSG_ID_UNKNOWN = 0x00,
@@ -734,98 +670,8 @@ struct WOW_CTRL {
 	uint8_t aucReserved1[1];
 	struct WOW_WAKE_HIF astWakeHif[2];
 	struct WOW_PORT stWowPort;
-	uint8_t ucReason;
-	uint8_t aucReserved2[3];
 };
 
-#if CFG_SUPPORT_MDNS_OFFLOAD
-#define MDNS_RESPONSE_RECORD_MAX_LEN	500
-#define MDNS_QUESTION_NAME_MAX_LEN	102
-#define MAX_MDNS_CACHE_NUM		4
-
-#define MDNS_CMD_ENABLE			1
-#define MDNS_CMD_DISABLE		2
-#define MDNS_CMD_ADD_RECORD		3
-#define MDNS_CMD_CLEAR_RECORD		4
-#define MDNS_CMD_DEL_RECORD		5
-
-#define MDNS_PAYLOAD_TYPE_LEN		2
-#define MDNS_PAYLOAD_CLASS_LEN		2
-#define MDNS_PAYLOAD_TTL_LEN		4
-#define MDNS_PAYLOAD_DATALEN_LEN	2
-
-#define MDNS_ELEM_TYPE_PTR		12
-#define MDNS_ELEM_TYPE_SRV		33
-#define MDNS_ELEM_TYPE_TXT		16
-#define MDNS_ELEM_TYPE_A		1
-
-#define MDNS_WAKEUP_BY_NO_MATCH_RECORD	BIT(0)
-#define MDNS_WAKEUP_BY_SUB_REQ		BIT(1)
-
-#define UDP_HEADER_LENGTH		8
-#define IPV4_HEADER_LENGTH		20
-
-struct WLAN_MAC_HEADER_QoS_T {
-	uint16_t u2FrameCtrl;
-	uint16_t DurationID;
-	uint8_t aucAddr1[MAC_ADDR_LEN];
-	uint8_t aucAddr2[MAC_ADDR_LEN];
-	uint8_t aucAddr3[MAC_ADDR_LEN];
-	uint16_t u2SeqCtrl;
-	uint16_t u2QosCtrl;
-};
-
-struct WLAN_MDNS_HDR_T {
-	uint16_t usMdnsId;
-	uint16_t usMdnsFlags;
-	uint16_t usQuestionCnt;
-	uint16_t usAnswerCnt;
-	uint16_t usAuthCnt;
-	uint16_t usAddtionCnt;
-};
-
-struct MDNS_TEMPLATE_T {
-	uint8_t name[MDNS_QUESTION_NAME_MAX_LEN];
-	uint8_t name_length;
-	uint16_t class;
-	uint16_t type;
-};
-
-struct MDNS_PARAM_T {
-	struct MDNS_TEMPLATE_T query_ptr;
-	struct MDNS_TEMPLATE_T query_srv;
-	struct MDNS_TEMPLATE_T query_txt;
-	struct MDNS_TEMPLATE_T query_a;
-	uint16_t response_len;
-	uint8_t response[MDNS_RESPONSE_RECORD_MAX_LEN];
-};
-
-struct MDNS_INFO_UPLAYER_T {
-	uint8_t ucCmd;
-	struct MDNS_PARAM_T mdns_param;
-};
-
-struct MDNS_PARAM_ENTRY_T {
-	struct LINK_ENTRY rLinkEntry;
-	struct MDNS_PARAM_T mdns_param;
-};
-
-struct CMD_MDNS_PARAM_T {
-	uint8_t ucCmd;
-	struct MDNS_PARAM_T mdns_param;
-	uint32_t u4RecordId;
-	uint8_t ucWakeFlag;
-	struct WLAN_MAC_HEADER_QoS_T aucMdnsMacHdr;
-	uint8_t aucMdnsIPHdr[IPV4_HEADER_LENGTH];
-	uint8_t aucMdnsUdpHdr[UDP_HEADER_LENGTH];
-};
-
-struct MDNS_INFO_T {
-	struct LINK rMdnsRecordList;
-	struct LINK rMdnsRecordFreeList;
-	struct MDNS_PARAM_ENTRY_T rMdnsEntry[MAX_MDNS_CACHE_NUM];
-};
-#endif /* CFG_SUPPORT_MDNS_OFFLOAD */
 #endif
 
 #if (CFG_SUPPORT_TWT == 1)
@@ -833,19 +679,7 @@ enum _TWT_GET_TSF_REASON {
 	TWT_GET_TSF_FOR_ADD_AGRT_BYPASS = 1,
 	TWT_GET_TSF_FOR_ADD_AGRT = 2,
 	TWT_GET_TSF_FOR_RESUME_AGRT = 3,
-	TWT_GET_TSF_FOR_ADD_AGRT_BTWT = 4,
-	TWT_GET_TSF_FOR_ADD_AGRT_ML_TWT_ALL_LINKS = 5,
-	TWT_GET_TSF_FOR_ADD_AGRT_ML_TWT_ONE_BY_ONE = 6,
-	TWT_GET_TSF_FOR_END_AGRT_ML_TWT_ONE_BY_ONE = 7,
-	TWT_GET_TSF_FOR_CNM_TEARDOWN_GRANTED = 8,
 	TWT_GET_TSF_REASON_MAX
-};
-
-enum _TWT_STA_CNM_REASON {
-	TWT_STA_CNM_DEFAULT = 0,
-	TWT_STA_CNM_SETUP = 1,
-	TWT_STA_CNM_TEARDOWN = 2,
-	TWT_STA_CNM_REASON_MAX
 };
 
 struct _TWT_PARAMS_T {
@@ -856,7 +690,6 @@ struct _TWT_PARAMS_T {
 	uint8_t ucSetupCmd;
 	uint8_t ucMinWakeDur;
 	uint8_t ucWakeIntvalExponent;
-	uint8_t fgByPassNego;
 	uint16_t u2WakeIntvalMantiss;
 	uint64_t u8TWT;
 };
@@ -870,42 +703,8 @@ struct _TWT_CTRL_T {
 	uint8_t ucBssIdx;
 	uint8_t ucCtrlAction;
 	uint8_t ucTWTFlowId;
-	uint8_t ucMLTWT_Param_Last;
 	struct _TWT_PARAMS_T rTWTParams;
-	struct _NEXT_TWT_INFO_T rNextTWT;
 };
-
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-struct _TWT_HOTSPOT_CTRL_T {
-	uint8_t ucBssIdx;
-	uint8_t ucCtrlAction;
-	uint8_t ucTWTFlowId;
-	struct _TWT_PARAMS_T rTWTParams;
-	uint8_t ucDialogToken;
-	uint8_t ucIsReject;
-	struct STA_RECORD *prStaRec;
-};
-
-struct _TWT_HOTSPOT_STA_NODE {
-	/* twt link node control */
-	struct LINK_ENTRY list_entry;
-	/* twt entry */
-	uint8_t	used;
-	uint8_t	agrt_tbl_idx;
-	uint8_t	own_mac_idx;
-	uint8_t	flow_id;
-	uint16_t	peer_id_grp_id;
-	uint8_t	agrt_sp_duration;
-	uint8_t	bss_idx;
-	/* used by scheduler and will be within TWT_SP_SPAN_TIME */
-	uint64_t	schedule_sp_start_tsf;
-	uint64_t  twt_assigned_tsf;  /* TWT real timestamp */
-	uint64_t	agrt_sp_start_tsf;  /* tsf from requester */
-	uint16_t	agrt_sp_wake_intvl_mantissa;
-	uint8_t	agrt_sp_wake_intvl_exponent;
-	struct STA_RECORD *prStaRec;
-};
-#endif
 
 struct _TWT_GET_TSF_CONTEXT_T {
 	enum _TWT_GET_TSF_REASON ucReason;
@@ -913,45 +712,9 @@ struct _TWT_GET_TSF_CONTEXT_T {
 	uint8_t ucTWTFlowId;
 	uint8_t fgIsOid;
 	struct _TWT_PARAMS_T rTWTParams;
-	struct _NEXT_TWT_INFO_T rNextTWT;
-	enum _TWT_STA_CNM_REASON ucTwtStaCnmReason;
 };
 
 #endif
-
-#if (CFG_SUPPORT_802_11AX == 1)
-struct _SMPS_PARAMS_T {
-	uint8_t ucHtHeCap;
-};
-
-struct _SMPS_CTRL_T {
-	uint8_t ucBssIdx;
-	uint8_t ucCtrlAction;
-	struct _SMPS_PARAMS_T rSMPSParams;
-};
-#endif
-
-struct REAL_TIME {
-	int32_t i4TmSec;
-	int32_t i4TmMin;
-	int32_t i4TmHour;
-	int32_t i4TmDay;
-	int32_t i4TmMon;
-	int32_t i4TmYear;
-	int32_t i4TmWday;
-	int32_t i4TmYday;
-	int32_t i4TmIsDst;
-	uint32_t u4TvValUsec;
-	uint32_t u4TvValSec;
-};
-
-struct FT_EVENT_PARAMS {
-	const uint8_t *pcIe;
-	uint16_t u2IeLen;
-	const uint8_t *pcTargetAp;
-	const uint8_t *pcRicIes;
-	uint16_t u2RicIesLen;
-};
 
 enum ENUM_NVRAM_MTK_FEATURE {
 	MTK_FEATURE_2G_256QAM_DISABLED = 0,
@@ -1091,11 +854,7 @@ struct MIB_INFO_STAT {
 	uint32_t u4RxFifoFull;
 	uint32_t u4AmpduTxSfCnt;
 	uint32_t u4AmpduTxAckSfCnt;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	uint32_t au4TxRangeAmpduCnt[AGG_RANGE_SEL_NUM + 1];
-#else
 	uint16_t au2TxRangeAmpduCnt[AGG_RANGE_SEL_NUM + 1];
-#endif
 };
 
 struct PARAM_GET_STA_STATISTICS {
@@ -1186,19 +945,12 @@ struct PARAM_GET_STA_STATISTICS {
 	uint32_t u4AggRangeCtrl_0;
 	uint32_t u4AggRangeCtrl_1;
 	uint8_t ucRangeType;
-#if (CFG_SUPPORT_CONNAC2X == 0 && CFG_SUPPORT_CONNAC3X == 0)
+#if (CFG_SUPPORT_CONNAC2X == 0)
 	uint8_t aucReserved5[24];
 #else
 	uint32_t u4AggRangeCtrl_2;
 	uint32_t u4AggRangeCtrl_3;
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	uint32_t u4AggRangeCtrl_4;
-	uint32_t u4AggRangeCtrl_5;
-	uint32_t u4AggRangeCtrl_6;
-	uint32_t u4AggRangeCtrl_7;
-#else
 	uint8_t aucReserved5[16];
-#endif
 #endif
 #endif
 	uint8_t ucArStateCurr;
@@ -1290,7 +1042,7 @@ struct PARAM_GET_BSS_STATISTICS {
 
 struct PARAM_GET_DRV_STATISTICS {
 	int32_t i4TxPendingFrameNum;
-	int32_t i4TxPendingCmdDataFrameNum;
+	int32_t i4TxPendingSecurityFrameNum;
 	int32_t i4TxPendingCmdNum;
 
 	/* sync i4PendingFwdFrameCount in _TX_CTRL_T */
@@ -1330,8 +1082,27 @@ enum ENUM_TX_RESULT_CODE {
 	TX_RESULT_DROPPED_IN_FW,
 	TX_RESULT_QUEUE_CLEARANCE,
 	TX_RESULT_INACTIVE_BSS,
-	TX_RESULT_FLUSH_PENDING,
 	TX_RESULT_NUM
+};
+
+/* enum of BEACON_TIMEOUT_REASON */
+enum _ENUM_PM_BEACON_TIME_OUT_REACON_CODE_T {
+	BEACON_TIMEOUT_DUE_2_HW_BEACON_LOST_NONADHOC,
+	BEACON_TIMEOUT_DUE_2_HW_BEACON_LOST_ADHOC,
+	BEACON_TIMEOUT_DUE_2_HW_TSF_DRIFT,
+	BEACON_TIMEOUT_DUE_2_NULL_FRAME_THRESHOLD,
+	BEACON_TIMEOUT_DUE_2_AGING_THRESHOLD,
+	BEACON_TIMEOUT_DUE_2_BSSID_BEACON_PEIROD_NOT_ILLIGAL,
+	BEACON_TIMEOUT_DUE_2_CONNECTION_FAIL,
+	BEACON_TIMEOUT_DUE_2_ALLOCAT_NULL_PKT_FAIL_THRESHOLD,
+	BEACON_TIMEOUT_DUE_2_NO_TX_DONE_EVENT,
+	BEACON_TIMEOUT_DUE_2_UNSPECIF_REASON,
+	BEACON_TIMEOUT_DUE_2_SET_CHIP,
+	BEACON_TIMEOUT_DUE_2_KEEP_SCAN_AP_MISS_CHECK_FAIL,
+	BEACON_TIMEOUT_DUE_2_KEEP_UNCHANGED_LOW_RSSI_CHECK_FAIL,
+	BEACON_TIMEOUT_DUE_2_NULL_FRAME_LIFE_TIMEOUT,
+	BEACON_TIMEOUT_DUE_2_APR_NO_RESPONSE,
+	BEACON_TIMEOUT_DUE_2_NUM
 };
 
 struct WLAN_CFG_ENTRY {
@@ -1430,7 +1201,7 @@ struct PARAM_GET_CNM_T {
 	uint8_t	au4Reserved[65]; /*Total 160 byte*/
 };
 
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 struct WIFI_LINK_QUALITY_INFO {
 	uint32_t u4CurTxRate;		/* current tx link speed */
 	uint64_t u8TxTotalCount;	/* tx total accumulated count */
@@ -1484,7 +1255,6 @@ enum ENUM_WLAN_IOT_AP_HANDLE_ACTION {
 	WLAN_IOT_AP_DIS_2GHT40,
 	WLAN_IOT_AP_KEEP_EDCA_PARAM = 6,
 	WLAN_IOT_AP_COEX_DIS_RX_AMPDU,
-	WLAN_IOT_AP_ADAPTIVE_BEACON_TIME = 12,
 	WLAN_IOT_AP_ACT_MAX
 };
 
@@ -1513,136 +1283,21 @@ struct TRX_INFO {
 	uint32_t u4RxOk[MAX_BSSID_NUM];	/* By BSSIDX */
 };
 
-struct RxRateInfo {
+struct ENV_INFO {
+	struct timespec64 rLongestTxTime;
+	uint32_t u4Snr;
+	uint32_t u4Noise;
+	uint32_t u4RxListenTime;
+	uint32_t u4TxTimeCount;
+	uint32_t u4Idle;
+};
+
+struct RateInfo {
 	uint32_t u4Mode;
 	uint32_t u4Nss;
 	uint32_t u4Bw;
 	uint32_t u4Gi;
 	uint32_t u4Rate;
-};
-
-enum THERMAL_TEMP_TYPE {
-	THERMAL_TEMP_TYPE_ADIE,
-	THERMAL_TEMP_TYPE_DDIE,
-	THERMAL_TEMP_TYPE_NUM,
-};
-
-struct THERMAL_TEMP_DATA {
-	enum THERMAL_TEMP_TYPE eType;
-	uint8_t ucIdx;
-	uint32_t u4Temperature;
-};
-
-/* channel operating width */
-enum WIFI_CHANNEL_WIDTH {
-	WIFI_CHAN_WIDTH_20 = 0,
-	WIFI_CHAN_WIDTH_40 = 1,
-	WIFI_CHAN_WIDTH_80 = 2,
-	WIFI_CHAN_WIDTH_160 = 3,
-	WIFI_CHAN_WIDTH_80P80 = 4,
-	WIFI_CHAN_WIDTH_5 = 5,
-	WIFI_CHAN_WIDTH_10 = 6,
-	WIFI_CHAN_WIDTH_INVALID = -1
-};
-
-/* channel information */
-struct WIFI_CHANNEL_INFO {
-	enum WIFI_CHANNEL_WIDTH width;
-	uint32_t center_freq;
-	uint32_t center_freq0;
-	uint32_t center_freq1;
-};
-
-/* wifi rate */
-struct WIFI_RATE {
-	uint32_t preamble: 3;
-	uint32_t nss: 2;
-	uint32_t bw: 3;
-	uint32_t rateMcsIdx: 8;
-	uint32_t reserved: 16;
-	uint32_t bitrate;
-};
-
-
-/* RTT Capabilities */
-struct RTT_CAPABILITIES {
-	/* if 1-sided rtt data collection is supported */
-	uint8_t fgRttOneSidedSupported;
-	/* if ftm rtt data collection is supported */
-	uint8_t fgRttFtmSupported;
-	/* if initiator supports LCI request. Applies to 2-sided RTT */
-	uint8_t fgLciSupported;
-	/* if initiator supports LCR request. Applies to 2-sided RTT */
-	uint8_t fgLcrSupported;
-	/* bit mask indicates what preamble is supported by initiator */
-	uint8_t ucPreambleSupport;
-	/* bit mask indicates what BW is supported by initiator */
-	uint8_t ucBwSupport;
-	/* if 11mc responder mode is supported */
-	uint8_t fgResponderSupported;
-	/* draft 11mc spec version supported by chip. For instance,
-	 * version 4.0 should be 40 and version 4.3 should be 43 etc.
-	 */
-	uint8_t fgMcVersion;
-};
-
-/* RTT configuration */
-struct RTT_CONFIG {
-	uint8_t aucAddr[MAC_ADDR_LEN]; /* peer device mac address */
-	uint8_t eType; /* enum ENUM_RTT_TYPE */
-	uint8_t ePeer; /* enum ENUM_RTT_PEER_TYPE */
-	struct WIFI_CHANNEL_INFO rChannel;
-	uint8_t ucBurstPeriod;
-	uint8_t ucNumBurst;
-	uint8_t ucNumFramesPerBurst;
-	uint8_t ucNumRetriesPerRttFrame;
-	uint8_t ucNumRetriesPerFtmr;
-	uint8_t ucLciRequest;
-	uint8_t ucLcrRequest;
-	uint8_t ucBurstDuration;
-	uint8_t ePreamble; /* enum ENUM_WIFI_RTT_PREAMBLE */
-	uint8_t eBw; /* enum ENUM_WIFI_RTT_BW */
-
-	/* bellow are for internal useages */
-	uint8_t fgASAP;
-	uint8_t ucMinDeltaIn100US;
-	uint64_t u8LocalTSFTime;
-	uint64_t u8PeerTSFTime;
-};
-
-struct RTT_RESULT {
-	uint8_t aucMacAddr[MAC_ADDR_LEN];
-	uint32_t u4BurstNum;
-	uint32_t  u4MeasurementNumber;
-	uint32_t  u4SuccessNumber;
-	uint8_t  ucNumPerBurstPeer;
-	uint32_t eStatus; /* enum ENUM_RTT_STATUS */
-	uint8_t  ucRetryAfterDuration;
-	uint32_t eType; /* enum ENUM_RTT_TYPE */
-	int32_t i4Rssi;
-	int32_t i4RssiSpread;
-	struct WIFI_RATE rTxRate;
-	struct WIFI_RATE rRxRate;
-	int64_t i8Rtt;
-	int64_t i8RttSd;
-	int64_t i8RttSpread;
-	int32_t i4DistanceMM;
-	int32_t i4DistanceSdMM;
-	int32_t i4DistanceSpreadMM;
-	int64_t i8Ts;
-	int32_t i4BurstDuration;
-	int32_t i4NegotiatedBustNum;
-};
-
-enum ENUM_TX_OVER_LIMIT_STATS_TYPE {
-	REPORT_IMMEDIATE,
-	REPORT_AVERAGE,
-};
-
-enum ENUM_TX_OVER_LIMIT_DELAY_TYPE {
-	DRIVER_DELAY,
-	MAC_DELAY,
-	MAX_TX_OVER_LIMIT_TYPE,
 };
 
 /*******************************************************************************
@@ -1688,365 +1343,368 @@ enum ENUM_TX_OVER_LIMIT_DELAY_TYPE {
  *******************************************************************************
  */
 
-struct ADAPTER *wlanAdapterCreate(struct GLUE_INFO *prGlueInfo);
+struct ADAPTER *wlanAdapterCreate(IN struct GLUE_INFO *prGlueInfo);
 
-void wlanAdapterDestroy(struct ADAPTER *prAdapter);
+void wlanAdapterDestroy(IN struct ADAPTER *prAdapter);
 
-void wlanCardEjected(struct ADAPTER *prAdapter);
+void wlanCardEjected(IN struct ADAPTER *prAdapter);
 
-void wlanIST(struct ADAPTER *prAdapter, bool fgEnInt);
+void wlanIST(IN struct ADAPTER *prAdapter, bool fgEnInt);
 
-u_int8_t wlanISR(struct ADAPTER *prAdapter, u_int8_t fgGlobalIntrCtrl);
+u_int8_t wlanISR(IN struct ADAPTER *prAdapter, IN u_int8_t fgGlobalIntrCtrl);
 
-uint32_t wlanProcessCommandQueue(struct ADAPTER *prAdapter,
-				 struct QUE *prCmdQue);
+uint32_t wlanProcessCommandQueue(IN struct ADAPTER *prAdapter,
+				 IN struct QUE *prCmdQue);
 
-uint32_t wlanSendCommand(struct ADAPTER *prAdapter,
-			 struct CMD_INFO *prCmdInfo);
+uint32_t wlanSendCommand(IN struct ADAPTER *prAdapter,
+			 IN struct CMD_INFO *prCmdInfo);
 
 #if CFG_SUPPORT_MULTITHREAD
-uint32_t wlanSendCommandMthread(struct ADAPTER *prAdapter,
-				struct CMD_INFO *prCmdInfo);
+uint32_t wlanSendCommandMthread(IN struct ADAPTER *prAdapter,
+				IN struct CMD_INFO *prCmdInfo);
 
-uint32_t wlanTxCmdMthread(struct ADAPTER *prAdapter);
+uint32_t wlanTxCmdMthread(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanTxCmdDoneMthread(struct ADAPTER *prAdapter);
+uint32_t wlanTxCmdDoneMthread(IN struct ADAPTER *prAdapter);
 
-void wlanClearTxCommandQueue(struct ADAPTER *prAdapter);
+void wlanClearTxCommandQueue(IN struct ADAPTER *prAdapter);
 
-void wlanClearTxCommandDoneQueue(struct ADAPTER *prAdapter);
+void wlanClearTxCommandDoneQueue(IN struct ADAPTER *prAdapter);
 
-void wlanClearDataQueue(struct ADAPTER *prAdapter);
+void wlanClearDataQueue(IN struct ADAPTER *prAdapter);
 
-void wlanClearRxToOsQueue(struct ADAPTER *prAdapter);
+void wlanClearRxToOsQueue(IN struct ADAPTER *prAdapter);
 #endif
 
-void wlanClearPendingCommandQueue(struct ADAPTER *prAdapter);
+void wlanClearPendingCommandQueue(IN struct ADAPTER *prAdapter);
 
-void wlanReleaseCommand(struct ADAPTER *prAdapter,
-			struct CMD_INFO *prCmdInfo,
-			enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+void wlanReleaseCommand(IN struct ADAPTER *prAdapter,
+			IN struct CMD_INFO *prCmdInfo,
+			IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-void wlanReleaseCommandEx(struct ADAPTER *prAdapter,
-			struct CMD_INFO *prCmdInfo,
-			enum ENUM_TX_RESULT_CODE rTxDoneStatus,
-			u_int8_t fgIsNeedHandler);
+void wlanReleaseCommandEx(IN struct ADAPTER *prAdapter,
+			IN struct CMD_INFO *prCmdInfo,
+			IN enum ENUM_TX_RESULT_CODE rTxDoneStatus,
+			IN u_int8_t fgIsNeedHandler);
 
-void wlanReleasePendingOid(struct ADAPTER *prAdapter,
-			   uintptr_t ulParamPtr);
 
-void wlanReleasePendingCMDbyBssIdx(struct ADAPTER *prAdapter,
-				   uint8_t ucBssIndex);
+void wlanReleasePendingOid(IN struct ADAPTER *prAdapter,
+			   IN unsigned long ulParamPtr);
 
-void wlanReturnPacketDelaySetup(struct ADAPTER *prAdapter);
+void wlanReleasePendingCMDbyBssIdx(IN struct ADAPTER *prAdapter,
+				   IN uint8_t ucBssIndex);
 
-#if (CFG_SUPPORT_RETURN_TASK == 1)
-void wlanReturnPacketDelaySetupTasklet(uintptr_t data);
-#endif
+void wlanReturnPacketDelaySetupTimeout(IN struct ADAPTER *prAdapter,
+				       IN unsigned long ulParamPtr);
 
-void wlanReturnPacketDelaySetupTimeout(struct ADAPTER *prAdapter,
-				       uintptr_t ulParamPtr);
-
-void wlanReturnPacket(struct ADAPTER *prAdapter, void *pvPacket);
+void wlanReturnPacket(IN struct ADAPTER *prAdapter, IN void *pvPacket);
 
 uint32_t
-wlanQueryInformation(struct ADAPTER *prAdapter,
-		     PFN_OID_HANDLER_FUNC pfOidQryHandler,
-		     void *pvInfoBuf, uint32_t u4InfoBufLen,
-		     uint32_t *pu4QryInfoLen);
+wlanQueryInformation(IN struct ADAPTER *prAdapter,
+		     IN PFN_OID_HANDLER_FUNC pfOidQryHandler,
+		     IN void *pvInfoBuf, IN uint32_t u4InfoBufLen,
+		     OUT uint32_t *pu4QryInfoLen);
 
 uint32_t
-wlanSetInformation(struct ADAPTER *prAdapter,
-		   PFN_OID_HANDLER_FUNC pfOidSetHandler,
-		   void *pvInfoBuf, uint32_t u4InfoBufLen,
-		   uint32_t *pu4SetInfoLen);
+wlanSetInformation(IN struct ADAPTER *prAdapter,
+		   IN PFN_OID_HANDLER_FUNC pfOidSetHandler,
+		   IN void *pvInfoBuf, IN uint32_t u4InfoBufLen,
+		   OUT uint32_t *pu4SetInfoLen);
 
-uint32_t wlanAdapterStart(struct ADAPTER *prAdapter,
-			  struct REG_INFO *prRegInfo,
-			  const u_int8_t bAtResetFlow);
+uint32_t wlanAdapterStart(IN struct ADAPTER *prAdapter,
+			  IN struct REG_INFO *prRegInfo,
+			  IN const u_int8_t bAtResetFlow);
 
-uint32_t wlanAdapterStop(struct ADAPTER *prAdapter,
-		const u_int8_t bAtResetFlow);
+uint32_t wlanAdapterStop(IN struct ADAPTER *prAdapter,
+		IN const u_int8_t bAtResetFlow);
 
-void wlanCheckAsicCap(struct ADAPTER *prAdapter);
+void wlanCheckAsicCap(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanCheckWifiFunc(struct ADAPTER *prAdapter,
-			   u_int8_t fgRdyChk);
+uint32_t wlanCheckWifiFunc(IN struct ADAPTER *prAdapter,
+			   IN u_int8_t fgRdyChk);
 
-void wlanReturnRxPacket(void *pvAdapter, void *pvPacket);
+void wlanReturnRxPacket(IN void *pvAdapter, IN void *pvPacket);
 
-void wlanRxSetBroadcast(struct ADAPTER *prAdapter,
-			u_int8_t fgEnableBroadcast);
+void wlanRxSetBroadcast(IN struct ADAPTER *prAdapter,
+			IN u_int8_t fgEnableBroadcast);
 
-u_int8_t wlanIsHandlerNeedHwAccess(PFN_OID_HANDLER_FUNC pfnOidHandler,
-				   u_int8_t fgSetInfo);
+u_int8_t wlanIsHandlerNeedHwAccess(IN PFN_OID_HANDLER_FUNC pfnOidHandler,
+				   IN u_int8_t fgSetInfo);
 
-void wlanSetPromiscuousMode(struct ADAPTER *prAdapter,
-			    u_int8_t fgEnablePromiscuousMode);
+void wlanSetPromiscuousMode(IN struct ADAPTER *prAdapter,
+			    IN u_int8_t fgEnablePromiscuousMode);
 
-uint32_t wlanSendDummyCmd(struct ADAPTER *prAdapter,
-			  u_int8_t fgIsReqTxRsrc);
+uint32_t wlanSendDummyCmd(IN struct ADAPTER *prAdapter,
+			  IN u_int8_t fgIsReqTxRsrc);
 
-uint32_t wlanSendNicPowerCtrlCmd(struct ADAPTER *prAdapter,
-				 uint8_t ucPowerMode);
+uint32_t wlanSendNicPowerCtrlCmd(IN struct ADAPTER *prAdapter,
+				 IN uint8_t ucPowerMode);
 
-u_int8_t wlanIsHandlerAllowedInRFTest(PFN_OID_HANDLER_FUNC pfnOidHandler,
-				      u_int8_t fgSetInfo);
+u_int8_t wlanIsHandlerAllowedInRFTest(IN PFN_OID_HANDLER_FUNC pfnOidHandler,
+				      IN u_int8_t fgSetInfo);
 
-uint32_t wlanProcessQueuedSwRfb(struct ADAPTER *prAdapter,
-				struct SW_RFB *prSwRfbListHead);
+uint32_t wlanProcessQueuedSwRfb(IN struct ADAPTER *prAdapter,
+				IN struct SW_RFB *prSwRfbListHead);
 
-uint32_t wlanProcessQueuedMsduInfo(struct ADAPTER *prAdapter,
-				   struct MSDU_INFO *prMsduInfoListHead);
+uint32_t wlanProcessQueuedMsduInfo(IN struct ADAPTER *prAdapter,
+				   IN struct MSDU_INFO *prMsduInfoListHead);
 
-u_int8_t wlanoidTimeoutCheck(struct ADAPTER *prAdapter,
-			     PFN_OID_HANDLER_FUNC pfnOidHandler);
+u_int8_t wlanoidTimeoutCheck(IN struct ADAPTER *prAdapter,
+			     IN PFN_OID_HANDLER_FUNC pfnOidHandler);
 
-void wlanoidClearTimeoutCheck(struct ADAPTER *prAdapter);
+void wlanoidClearTimeoutCheck(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanUpdateNetworkAddress(struct ADAPTER *prAdapter);
+uint32_t wlanUpdateNetworkAddress(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanUpdateBasicConfig(struct ADAPTER *prAdapter);
+uint32_t wlanUpdateBasicConfig(IN struct ADAPTER *prAdapter);
 
-u_int8_t wlanQueryTestMode(struct ADAPTER *prAdapter);
+u_int8_t wlanQueryTestMode(IN struct ADAPTER *prAdapter);
 
-u_int8_t wlanProcessTxFrame(struct ADAPTER *prAdapter,
-			    void *prPacket);
+u_int8_t wlanProcessTxFrame(IN struct ADAPTER *prAdapter,
+			    IN void *prPacket);
 
-uint32_t wlanProcessCmdDataFrame(struct ADAPTER *prAdapter,
-				 void *prPacket);
+/* Security Frame Handling */
+u_int8_t wlanProcessSecurityFrame(IN struct ADAPTER *prAdapter,
+				  IN void *prPacket);
 
-void wlanCmdDataFrameTxTimeout(struct ADAPTER *prAdapter,
-				struct CMD_INFO *prCmdInfo);
+uint32_t wlanProcessCmdDataFrame(IN struct ADAPTER
+				  *prAdapter, IN void *prPacket);
 
-uint32_t wlanGetThreadWakeUp(struct ADAPTER *prAdapter);
+void wlanSecurityFrameTxDone(IN struct ADAPTER *prAdapter,
+			     IN struct CMD_INFO *prCmdInfo,
+			     IN uint8_t *pucEventBuf);
 
-uint32_t wlanGetTxdAppendSize(struct ADAPTER *prAdapter);
+void wlanSecurityAndCmdDataFrameTxTimeout(IN struct ADAPTER *prAdapter,
+				IN struct CMD_INFO *prCmdInfo);
 
-void wlanCmdDataFrameTxDone(struct ADAPTER *prAdapter,
-			     struct CMD_INFO *prCmdInfo,
-			     uint8_t *pucEventBuf);
+void wlanCmdDataFrameTxDone(IN struct ADAPTER *prAdapter,
+			     IN struct CMD_INFO *prCmdInfo,
+			     IN uint8_t *pucEventBuf);
 
 
 /*----------------------------------------------------------------------------*/
 /* OID/IOCTL Handling                                                         */
 /*----------------------------------------------------------------------------*/
-void wlanClearScanningResult(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void wlanClearScanningResult(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void wlanClearBssInScanningResult(struct ADAPTER *prAdapter,
-				  uint8_t *arBSSID);
+void wlanClearBssInScanningResult(IN struct ADAPTER *prAdapter,
+				  IN uint8_t *arBSSID);
 
 #if CFG_TEST_WIFI_DIRECT_GO
-void wlanEnableP2pFunction(struct ADAPTER *prAdapter);
+void wlanEnableP2pFunction(IN struct ADAPTER *prAdapter);
 
-void wlanEnableATGO(struct ADAPTER *prAdapter);
+void wlanEnableATGO(IN struct ADAPTER *prAdapter);
 #endif
 
 /*----------------------------------------------------------------------------*/
 /* NIC Capability Retrieve by Polling                                         */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanQueryNicCapability(struct ADAPTER *prAdapter);
+uint32_t wlanQueryNicCapability(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* PD MCR Retrieve by Polling                                                 */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanQueryPdMcr(struct ADAPTER *prAdapter,
-			struct PARAM_MCR_RW_STRUCT *prMcrRdInfo);
+uint32_t wlanQueryPdMcr(IN struct ADAPTER *prAdapter,
+			IN struct PARAM_MCR_RW_STRUCT *prMcrRdInfo);
 
 /*----------------------------------------------------------------------------*/
 /* Get minimal tx power setting from NVRAM */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanGetMiniTxPower(struct ADAPTER *prAdapter,
-				  enum ENUM_BAND eBand,
-				  enum ENUM_PHY_MODE_TYPE ePhyMode,
-				  int8_t *pTxPwr);
+uint32_t wlanGetMiniTxPower(IN struct ADAPTER *prAdapter,
+				  IN enum ENUM_BAND eBand,
+				  IN enum ENUM_PHY_MODE_TYPE ePhyMode,
+				  OUT int8_t *pTxPwr);
 /*----------------------------------------------------------------------------*/
 /* Loading Manufacture Data                                                   */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanLoadManufactureData(struct ADAPTER *prAdapter,
-				 struct REG_INFO *prRegInfo);
+uint32_t wlanLoadManufactureData(IN struct ADAPTER *prAdapter,
+				 IN struct REG_INFO *prRegInfo);
+
+/*----------------------------------------------------------------------------*/
+/* Media Stream Mode                                                          */
+/*----------------------------------------------------------------------------*/
+u_int8_t wlanResetMediaStreamMode(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* Timer Timeout Check (for Glue Layer)                                       */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanTimerTimeoutCheck(struct ADAPTER *prAdapter);
+uint32_t wlanTimerTimeoutCheck(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* Mailbox Message Check (for Glue Layer)                                     */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanProcessMboxMessage(struct ADAPTER *prAdapter);
+uint32_t wlanProcessMboxMessage(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* TX Pending Packets Handling (for Glue Layer)                               */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanEnqueueTxPacket(struct ADAPTER *prAdapter,
-			     void *prNativePacket);
+uint32_t wlanEnqueueTxPacket(IN struct ADAPTER *prAdapter,
+			     IN void *prNativePacket);
 
-uint32_t wlanFlushTxPendingPackets(struct ADAPTER *prAdapter);
+uint32_t wlanFlushTxPendingPackets(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanTxPendingPackets(struct ADAPTER *prAdapter,
-			      u_int8_t *pfgHwAccess);
+uint32_t wlanTxPendingPackets(IN struct ADAPTER *prAdapter,
+			      IN OUT u_int8_t *pfgHwAccess);
 
 /*----------------------------------------------------------------------------*/
 /* Low Power Acquire/Release (for Glue Layer)                                 */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanAcquirePowerControl(struct ADAPTER *prAdapter);
+uint32_t wlanAcquirePowerControl(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanReleasePowerControl(struct ADAPTER *prAdapter);
+uint32_t wlanReleasePowerControl(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* Pending Packets Number Reporting (for Glue Layer)                          */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanGetTxPendingFrameCount(struct ADAPTER *prAdapter);
+uint32_t wlanGetTxPendingFrameCount(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* ACPI state inquiry (for Glue Layer)                                        */
 /*----------------------------------------------------------------------------*/
-enum ENUM_ACPI_STATE wlanGetAcpiState(struct ADAPTER *prAdapter);
+enum ENUM_ACPI_STATE wlanGetAcpiState(IN struct ADAPTER *prAdapter);
 
-void wlanSetAcpiState(struct ADAPTER *prAdapter,
-		      enum ENUM_ACPI_STATE ePowerState);
+void wlanSetAcpiState(IN struct ADAPTER *prAdapter,
+		      IN enum ENUM_ACPI_STATE ePowerState);
 
 
 /*----------------------------------------------------------------------------*/
 /* get ECO version from Revision ID register (for Win32)                      */
 /*----------------------------------------------------------------------------*/
-uint8_t wlanGetEcoVersion(struct ADAPTER *prAdapter);
-
-/*----------------------------------------------------------------------------*/
-/* get Rom version                                                            */
-/*----------------------------------------------------------------------------*/
-uint8_t wlanGetRomVersion(struct ADAPTER *prAdapter);
+uint8_t wlanGetEcoVersion(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* set preferred band configuration corresponding to network type             */
 /*----------------------------------------------------------------------------*/
-void wlanSetPreferBandByNetwork(struct ADAPTER *prAdapter,
-				enum ENUM_BAND eBand, uint8_t ucBssIndex);
+void wlanSetPreferBandByNetwork(IN struct ADAPTER *prAdapter,
+				IN enum ENUM_BAND eBand, IN uint8_t ucBssIndex);
 
 /*----------------------------------------------------------------------------*/
 /* get currently operating channel information                                */
 /*----------------------------------------------------------------------------*/
-uint8_t wlanGetChannelNumberByNetwork(struct ADAPTER *prAdapter,
-				      uint8_t ucBssIndex);
+uint8_t wlanGetChannelNumberByNetwork(IN struct ADAPTER *prAdapter,
+				      IN uint8_t ucBssIndex);
 
 /*----------------------------------------------------------------------------*/
 /* get currently operating band information                                */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanGetBandIndexByNetwork(struct ADAPTER *prAdapter,
-				uint8_t ucBssIndex);
+uint32_t wlanGetBandIndexByNetwork(IN struct ADAPTER *prAdapter,
+				IN uint8_t ucBssIndex);
 
 /*----------------------------------------------------------------------------*/
 /* check for system configuration to generate message on scan list            */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanCheckSystemConfiguration(struct ADAPTER *prAdapter);
+uint32_t wlanCheckSystemConfiguration(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* query bss statistics information from driver and firmware                  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-wlanoidQueryBssStatistics(struct ADAPTER *prAdapter,
-			  void *pvQueryBuffer, uint32_t u4QueryBufferLen,
-			  uint32_t *pu4QueryInfoLen);
+wlanoidQueryBssStatistics(IN struct ADAPTER *prAdapter,
+			  IN void *pvQueryBuffer, IN uint32_t u4QueryBufferLen,
+			  OUT uint32_t *pu4QueryInfoLen);
 
 /*----------------------------------------------------------------------------*/
 /* dump per-BSS statistics            */
 /*----------------------------------------------------------------------------*/
-void wlanDumpBssStatistics(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+void wlanDumpBssStatistics(IN struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 
 /*----------------------------------------------------------------------------*/
 /* query sta statistics information from driver and firmware                  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-wlanoidQueryStaStatistics(struct ADAPTER *prAdapter,
-			  void *pvQueryBuffer, uint32_t u4QueryBufferLen,
-			  uint32_t *pu4QueryInfoLen);
+wlanoidQueryStaStatistics(IN struct ADAPTER *prAdapter,
+			  IN void *pvQueryBuffer, IN uint32_t u4QueryBufferLen,
+			  OUT uint32_t *pu4QueryInfoLen);
 
 uint32_t
-wlanQueryStaStatistics(struct ADAPTER *prAdapter, void *pvQueryBuffer,
-		       uint32_t u4QueryBufferLen,
-		       uint32_t *pu4QueryInfoLen,
+wlanQueryStaStatistics(IN struct ADAPTER *prAdapter, IN void *pvQueryBuffer,
+		       IN uint32_t u4QueryBufferLen,
+		       OUT uint32_t *pu4QueryInfoLen,
 		       u_int8_t fgIsOid);
 
 uint32_t
-wlanQueryStatistics(struct ADAPTER *prAdapter,
-		       void *pvQueryBuffer, uint32_t u4QueryBufferLen,
-		       uint32_t *pu4QueryInfoLen, uint8_t fgIsOid);
+wlanQueryStatistics(IN struct ADAPTER *prAdapter,
+		       IN void *pvQueryBuffer, IN uint32_t u4QueryBufferLen,
+		       OUT uint32_t *pu4QueryInfoLen, IN uint8_t fgIsOid);
 
 /*----------------------------------------------------------------------------*/
 /* query NIC resource information from chip and reset Tx resource for normal  */
 /* operation                                                                  */
 /*----------------------------------------------------------------------------*/
-void wlanQueryNicResourceInformation(struct ADAPTER *prAdapter);
+void wlanQueryNicResourceInformation(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanQueryNicCapabilityV2(struct ADAPTER *prAdapter);
+uint32_t wlanQueryNicCapabilityV2(IN struct ADAPTER *prAdapter);
 
-void wlanUpdateNicResourceInformation(struct ADAPTER *prAdapter);
+void wlanUpdateNicResourceInformation(IN struct ADAPTER *prAdapter);
 
 /*----------------------------------------------------------------------------*/
 /* GET/SET BSS index mapping for network interfaces                           */
 /*----------------------------------------------------------------------------*/
-void wlanBindNetInterface(struct GLUE_INFO *prGlueInfo,
-			  uint8_t ucNetInterfaceIndex,
-			  void *pvNetInterface);
+void wlanBindNetInterface(IN struct GLUE_INFO *prGlueInfo,
+			  IN uint8_t ucNetInterfaceIndex,
+			  IN void *pvNetInterface);
 
-void wlanBindBssIdxToNetInterface(struct GLUE_INFO *prGlueInfo,
-				  uint8_t ucBssIndex,
-				  void *pvNetInterface);
+void wlanBindBssIdxToNetInterface(IN struct GLUE_INFO *prGlueInfo,
+				  IN uint8_t ucBssIndex,
+				  IN void *pvNetInterface);
 
-uint8_t wlanGetBssIdxByNetInterface(struct GLUE_INFO *prGlueInfo,
-				    void *pvNetInterface);
+uint8_t wlanGetBssIdxByNetInterface(IN struct GLUE_INFO *prGlueInfo,
+				    IN void *pvNetInterface);
 
-void *wlanGetNetInterfaceByBssIdx(struct GLUE_INFO *prGlueInfo,
-				  uint8_t ucBssIndex);
+void *wlanGetNetInterfaceByBssIdx(IN struct GLUE_INFO *prGlueInfo,
+				  IN uint8_t ucBssIndex);
 
 /* for windows as windows glue cannot see through P_ADAPTER_T */
 
-void wlanInitFeatureOption(struct ADAPTER *prAdapter);
+void wlanInitFeatureOption(IN struct ADAPTER *prAdapter);
 
-void wlanCfgSetSwCtrl(struct ADAPTER *prAdapter);
+void wlanCfgSetSwCtrl(IN struct ADAPTER *prAdapter);
 
-void wlanCfgSetChip(struct ADAPTER *prAdapter);
+void wlanCfgSetChip(IN struct ADAPTER *prAdapter);
 
-void wlanCfgSetDebugLevel(struct ADAPTER *prAdapter);
+#if (CFG_SUPPORT_CONNINFRA == 1)
+void wlanCfgSetChipSyncTime(IN struct ADAPTER *prAdapter);
+#endif
 
-void wlanCfgSetCountryCode(struct ADAPTER *prAdapter);
+void wlanCfgSetDebugLevel(IN struct ADAPTER *prAdapter);
 
-struct WLAN_CFG_ENTRY *wlanCfgGetEntry(struct ADAPTER *prAdapter,
+void wlanCfgSetCountryCode(IN struct ADAPTER *prAdapter);
+
+struct WLAN_CFG_ENTRY *wlanCfgGetEntry(IN struct ADAPTER *prAdapter,
 				       const int8_t *pucKey,
 				       uint32_t u4Flags);
 
 uint32_t
-wlanCfgGet(struct ADAPTER *prAdapter, const int8_t *pucKey, int8_t *pucValue,
+wlanCfgGet(IN struct ADAPTER *prAdapter, const int8_t *pucKey, int8_t *pucValue,
 	   int8_t *pucValueDef, uint32_t u4Flags);
 
-uint32_t wlanCfgGetUint32(struct ADAPTER *prAdapter, const int8_t *pucKey,
+uint32_t wlanCfgGetUint32(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 			  uint32_t u4ValueDef);
 
-int32_t wlanCfgGetInt32(struct ADAPTER *prAdapter, const int8_t *pucKey,
+int32_t wlanCfgGetInt32(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 			int32_t i4ValueDef);
 
-uint32_t wlanCfgSetUint32(struct ADAPTER *prAdapter, const int8_t *pucKey,
+uint32_t wlanCfgSetUint32(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 			  uint32_t u4Value);
 
-uint32_t wlanCfgSet(struct ADAPTER *prAdapter, const int8_t *pucKey,
+uint32_t wlanCfgSet(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 		    int8_t *pucValue, uint32_t u4Flags);
 
-uint32_t wlanCfgSetCb(struct ADAPTER *prAdapter, const int8_t *pucKey,
+uint32_t wlanCfgSetCb(IN struct ADAPTER *prAdapter, const int8_t *pucKey,
 		      WLAN_CFG_SET_CB pfSetCb, void *pPrivate,
 		      uint32_t u4Flags);
 
 #if CFG_SUPPORT_EASY_DEBUG
 
-uint32_t wlanCfgParse(struct ADAPTER *prAdapter, uint8_t *pucConfigBuf,
+uint32_t wlanCfgParse(IN struct ADAPTER *prAdapter, uint8_t *pucConfigBuf,
 		      uint32_t u4ConfigBufLen, u_int8_t isFwConfig);
-void wlanFeatureToFw(struct ADAPTER *prAdapter, uint32_t u4Flag);
+void wlanFeatureToFw(IN struct ADAPTER *prAdapter, uint32_t u4Flag);
 #endif
 
-void wlanLoadDefaultCustomerSetting(struct ADAPTER *prAdapter);
+void wlanLoadDefaultCustomerSetting(IN struct ADAPTER *prAdapter);
 
-uint32_t wlanCfgInit(struct ADAPTER *prAdapter, uint8_t *pucConfigBuf,
+uint32_t wlanCfgInit(IN struct ADAPTER *prAdapter, uint8_t *pucConfigBuf,
 		     uint32_t u4ConfigBufLen, uint32_t u4Flags);
 
 uint32_t wlanCfgParseArgument(int8_t *cmdLine, int32_t *argc, int8_t *argv[]);
@@ -2057,8 +1715,8 @@ uint32_t wlanCfgParseArgumentLong(int8_t *cmdLine, int32_t *argc,
 #endif
 
 #if CFG_SUPPORT_IOT_AP_BLACKLIST
-void wlanCfgLoadIotApRule(struct ADAPTER *prAdapter);
-void wlanCfgDumpIotApRule(struct ADAPTER *prAdapter);
+void wlanCfgLoadIotApRule(IN struct ADAPTER *prAdapter);
+void wlanCfgDumpIotApRule(IN struct ADAPTER *prAdapter);
 #endif
 
 int32_t wlanHexToNum(int8_t c);
@@ -2071,166 +1729,175 @@ int32_t wlanHexToArrayR(int8_t *hexString, int8_t *hexArray, uint8_t arrayLen);
 
 int32_t wlanHwAddrToBin(int8_t *txt, uint8_t *addr);
 
-u_int8_t wlanIsChipNoAck(struct ADAPTER *prAdapter);
+u_int8_t wlanIsChipNoAck(IN struct ADAPTER *prAdapter);
 
-u_int8_t wlanIsChipRstRecEnabled(struct ADAPTER *prAdapter);
+u_int8_t wlanIsChipRstRecEnabled(IN struct ADAPTER *prAdapter);
 
-u_int8_t wlanIsChipAssert(struct ADAPTER *prAdapter);
+u_int8_t wlanIsChipAssert(IN struct ADAPTER *prAdapter);
 
-void wlanChipRstPreAct(struct ADAPTER *prAdapter);
+void wlanChipRstPreAct(IN struct ADAPTER *prAdapter);
 
-void wlanCountTxDelayOverLimit(struct ADAPTER *prAdapter,
-		enum ENUM_TX_OVER_LIMIT_DELAY_TYPE type,
-		uint32_t u4Latency);
+void wlanTxProfilingTagPacket(IN struct ADAPTER *prAdapter, IN void *prPacket,
+			      IN enum ENUM_TX_PROFILING_TAG eTag);
 
-void wlanTxProfilingTagPacket(struct ADAPTER *prAdapter, void *prPacket,
-			      enum ENUM_TX_PROFILING_TAG eTag);
+void wlanTxProfilingTagMsdu(IN struct ADAPTER *prAdapter,
+			    IN struct MSDU_INFO *prMsduInfo,
+			    IN enum ENUM_TX_PROFILING_TAG eTag);
 
-void wlanTxProfilingTagMsdu(struct ADAPTER *prAdapter,
-			    struct MSDU_INFO *prMsduInfo,
-			    enum ENUM_TX_PROFILING_TAG eTag);
+void wlanTxLifetimeTagPacket(IN struct ADAPTER *prAdapter,
+			     IN struct MSDU_INFO *prMsduInfoListHead,
+			     IN enum ENUM_TX_PROFILING_TAG eTag);
 
-void wlanTxLifetimeTagPacket(struct ADAPTER *prAdapter,
-			     struct MSDU_INFO *prMsduInfoListHead,
-			     enum ENUM_TX_PROFILING_TAG eTag);
 
-#if (CFG_CE_ASSERT_DUMP == 1)
-void wlanCorDumpTimerInit(struct ADAPTER *prAdapter);
+u_int8_t wlanGetWlanIdxByAddress(IN struct ADAPTER *prAdapter,
+				 IN uint8_t *pucAddr, OUT uint8_t *pucIndex);
 
-void wlanCorDumpTimerReset(struct ADAPTER *prAdapter);
+uint8_t *wlanGetStaAddrByWlanIdx(IN struct ADAPTER *prAdapter,
+				 IN uint8_t ucIndex);
 
-void wlanN9CorDumpTimeOut(struct ADAPTER *prAdapter,
-			  uintptr_t ulParamPtr);
-
-#endif
-
-u_int8_t wlanGetWlanIdxByAddress(struct ADAPTER *prAdapter,
-				 uint8_t *pucAddr, uint8_t *pucIndex);
-
-uint8_t *wlanGetStaAddrByWlanIdx(struct ADAPTER *prAdapter,
-				 uint8_t ucIndex);
-
-struct WLAN_CFG_ENTRY *wlanCfgGetEntryByIndex(struct ADAPTER *prAdapter,
+struct WLAN_CFG_ENTRY *wlanCfgGetEntryByIndex(IN struct ADAPTER *prAdapter,
 					      const uint8_t ucIdx,
 					      uint32_t flag);
 
 uint32_t wlanCfgGetTotalCfgNum(
-	struct ADAPTER *prAdapter, uint32_t flag);
+	IN struct ADAPTER *prAdapter, uint32_t flag);
 
 
-uint32_t wlanGetStaIdxByWlanIdx(struct ADAPTER *prAdapter,
-				uint8_t ucIndex, uint8_t *pucStaIdx);
+uint32_t wlanGetStaIdxByWlanIdx(IN struct ADAPTER *prAdapter,
+				IN uint8_t ucIndex, OUT uint8_t *pucStaIdx);
+
+uint8_t wlanGetBssIdx(struct net_device *ndev);
+
+struct net_device *wlanGetNetDev(IN struct GLUE_INFO *prGlueInfo,
+	IN uint8_t ucBssIndex);
+
+struct wiphy *wlanGetWiphy(void);
+
+u_int8_t wlanIsAisDev(struct net_device *prDev);
+
 /*----------------------------------------------------------------------------*/
 /* update per-AC statistics for LLS                */
 /*----------------------------------------------------------------------------*/
-void wlanUpdateTxStatistics(struct ADAPTER *prAdapter,
-			    struct MSDU_INFO *prMsduInfo, u_int8_t fgTxDrop);
+void wlanUpdateTxStatistics(IN struct ADAPTER *prAdapter,
+			    IN struct MSDU_INFO *prMsduInfo, u_int8_t fgTxDrop);
 
-void wlanUpdateRxStatistics(struct ADAPTER *prAdapter,
-			    struct SW_RFB *prSwRfb);
+void wlanUpdateRxStatistics(IN struct ADAPTER *prAdapter,
+			    IN struct SW_RFB *prSwRfb);
 
-uint32_t wlanPktTxDone(struct ADAPTER *prAdapter,
-		       struct MSDU_INFO *prMsduInfo,
-		       enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+uint32_t wlanPktTxDone(IN struct ADAPTER *prAdapter,
+		       IN struct MSDU_INFO *prMsduInfo,
+		       IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-uint32_t wlanPowerOffWifi(struct ADAPTER *prAdapter);
+uint32_t wlanPowerOffWifi(IN struct ADAPTER *prAdapter);
 
 void wlanPrintVersion(struct ADAPTER *prAdapter);
 
-uint32_t wlanAccessRegister(struct ADAPTER *prAdapter,
-	uint32_t u4Addr, uint32_t *pru4Result,
-	uint32_t u4Data, uint8_t ucSetQuery);
+uint32_t wlanAccessRegister(IN struct ADAPTER *prAdapter,
+			    IN uint32_t u4Addr, IN uint32_t *pru4Result,
+			    IN uint32_t u4Data,
+			    IN uint8_t ucSetQuery);
 
-uint32_t wlanSetChipEcoInfo(struct ADAPTER *prAdapter);
-void wlanClearPendingInterrupt(struct ADAPTER *prAdapter);
+uint32_t wlanAccessRegisterStatus(IN struct ADAPTER
+				  *prAdapter, IN uint8_t ucCmdSeqNum,
+				  IN uint8_t ucSetQuery, IN void *prEvent,
+				  IN uint32_t u4EventLen);
+
+uint32_t wlanSetChipEcoInfo(IN struct ADAPTER *prAdapter);
+
+void wlanNotifyFwSuspend(struct GLUE_INFO *prGlueInfo,
+			 struct net_device *prDev, u_int8_t fgSuspend);
+
+void wlanClearPendingInterrupt(IN struct ADAPTER *prAdapter);
 
 #if CFG_WMT_WIFI_PATH_SUPPORT
 extern int32_t mtk_wcn_wmt_wifi_fem_cfg_report(void *pvInfoBuf);
 #endif
 
 #if ((CFG_SISO_SW_DEVELOP == 1) || (CFG_SUPPORT_SPE_IDX_CONTROL == 1))
-uint8_t wlanGetAntPathType(struct ADAPTER *prAdapter,
-			   enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
+uint8_t wlanGetAntPathType(IN struct ADAPTER *prAdapter,
+			   IN enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
 #endif
 
-uint8_t wlanGetSpeIdx(struct ADAPTER *prAdapter,
-		      uint8_t ucBssIndex,
-		      enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
+uint8_t wlanGetSpeIdx(IN struct ADAPTER *prAdapter,
+		      IN uint8_t ucBssIndex,
+		      IN enum ENUM_WF_PATH_FAVOR_T eWfPathFavor);
 
-uint8_t wlanGetSupportNss(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+uint8_t wlanGetSupportNss(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex);
 
 #if CFG_SUPPORT_LOWLATENCY_MODE
-uint32_t wlanAdapterStartForLowLatency(struct ADAPTER *prAdapter);
-uint32_t wlanProbeSuccessForLowLatency(struct ADAPTER *prAdapter);
-uint32_t wlanConnectedForLowLatency(struct ADAPTER *prAdapter,
-				    uint8_t ucBssIndex);
-uint32_t wlanSetLowLatencyCommand(struct ADAPTER *prAdapter,
-				     u_int8_t fgEnLowLatencyMode,
-				     u_int8_t fgEnTxDupDetect,
-				     u_int8_t fgTxDupCertQuery);
-uint32_t wlanSetLowLatencyMode(struct ADAPTER *prAdapter,
-				uint32_t u4Events, uint8_t ucBssIndex);
+uint32_t wlanAdapterStartForLowLatency(IN struct ADAPTER *prAdapter);
+uint32_t wlanProbeSuccessForLowLatency(IN struct ADAPTER *prAdapter);
+uint32_t wlanConnectedForLowLatency(IN struct ADAPTER *prAdapter);
+uint32_t wlanSetLowLatencyCommand(IN struct ADAPTER *prAdapter,
+				     IN u_int8_t fgEnLowLatencyMode,
+				     IN u_int8_t fgEnTxDupDetect,
+				     IN u_int8_t fgTxDupCertQuery);
+uint32_t wlanSetLowLatencyMode(IN struct ADAPTER *prAdapter,
+				IN uint32_t u4Events);
 #endif /* CFG_SUPPORT_LOWLATENCY_MODE */
+int32_t wlanGetFileContent(struct ADAPTER *prAdapter,
+	const uint8_t *pcFileName, uint8_t *pucBuf,
+	uint32_t u4MaxFileLen, uint32_t *pu4ReadFileLen);
 
 #if CFG_SUPPORT_EASY_DEBUG
-uint32_t wlanFwCfgParse(struct ADAPTER *prAdapter, uint8_t *pucConfigBuf);
+uint32_t wlanFwCfgParse(IN struct ADAPTER *prAdapter, uint8_t *pucConfigBuf);
 #endif /* CFG_SUPPORT_EASY_DEBUG */
 
 void wlanReleasePendingCmdById(struct ADAPTER *prAdapter, uint8_t ucCid);
 
 uint32_t wlanDecimalStr2Hexadecimals(uint8_t *pucDecimalStr, uint16_t *pu2Out);
 
-uint64_t wlanGetSupportedFeatureSet(struct GLUE_INFO *prGlueInfo);
+uint64_t wlanGetSupportedFeatureSet(IN struct GLUE_INFO *prGlueInfo);
 
 uint32_t
-wlanQueryLteSafeChannel(struct ADAPTER *prAdapter,
-		uint8_t ucRoleIndex);
+wlanQueryLteSafeChannel(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucRoleIndex);
 
 uint32_t
-wlanCalculateAllChannelDirtiness(struct ADAPTER *prAdapter);
+wlanCalculateAllChannelDirtiness(IN struct ADAPTER *prAdapter);
 
 void
-wlanInitChnLoadInfoChannelList(struct ADAPTER *prAdapter);
+wlanInitChnLoadInfoChannelList(IN struct ADAPTER *prAdapter);
 
 uint8_t
-wlanGetChannelIndex(enum ENUM_BAND band, uint8_t channel);
+wlanGetChannelIndex(IN enum ENUM_BAND band, IN uint8_t channel);
 
 uint8_t
-wlanGetChannelNumFromIndex(uint8_t ucIdx);
+wlanGetChannelNumFromIndex(IN uint8_t ucIdx);
 
 enum ENUM_BAND
-wlanGetChannelBandFromIndex(uint8_t ucIdx);
+wlanGetChannelBandFromIndex(IN uint8_t ucIdx);
 
 void
-wlanSortChannel(struct ADAPTER *prAdapter,
-		enum ENUM_CHNL_SORT_POLICY ucSortType);
+wlanSortChannel(IN struct ADAPTER *prAdapter,
+		IN enum ENUM_CHNL_SORT_POLICY ucSortType);
 
 void wlanSuspendPmHandle(struct GLUE_INFO *prGlueInfo);
 void wlanResumePmHandle(struct GLUE_INFO *prGlueInfo);
-uint32_t wlanWakeUpWiFi(struct ADAPTER *prAdapter);
 
 #if CFG_REPORT_MAX_TX_RATE
-int wlanGetMaxTxRate(struct ADAPTER *prAdapter,
-		 void *prBssPtr, struct STA_RECORD *prStaRec,
-		 uint32_t *pu4CurRate, uint32_t *pu4MaxRate);
+int wlanGetMaxTxRate(IN struct ADAPTER *prAdapter,
+		 IN void *prBssPtr, IN struct STA_RECORD *prStaRec,
+		 OUT uint32_t *pu4CurRate, OUT uint32_t *pu4MaxRate);
 #endif /* CFG_REPORT_MAX_TX_RATE */
 
-int wlanGetRxRateByBssid(struct GLUE_INFO *prGlueInfo, uint8_t ucBssIdx,
-		uint32_t *pu4CurRate, uint32_t *pu4MaxRate,
-		struct RxRateInfo *prRxRateInfo);
 #ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+int wlanGetRxRate(IN struct GLUE_INFO *prGlueInfo, IN uint8_t ucBssIdx,
+		OUT uint32_t *pu4CurRate, OUT uint32_t *pu4MaxRate,
+		OUT struct RateInfo *prRateInfo);
 uint32_t wlanLinkQualityMonitor(struct GLUE_INFO *prGlueInfo, bool bFgIsOid);
 void wlanFinishCollectingLinkQuality(struct GLUE_INFO *prGlueInfo);
 #endif /* CFG_SUPPORT_LINK_QUALITY_MONITOR */
-u_int8_t wlanIsDriverReady(struct GLUE_INFO *prGlueInfo, uint32_t u4Check);
-void wlanOffUninitNicModule(struct ADAPTER *prAdapter,
-				const u_int8_t bAtResetFlow);
-void wlanOffClearAllQueues(struct ADAPTER *prAdapter);
+u_int8_t wlanIsDriverReady(IN struct GLUE_INFO *prGlueInfo);
+void wlanOffUninitNicModule(IN struct ADAPTER *prAdapter,
+				IN const u_int8_t bAtResetFlow);
+void wlanOffClearAllQueues(IN struct ADAPTER *prAdapter);
+uint8_t wlanGetBssIdx(struct net_device *ndev);
 int wlanQueryRateByTable(uint32_t txmode, uint32_t rate,
 			uint32_t frmode, uint32_t sgi, uint32_t nsts,
 			uint32_t *pu4CurRate, uint32_t *pu4MaxRate);
 
-#if (CFG_SUPPORT_DATA_STALL && CFG_SUPPORT_LINK_QUALITY_MONITOR)
+#if CFG_SUPPORT_DATA_STALL
 void wlanCustomMonitorFunction(struct ADAPTER *prAdapter,
 	struct WIFI_LINK_QUALITY_INFO *prLinkQualityInfo, uint8_t ucBssIdx);
 #endif /* CFG_SUPPORT_DATA_STALL */
@@ -2238,76 +1905,68 @@ void wlanCustomMonitorFunction(struct ADAPTER *prAdapter,
 uint8_t wlanCheckExtCapBit(struct STA_RECORD *prStaRec, uint8_t *pucIE,
 	uint8_t ucTargetBit);
 
-uint32_t wlanSetForceRTS(struct ADAPTER *prAdapter,
-	u_int8_t fgEnForceRTS);
+uint32_t wlanSetForceRTS(IN struct ADAPTER *prAdapter,
+	IN u_int8_t fgEnForceRTS);
 
 void
-wlanBackupEmCfgSetting(struct ADAPTER *prAdapter);
+wlanBackupEmCfgSetting(IN struct ADAPTER *prAdapter);
 
 void
-wlanResoreEmCfgSetting(struct ADAPTER *prAdapter);
+wlanResoreEmCfgSetting(IN struct ADAPTER *prAdapter);
 
 void
-wlanCleanAllEmCfgSetting(struct ADAPTER *prAdapter);
+wlanCleanAllEmCfgSetting(IN struct ADAPTER *prAdapter);
 
 #if CFG_SUPPORT_NCHO
-void wlanNchoInit(struct ADAPTER *prAdapter, uint8_t fgFwSync);
-uint32_t wlanNchoSetFWEnable(struct ADAPTER *prAdapter, uint8_t fgEnable);
-uint32_t wlanNchoSetFWRssiTrigger(struct ADAPTER *prAdapter,
-	int32_t i4RoamTriggerRssi);
-uint32_t wlanNchoSetFWScanPeriod(struct ADAPTER *prAdapter,
-	uint32_t u4RoamScanPeriod);
+void wlanNchoInit(IN struct ADAPTER *prAdapter, IN uint8_t fgFwSync);
+uint32_t wlanNchoSetFWEnable(IN struct ADAPTER *prAdapter, IN uint8_t fgEnable);
+uint32_t wlanNchoSetFWRssiTrigger(IN struct ADAPTER *prAdapter,
+	IN int32_t i4RoamTriggerRssi);
+uint32_t wlanNchoSetFWScanPeriod(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4RoamScanPeriod);
 #endif
 
 u_int8_t wlanWfdEnabled(struct ADAPTER *prAdapter);
 
 int wlanChipConfig(struct ADAPTER *prAdapter,
 	char *pcCommand, int i4TotalLen);
-int wlanChipCommand(struct ADAPTER *prAdapter,
-	char *pcCommand, int i4TotalLen);
 
-uint32_t wlanSetRxBaSize(struct GLUE_INFO *prGlueInfo,
+uint32_t wlanSetRxBaSize(IN struct GLUE_INFO *prGlueInfo,
 	int8_t i4Type, uint16_t u2BaSize);
-uint32_t wlanSetTxBaSize(struct GLUE_INFO *prGlueInfo,
+uint32_t wlanSetTxBaSize(IN struct GLUE_INFO *prGlueInfo,
 	int8_t i4Type, uint16_t u2BaSize);
 
 void
-wlanGetTRXInfo(struct ADAPTER *prAdapter,
-	struct TRX_INFO *prTRxInfo);
+wlanGetEnvInfo(IN struct ADAPTER *prAdapter,
+	OUT struct ENV_INFO *prEnvInfo);
 
-#if (CFG_WOW_SUPPORT == 1)
-void wlanReleaseAllTxCmdQueue(struct ADAPTER *prAdapter);
-void wlanWaitCfg80211SuspendDone(struct GLUE_INFO *prGlueInfo);
+void
+wlanGetTRXInfo(IN struct ADAPTER *prAdapter,
+	OUT struct TRX_INFO *prTRxInfo);
+
+#if CFG_SUPPORT_TPENHANCE_MODE
+inline uint64_t wlanTpeTimeUs(void);
+void wlanTpeUpdate(struct GLUE_INFO *prGlueInfo, struct QUE *prSrcQue,
+		uint8_t ucPktJump);
+void wlanTpeFlush(struct GLUE_INFO *prGlueInfo);
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void wlanTpeTimeoutHandler(struct timer_list *timer);
+#else
+void wlanTpeTimeoutHandler(unsigned long ulData);
 #endif
+void wlanTpeInit(struct GLUE_INFO *prGlueInfo);
+void wlanTpeUninit(struct GLUE_INFO *prGlueInfo);
+int wlanTpeProcess(struct GLUE_INFO *prGlueInfo,
+			struct sk_buff *prSkb,
+			struct net_device *prDev);
+#endif /* CFG_SUPPORT_TPENHANCE_MODE */
 
-void wlanSetConnsysFwLog(struct ADAPTER *prAdapter);
-uint32_t wlanSendFwLogControlCmd(struct ADAPTER *prAdapter,
+void wlanSetConnsysFwLog(IN struct ADAPTER *prAdapter);
+uint32_t wlanSendFwLogControlCmd(IN struct ADAPTER *prAdapter,
 				uint8_t ucCID,
 				PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
 				PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler,
 				uint32_t u4SetQueryInfoLen,
 				int8_t *pucInfoBuffer);
-
-void wlanReportTxDelayOverLimit(struct ADAPTER *prAdapter,
-	enum ENUM_TX_OVER_LIMIT_DELAY_TYPE type, uint32_t delay);
-
-int wlanSetTxDelayOverLimitReport(struct ADAPTER *prAdapter,
-		bool enable, bool isAverage,
-		uint32_t interval, uint32_t driver_limit, uint32_t mac_limit);
-
-void wlanGetChipDbgOps(struct ADAPTER *prAdapter, uint32_t **pu4Handle);
-
-#if (CFG_SUPPORT_DYNAMIC_EDCCA == 1)
-uint32_t wlanSetEd(struct ADAPTER *prAdapter, int32_t i4EdVal2G,
-					int32_t i4EdVal5G, uint32_t u4Sel);
-#endif
-
-#if (CFG_WIFI_GET_MCS_INFO == 1)
-void wlanRxMcsInfoMonitor(struct ADAPTER *prAdapter,
-					uintptr_t ulParamPtr);
-#endif
-
-uint32_t wlanQueryThermalTemp(struct ADAPTER *ad,
-	struct THERMAL_TEMP_DATA *data);
 
 #endif /* _WLAN_LIB_H */

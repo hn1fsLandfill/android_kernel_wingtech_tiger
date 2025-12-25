@@ -85,22 +85,12 @@
 #define FIELD_HE_6G_CAP_RDR     0
 #endif
 
-#if (CFG_SUPPORT_CONNAC3X_SMALL_PKT == 1)
-#define HE_6G_CAP_INFO_DEFAULT_VAL \
-	(HE_6G_CAP_INFO_MSS_1_US | \
-	HE_6G_CAP_INFO_MAX_AMPDU_LEN_1024K | \
-	HE_6G_CAP_INFO_MAX_MPDU_LEN_3K | \
-	HE_6G_CAP_INFO_SM_POWER_SAVE | \
-	FIELD_HE_6G_CAP_RDR)
-#else
 #define HE_6G_CAP_INFO_DEFAULT_VAL \
 	(HE_6G_CAP_INFO_MSS_NO_RESTRICIT | \
 	HE_6G_CAP_INFO_MAX_AMPDU_LEN_1024K | \
 	HE_6G_CAP_INFO_MAX_MPDU_LEN_3K | \
 	HE_6G_CAP_INFO_SM_POWER_SAVE | \
 	FIELD_HE_6G_CAP_RDR)
-#endif /* CFG_SUPPORT_CONNAC3X_SMALL_PKT */
-
 #endif /* CFG_SUPPORT_WIFI_6G */
 
 #define PPE_RU_IDX_SIZE              4
@@ -119,15 +109,6 @@
 	_aucHePhyCapInfo[2] = (u_int8_t)HE_PHY_CAP2_INFO_DEFAULT_VAL; \
 	_aucHePhyCapInfo[6] = (u_int8_t)HE_PHY_CAP6_INFO_DEFAULT_VAL; \
 }
-
-
-/* Definitions for action control of SMPS params */
-enum {
-	SMPS_ACTION_UPDATE_HT_CAP = 0,
-	SMPS_ACTION_UPDATE_HE_CAP = 1,
-	SMPS_ACTION_SEND_ACTION_FRAME = 2,
-	SMPS_ACTION_MAX
-};
 
 /******************************************************************************
  *                             D A T A   T Y P E S
@@ -165,9 +146,6 @@ struct HE_A_CTRL_OM_T {
  *                            P U B L I C   D A T A
  ******************************************************************************
  */
-#if (CFG_SUPPORT_802_11AX == 1)
-extern uint8_t  g_fgHTSMPSEnabled;
-#endif
 
 /******************************************************************************
  *                           P R I V A T E   D A T A
@@ -178,14 +156,11 @@ extern uint8_t  g_fgHTSMPSEnabled;
  *                  F U N C T I O N   D E C L A R A T I O N S
  ******************************************************************************
  */
+
 u_int32_t heRlmCalculateHeCapIELen(
 	struct ADAPTER *prAdapter,
 	u_int8_t ucBssIndex,
 	struct STA_RECORD *prStaRec);
-void heRlmFillHeCapIE(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	struct MSDU_INFO *prMsduInfo);
 u_int32_t heRlmCalculateHeOpIELen(
 	struct ADAPTER *prAdapter,
 	u_int8_t ucBssIndex,
@@ -199,8 +174,6 @@ void heRlmRspGenerateHeCapIE(
 void heRlmRspGenerateHeOpIE(
 	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo);
-uint8_t heRlmPeerMaxBwCap(
-	uint8_t *pucChannelWidthSet);
 void heRlmRecHeCapInfo(
 	struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec,
@@ -221,27 +194,15 @@ void heRlmParseHeHtcACtrlOM(
 	uint32_t u4Htc,
 	struct HE_A_CTRL_OM_T *prHeActrlOM);
 uint32_t heRlmSendHtcNullFrame(
+	IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec,
+	IN uint8_t ucUP,
+	IN PFN_TX_DONE_HANDLER pfTxDoneHandler);
+uint8_t heGetBssBandBw(
 	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucUP,
-	PFN_TX_DONE_HANDLER pfTxDoneHandler);
+	struct BSS_INFO *prBssInfo,
+	enum ENUM_BAND eBand);
 uint8_t heRlmMaxBwToHeBw(uint8_t ucMaxBw);
-
-#if (CFG_SUPPORT_802_11AX == 1)
-uint32_t heRlmSMPSTxDone(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus);
-
-void heRlmSendSMPSActionFrame(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec);
-
-void heRlmProcessSMPSAction(
-	struct ADAPTER *prAdapter,
-	struct MSG_HDR *prMsgHdr);
-#endif
-
 #if (CFG_SUPPORT_WIFI_6G == 1)
 void heRlmRecHe6GCapInfo(
 	struct ADAPTER *prAdapter,
@@ -251,36 +212,5 @@ void heRlmReqGenerateHe6gBandCapIE(
 	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo);
 #endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-void heRlmRecBTWTparams(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t *pucIE);
-#endif
-
-void heRlmRspGenerateBssMaxIdleIE(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
-
-void heRlmReqGenerateBssMaxIdleIE(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
-
-static void heRlmFillBssMaxIdleIE(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	struct MSDU_INFO *prMsduInfo);
-
-#if (CFG_SUPPORT_NAN == 1)
-uint32_t heRlmFillNANHECapIE(struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo, uint8_t *pOutBuf);
-
-uint32_t heRlmFillNANHeOpIE(
-	struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo,
-	uint8_t *pOutBuf);
-#endif
-
 #endif /* CFG_SUPPORT_802_11AX == 1 */
 #endif /* !_HE_RLM_H */

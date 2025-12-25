@@ -215,6 +215,8 @@ struct LINK_MGMT {
 	((struct LINK_ENTRY *)(prEntry))->prPrev != \
 	(struct LINK_ENTRY *)INVALID_LINK_POISON2)
 
+
+
 /* NOTE: We should do memory zero before any LINK been initiated,
  *       so we can check if it is valid before parsing the LINK.
  */
@@ -238,26 +240,6 @@ struct LINK_MGMT {
 	{ \
 	    linkAddTail(prEntry, prLink); \
 	    ((prLink)->u4NumElem)++; \
-	}
-
-/* Insert an entry after a speceified entry */
-#define LINK_INSERT_AFTER(prLink, prEntry, prNew) \
-	{ \
-		__linkAdd( \
-			(struct LINK_ENTRY *)prNew, \
-			(struct LINK_ENTRY *)prEntry, \
-			(struct LINK_ENTRY *)(prEntry)->prNext); \
-		((prLink)->u4NumElem)++; \
-	}
-
-/* Insert an entry before a speceified entry */
-#define LINK_INSERT_BEFORE(prLink, prEntry, prNew) \
-	{ \
-		__linkAdd( \
-			(struct LINK_ENTRY *)prNew, \
-			(struct LINK_ENTRY *)(prEntry)->prPrev,	\
-			(struct LINK_ENTRY *)prEntry); \
-		((prLink)->u4NumElem)++; \
 	}
 
 /* Peek head entry, but keep still in link list */
@@ -384,9 +366,9 @@ struct LINK_MGMT {
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void __linkAdd(struct LINK_ENTRY
-				     *prNew, struct LINK_ENTRY *prPrev,
-				     struct LINK_ENTRY *prNext)
+static __KAL_INLINE__ void __linkAdd(IN struct LINK_ENTRY
+				     *prNew, IN struct LINK_ENTRY *prPrev,
+				     IN struct LINK_ENTRY *prNext)
 {
 	if (prNext) {
 		prNext->prPrev = prNew;
@@ -408,8 +390,8 @@ static __KAL_INLINE__ void __linkAdd(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void linkAdd(struct LINK_ENTRY
-				   *prNew, struct LINK *prLink)
+static __KAL_INLINE__ void linkAdd(IN struct LINK_ENTRY
+				   *prNew, IN struct LINK *prLink)
 {
 	__linkAdd(prNew, (struct LINK_ENTRY *) prLink,
 		  prLink->prNext);
@@ -425,8 +407,8 @@ static __KAL_INLINE__ void linkAdd(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void linkAddTail(struct LINK_ENTRY
-				       *prNew, struct LINK *prLink)
+static __KAL_INLINE__ void linkAddTail(IN struct LINK_ENTRY
+				       *prNew, IN struct LINK *prLink)
 {
 	__linkAdd(prNew, prLink->prPrev,
 		  (struct LINK_ENTRY *) prLink);
@@ -442,8 +424,8 @@ static __KAL_INLINE__ void linkAddTail(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void __linkDel(struct LINK_ENTRY
-				     *prPrev, struct LINK_ENTRY *prNext)
+static __KAL_INLINE__ void __linkDel(IN struct LINK_ENTRY
+				     *prPrev, IN struct LINK_ENTRY *prNext)
 {
 	if (prNext)
 		prNext->prPrev = prPrev;
@@ -461,7 +443,7 @@ static __KAL_INLINE__ void __linkDel(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void linkDel(struct LINK_ENTRY
+static __KAL_INLINE__ void linkDel(IN struct LINK_ENTRY
 				   *prEntry)
 {
 	__linkDel(prEntry->prPrev, prEntry->prNext);
@@ -480,8 +462,8 @@ static __KAL_INLINE__ void linkDel(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void linkMove(struct LINK_ENTRY
-				    *prEntry, struct LINK *prLink)
+static __KAL_INLINE__ void linkMove(IN struct LINK_ENTRY
+				    *prEntry, IN struct LINK *prLink)
 {
 	__linkDel(prEntry->prPrev, prEntry->prNext);
 	linkAdd(prEntry, prLink);
@@ -498,8 +480,8 @@ static __KAL_INLINE__ void linkMove(struct LINK_ENTRY
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static __KAL_INLINE__ void linkMoveTail(struct LINK_ENTRY
-					*prEntry, struct LINK *prLink)
+static __KAL_INLINE__ void linkMoveTail(IN struct LINK_ENTRY
+					*prEntry, IN struct LINK *prLink)
 {
 	__linkDel(prEntry->prPrev, prEntry->prNext);
 	linkAddTail(prEntry, prLink);

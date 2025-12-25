@@ -162,11 +162,11 @@ typedef void(*remove_card) (void);
  *                                 M A C R O S
  *******************************************************************************
  */
+#define IN			/* volatile */
+#define OUT			/* volatile */
 
 #define __KAL_INLINE__                  inline
-#define __KAL_ATTRIB_PACKED_FRONT__     /* for OS compatibility not used */
 #define __KAL_ATTRIB_PACKED__           __attribute__((__packed__))
-#define __KAL_ATTRIB_ALIGN_4_FRONT__    /* for OS compatibility not used */
 #define __KAL_ATTRIB_ALIGN_4__          __aligned(4)
 
 #ifndef BIT
@@ -184,11 +184,6 @@ typedef void(*remove_card) (void);
  */
 #define BITS(m, n)                       (~(BIT(m)-1) & ((BIT(n) - 1) | BIT(n)))
 #endif /* BIT */
-
-#ifndef BITS_ULL
-#define BITS_ULL(m, n) \
-	(~(BIT_ULL(m)-1) & ((BIT_ULL(n) - 1) | BIT_ULL(n)))
-#endif /* BITS_ULL */
 
 /* This macro returns the byte offset of a named field in a known structure
  *   type.
@@ -222,10 +217,6 @@ typedef void(*remove_card) (void);
 #ifndef ALIGN_8
 #define ALIGN_8(_value)             (((_value) + 7) & ~7u)
 #endif /* ALIGN_4 */
-
-#ifndef ALIGN_16
-#define ALIGN_16(_value)             (((_value) + 15) & ~15u)
-#endif /* ALIGN_16 */
 
 /* This macro check the DW alignment of the input value.
  * _value - value of address need to check

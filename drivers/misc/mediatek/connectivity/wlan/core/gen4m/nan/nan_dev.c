@@ -7,9 +7,8 @@
 #include "precomp.h"
 #include "nan/nan_sec.h"
 
-
 uint8_t
-nanDevInit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
+nanDevInit(IN struct ADAPTER *prAdapter, uint8_t ucIdx) {
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
 		(struct _NAN_SPECIFIC_BSS_INFO_T *)NULL;
 	struct BSS_INFO *prnanBssInfo = (struct BSS_INFO *)NULL;
@@ -26,8 +25,8 @@ nanDevInit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 		return MAX_BSS_INDEX;
 	}
 
-	prnanBssInfo = cnmGetBssInfoAndInit(prAdapter,
-		NETWORK_TYPE_NAN, FALSE, FALSE);
+	prnanBssInfo = cnmGetBssInfoAndInit(prAdapter, NETWORK_TYPE_NAN,
+					    FALSE);
 	if (prnanBssInfo == NULL) {
 		DBGLOG(NAN, INFO, "No enough BSS INDEX\n");
 		return MAX_BSS_INDEX;
@@ -73,24 +72,28 @@ nanDevInit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 		 */
 		prnanBssInfo->fgIsProtection = FALSE;
 
-		cnmWmmIndexDecision(prAdapter, prnanBssInfo);
+#if (CFG_HW_WMM_BY_BSS == 1)
+		if (prnanBssInfo->fgIsWmmInited == FALSE)
+			prnanBssInfo->ucWmmQueSet = cnmWmmIndexDecision(
+				prAdapter, prnanBssInfo);
+#else
+		prnanBssInfo->ucWmmQueSet =
+			(prAdapter->rWifiVar.ucDbdcMode ==
+			DBDC_MODE_DISABLED) ? DBDC_5G_WMM_INDEX
+			: DBDC_2G_WMM_INDEX;
+#endif
+
 
 #if (CFG_SUPPORT_DBDC == 1)
-		if (ucIdx == NAN_BSS_INDEX_BAND1) {
+		if (ucIdx == NAN_BSS_INDEX_BAND1)
 			prnanBssInfo->ucPhyTypeSet =
 				prWifiVar->ucAvailablePhyTypeSet &
 				PHY_TYPE_SET_802_11ANAC;
-#if (CFG_SUPPORT_802_11AX == 1)
-			prnanBssInfo->ucPhyTypeSet =
-				prWifiVar->ucAvailablePhyTypeSet &
-				PHY_TYPE_SET_802_11ABGNACAX;
-#endif
-		} else {
+		else
 #endif
 			prnanBssInfo->ucPhyTypeSet =
 				prWifiVar->ucAvailablePhyTypeSet &
 				PHY_TYPE_SET_802_11BGN;
-		}
 
 		prnanBssInfo->ucNonHTBasicPhyType = ucLegacyPhyTp;
 		if (prLegacyPhyAttr
@@ -177,7 +180,6 @@ nanDevInit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 
 			SET_NET_ACTIVE(prAdapter,
 				prnanBssInfo->ucBssIndex);
-
 			prnanBssInfo->eConnectionState
 				= MEDIA_STATE_CONNECTED;
 
@@ -191,7 +193,7 @@ nanDevInit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 } /* p2pDevFsmInit */
 
 void
-nanDevFsmUninit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
+nanDevFsmUninit(IN struct ADAPTER *prAdapter, uint8_t ucIdx) {
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
 		(struct _NAN_SPECIFIC_BSS_INFO_T *)NULL;
 	struct BSS_INFO *prnanBssInfo = (struct BSS_INFO *)NULL;
@@ -219,7 +221,7 @@ nanDevFsmUninit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 		/* Clear CmdQue */
 		kalClearMgmtFramesByBssIdx(prAdapter->prGlueInfo,
 					   prnanBssInfo->ucBssIndex);
-		kalClearCmdDataFramesByBssIdx(prAdapter->prGlueInfo,
+		kalClearSecurityFramesByBssIdx(prAdapter->prGlueInfo,
 					       prnanBssInfo->ucBssIndex);
 		/* Clear PendingCmdQue */
 		wlanReleasePendingCMDbyBssIdx(prAdapter,
@@ -232,23 +234,21 @@ nanDevFsmUninit(struct ADAPTER *prAdapter, uint8_t ucIdx) {
 
 		/* Deactivate BSS. */
 		prnanBssInfo->eConnectionState = MEDIA_STATE_DISCONNECTED;
+		UNSET_NET_ACTIVE(prAdapter, prnanBssInfo->ucBssIndex);
 		nicDeactivateNetwork(prAdapter, prnanBssInfo->ucBssIndex);
 		nicUpdateBss(prAdapter, prnanBssInfo->ucBssIndex);
 
 		cnmFreeBssInfo(prAdapter, prnanBssInfo);
-
-		g_ucNanWmmQueIdx = 0;
-
 	}
 } /* p2pDevFsmUninit */
 struct _NAN_SPECIFIC_BSS_INFO_T *
-nanGetSpecificBssInfo(struct ADAPTER *prAdapter,
+nanGetSpecificBssInfo(IN struct ADAPTER *prAdapter,
 		      uint8_t eIndex) {
 	return prAdapter->rWifiVar.aprNanSpecificBssInfo[eIndex];
 }
 
 uint8_t
-nanGetBssIdxbyBand(struct ADAPTER *prAdapter,
+nanGetBssIdxbyBand(IN struct ADAPTER *prAdapter,
 		      enum ENUM_BAND eBand) {
 	uint8_t ucIdx = 0;
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo;
@@ -268,7 +268,7 @@ nanGetBssIdxbyBand(struct ADAPTER *prAdapter,
 			prAdapter,
 			prNANSpecInfo->ucBssIndex);
 
-		if ((prBssInfo != NULL) && (prBssInfo->eBand == eBand))
+		if (prBssInfo->eBand == eBand)
 			break;
 	}
 
@@ -276,8 +276,8 @@ nanGetBssIdxbyBand(struct ADAPTER *prAdapter,
 }
 
 void
-nanDevCommonSetCb(struct ADAPTER *prAdapter, struct CMD_INFO *prCmdInfo,
-		  uint8_t *pucEventBuf) {
+nanDevCommonSetCb(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo,
+		  IN uint8_t *pucEventBuf) {
 
 	if (prAdapter == NULL) {
 		DBGLOG(NAN, ERROR, "[%s] prAdapter is NULL\n", __func__);
@@ -291,7 +291,7 @@ nanDevCommonSetCb(struct ADAPTER *prAdapter, struct CMD_INFO *prCmdInfo,
 }
 
 void
-nanDevSetMasterPreference(struct ADAPTER *prAdapter,
+nanDevSetMasterPreference(IN struct ADAPTER *prAdapter,
 			  uint8_t ucMasterPreference) {
 	uint32_t rStatus;
 	void *prCmdBuffer;
@@ -347,7 +347,7 @@ nanDevSetMasterPreference(struct ADAPTER *prAdapter,
 }
 
 enum NanStatusType
-nanDevEnableRequest(struct ADAPTER *prAdapter,
+nanDevEnableRequest(IN struct ADAPTER *prAdapter,
 		    struct NanEnableRequest *prEnableReq) {
 	uint32_t rStatus;
 	void *prCmdBuffer;
@@ -407,7 +407,7 @@ nanDevEnableRequest(struct ADAPTER *prAdapter,
 }
 
 enum NanStatusType
-nanDevDisableRequest(struct ADAPTER *prAdapter) {
+nanDevDisableRequest(IN struct ADAPTER *prAdapter) {
 	uint32_t rStatus;
 	void *prCmdBuffer;
 	uint32_t u4CmdBufferLen;
@@ -459,7 +459,7 @@ nanDevDisableRequest(struct ADAPTER *prAdapter) {
 }
 
 void
-nanDevMasterIndEvtHandler(struct ADAPTER *prAdapter, uint8_t *pcuEvtBuf) {
+nanDevMasterIndEvtHandler(IN struct ADAPTER *prAdapter, IN uint8_t *pcuEvtBuf) {
 	struct _NAN_ATTR_MASTER_INDICATION_T *prMasterIndEvt;
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
 		(struct _NAN_SPECIFIC_BSS_INFO_T *)NULL;
@@ -479,7 +479,7 @@ nanDevMasterIndEvtHandler(struct ADAPTER *prAdapter, uint8_t *pcuEvtBuf) {
 }
 
 uint32_t
-nanDevGetMasterIndAttr(struct ADAPTER *prAdapter,
+nanDevGetMasterIndAttr(IN struct ADAPTER *prAdapter,
 		       uint8_t *pucMasterIndAttrBuf,
 		       uint32_t *pu4MasterIndAttrLength) {
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
@@ -503,7 +503,7 @@ nanDevGetMasterIndAttr(struct ADAPTER *prAdapter,
 }
 
 void
-nanDevClusterIdEvtHandler(struct ADAPTER *prAdapter, uint8_t *pcuEvtBuf) {
+nanDevClusterIdEvtHandler(IN struct ADAPTER *prAdapter, IN uint8_t *pcuEvtBuf) {
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
 		(struct _NAN_SPECIFIC_BSS_INFO_T *)NULL;
 
@@ -518,7 +518,7 @@ nanDevClusterIdEvtHandler(struct ADAPTER *prAdapter, uint8_t *pcuEvtBuf) {
 }
 
 uint32_t
-nanDevGetClusterId(struct ADAPTER *prAdapter, uint8_t *pucClusterId) {
+nanDevGetClusterId(IN struct ADAPTER *prAdapter, OUT uint8_t *pucClusterId) {
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
 		(struct _NAN_SPECIFIC_BSS_INFO_T *)NULL;
 
@@ -538,7 +538,7 @@ nanDevGetClusterId(struct ADAPTER *prAdapter, uint8_t *pucClusterId) {
 }
 
 uint32_t
-nanDevSendEnableRequestToCnm(struct ADAPTER *prAdapter)
+nanDevSendEnableRequestToCnm(IN struct ADAPTER *prAdapter)
 {
 	struct MSG_CH_REQ *prMsgChReq = NULL;
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
@@ -558,17 +558,8 @@ nanDevSendEnableRequestToCnm(struct ADAPTER *prAdapter)
 			"[%s] prNANSpecInfo is NULL\n", __func__);
 		return WLAN_STATUS_FAILURE;
 	}
-
 	prnanBssInfo =
 		GET_BSS_INFO_BY_INDEX(prAdapter, prNANSpecInfo->ucBssIndex);
-
-	if (prnanBssInfo == NULL) {
-		DBGLOG(NAN, ERROR,
-			"[%s] prnanBssInfo [%d] is NULL\n",
-			__func__, prNANSpecInfo->ucBssIndex);
-		return WLAN_STATUS_FAILURE;
-	}
-
 	prMsgChReq =
 		(struct MSG_CH_REQ *)cnmMemAlloc(prAdapter,
 		RAM_TYPE_MSG,
@@ -580,7 +571,7 @@ nanDevSendEnableRequestToCnm(struct ADAPTER *prAdapter)
 
 	prMsgChReq->rMsgHdr.eMsgId = MID_MNY_CNM_CH_REQ;
 	prMsgChReq->ucBssIndex = prNANSpecInfo->ucBssIndex;
-	prMsgChReq->ucTokenID = prAdapter->ucNanReqTokenId = cnmIncreaseTokenId(prAdapter);
+	prMsgChReq->ucTokenID = ++prAdapter->ucNanReqTokenId;
 	prMsgChReq->ucPrimaryChannel = prnanBssInfo->ucPrimaryChannel;
 	prMsgChReq->eRfSco = prnanBssInfo->eBssSCO;
 	prMsgChReq->eRfBand = prnanBssInfo->eBand;
@@ -602,12 +593,6 @@ nanDevSendEnableRequestToCnm(struct ADAPTER *prAdapter)
 			->rWifiVar.aprNanSpecificBssInfo[ucIdx];
 		prnanBssInfo = GET_BSS_INFO_BY_INDEX(
 					prAdapter, prNANSpecInfo->ucBssIndex);
-		if (prnanBssInfo == NULL) {
-			DBGLOG(NAN, ERROR,
-				"[%s] prnanBssInfo [%d] is NULL\n",
-				__func__, prNANSpecInfo->ucBssIndex);
-			return WLAN_STATUS_FAILURE;
-		}
 
 		UNSET_NET_ACTIVE(prAdapter, prnanBssInfo->ucBssIndex);
 	}
@@ -622,7 +607,7 @@ nanDevSendEnableRequestToCnm(struct ADAPTER *prAdapter)
 }
 
 uint32_t
-nanDevSendAbortRequestToCnm(struct ADAPTER *prAdapter)
+nanDevSendAbortRequestToCnm(IN struct ADAPTER *prAdapter)
 {
 	struct MSG_CH_ABORT *prMsgChAbort = NULL;
 	struct _NAN_SPECIFIC_BSS_INFO_T *prNANSpecInfo =
@@ -684,11 +669,24 @@ nanDevSendEnableRequest(struct ADAPTER *prAdapter,
 
 		prNANSpecInfo = prAdapter->rWifiVar
 				.aprNanSpecificBssInfo[ucIdx];
+		if (prNANSpecInfo == NULL) {
+			DBGLOG(NAN, ERROR,
+				"[%s] prNANSpecInfo is NULL\n",
+				__func__);
+			return;
+		}
 		prnanBssInfo =
 			prAdapter->aprBssInfo[prNANSpecInfo->ucBssIndex];
-
-		if (!IS_BSS_ACTIVE(prnanBssInfo))
+		if (prnanBssInfo == NULL) {
+			DBGLOG(NAN, ERROR,
+				"[%s] prnanBssInfo is NULL\n",
+				__func__);
+			return;
+		}
+		if (!IS_BSS_ACTIVE(prnanBssInfo)) {
+			SET_NET_ACTIVE(prAdapter, prnanBssInfo->ucBssIndex);
 			nicActivateNetwork(prAdapter, prnanBssInfo->ucBssIndex);
+		}
 
 		prnanBssInfo->eConnectionState = MEDIA_STATE_CONNECTED;
 

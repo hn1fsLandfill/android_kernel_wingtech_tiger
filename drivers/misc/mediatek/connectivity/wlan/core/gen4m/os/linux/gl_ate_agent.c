@@ -83,8 +83,6 @@
 union PFMU_PROFILE_TAG1 g_rPfmuTag1;
 union PFMU_PROFILE_TAG2 g_rPfmuTag2;
 union PFMU_DATA g_rPfmuData;
-struct PFMU_HE_INFO g_rPfmuHeInfo;
-uint8_t g_rBandIdx;
 #endif
 
 struct ATE_PRIV_CMD {
@@ -135,14 +133,13 @@ struct ATE_PRIV_CMD rAtePrivCmdTable[] = {
 	{"TxBfProfileTagDesiredBw", Set_TxBfProfileTag_DesiredBW},
 	{"TxBfProfileTagDesiredNc", Set_TxBfProfileTag_DesiredNc},
 	{"TxBfProfileTagDesiredNr", Set_TxBfProfileTag_DesiredNr},
-	{"TxBfProfileTagBandIdx", Set_TxBfProfileTag_BandIdx},
 	{"TxBfProfileTagRead", Set_TxBfProfileTagRead},
 	{"TxBfProfileTagWrite", Set_TxBfProfileTagWrite},
 	{"TxBfProfileDataRead", Set_TxBfProfileDataRead},
 	{"TxBfProfileDataWrite", Set_TxBfProfileDataWrite},
 	{"TxBfProfilePnRead", Set_TxBfProfilePnRead},
 	{"TxBfProfilePnWrite", Set_TxBfProfilePnWrite},
-	{"TriggerSounding", Set_Trigger_Sounding_Proc},
+	{"TxBfSounding", Set_Trigger_Sounding_Proc},
 	{"TxBfSoundingStop", Set_Stop_Sounding_Proc},
 	{"TxBfTxApply", Set_TxBfTxApply},
 	{"TxBfManualAssoc", Set_TxBfManualAssoc},
@@ -150,11 +147,8 @@ struct ATE_PRIV_CMD rAtePrivCmdTable[] = {
 	{"TxBfPfmuMemRelease", Set_TxBfPfmuMemRelease},
 	{"StaRecCmmUpdate", Set_StaRecCmmUpdate},
 	{"StaRecBfUpdate", Set_StaRecBfUpdate},
-	{"StaRecBfRead", Set_StaRecBfRead},
-	{"StaRecBfHeUpdate", Set_StaRecBfHeUpdate},
 	{"DevInfoUpdate", Set_DevInfoUpdate},
 	{"BssInfoUpdate", Set_BssInfoUpdate},
-	{"TxBfProfileTagPartialBw", Set_TxBfProfileTagPartialBw},
 #if CFG_SUPPORT_MU_MIMO
 	{"MUGetInitMCS", Set_MUGetInitMCS},
 	{"MUCalInitMCS", Set_MUCalInitMCS},
@@ -234,6 +228,9 @@ int SetATE(struct net_device *prNetDev, uint8_t *prInBuf)
 {
 	int32_t i4Status;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetATE\n");
 
 	if (!strcmp(prInBuf, "ATESTART")) {
@@ -289,6 +286,9 @@ int SetATEDa(struct net_device *prNetDev, uint8_t *prInBuf)
 	uint8_t addr2[MAC_ADDR_LEN];
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "ATE_AGENT iwpriv SetDa\n");
 	/* xx:xx:xx:xx:xx:xx */
 	rv = sscanf(prInBuf, "%x:%x:%x:%x:%x:%x", &addr[0],
@@ -331,6 +331,9 @@ int SetATESa(struct net_device *prNetDev, uint8_t *prInBuf)
 	uint32_t addr[MAC_ADDR_LEN];
 	uint8_t addr2[MAC_ADDR_LEN];
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "ATE_AGENT iwpriv SetSa\n");
 	/* xx:xx:xx:xx:xx:xx */
@@ -375,6 +378,9 @@ int SetATEChannel(struct net_device *prNetDev,
 	int32_t i4Status, i4SetChan = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetChannel\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetChan);
@@ -406,6 +412,9 @@ int SetATETxPower0(struct net_device *prNetDev,
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxPower0\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetTxPower0);
@@ -435,6 +444,9 @@ int SetATETxGi(struct net_device *prNetDev,
 	uint32_t i4SetTxGi = 0;
 	int32_t i4Status;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxGi\n");
 
@@ -466,6 +478,9 @@ int SetATETxBw(struct net_device *prNetDev,
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetSystemBW\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetSystemBW);
@@ -495,6 +510,9 @@ int SetATETxMode(struct net_device *prNetDev,
 	uint32_t i4SetTxMode = 0;
 	int32_t i4Status;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxMode\n");
 
@@ -526,6 +544,9 @@ int SetATETxLength(struct net_device *prNetDev,
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxLength\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetTxLength);
@@ -556,6 +577,9 @@ int SetATETxCount(struct net_device *prNetDev,
 	int32_t i4Status;
 	int32_t rv;
 	uint8_t addr[MAC_ADDR_LEN] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxCount\n");
 
@@ -590,6 +614,9 @@ int SetATETxMcs(struct net_device *prNetDev,
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetTxMcs\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetTxMcs);
@@ -618,6 +645,9 @@ int SetATEIpg(struct net_device *prNetDev, uint8_t *prInBuf)
 	uint32_t i4SetTxIPG = 0;
 	int32_t i4Status;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetIpg\n");
 
@@ -648,6 +678,9 @@ int SetATETxVhtNss(struct net_device *prNetDev, uint8_t *prInBuf)
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetATETxVhtNss\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4SetTVhtNSS);
@@ -676,6 +709,10 @@ int SetATETxPath(struct net_device *prNetDev, uint8_t *prInBuf)
 	uint32_t i4TxPath = 0;
 	int32_t i4Status;
 	int32_t rv;
+
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetATETxPath\n");
 
@@ -706,6 +743,9 @@ int SetATERxPath(struct net_device *prNetDev, uint8_t *prInBuf)
 	int32_t i4Status;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetATERxPath\n");
 
 	rv = kstrtoint(prInBuf, 0, &i4RxPath);
@@ -735,6 +775,9 @@ int SetATEAntSwp(struct net_device *prNetDev, uint8_t *prInBuf)
 	uint32_t i4SetAntSwp = 0;
 	int32_t i4Status;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv SetAntSwp\n");
 
@@ -806,6 +849,9 @@ int Set_TxBfProfileTag_InValid(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_InValid\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucInValid);
@@ -828,6 +874,9 @@ int Set_TxBfProfileTag_PfmuIdx(struct net_device *prNetDev,
 	uint32_t ucProfileIdx;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_PfmuIdx\n");
 
@@ -852,6 +901,9 @@ int Set_TxBfProfileTag_BfType(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_BfType\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucBFType);
@@ -874,6 +926,9 @@ int Set_TxBfProfileTag_DBW(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_DBW\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucBW);
@@ -894,6 +949,9 @@ int Set_TxBfProfileTag_SuMu(struct net_device *prNetDev,
 	uint32_t ucSuMu;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_SuMu\n");
 
@@ -917,6 +975,9 @@ int Set_TxBfProfileTag_Mem(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	uint8_t aucMemAddrColIdx[4], aucMemAddrRowIdx[4];
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_Mem\n");
 
@@ -958,6 +1019,9 @@ int Set_TxBfProfileTag_Matrix(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_Matrix\n");
 
 	rv = sscanf(prInBuf, "%d:%d:%d:%d:%d:%d",
@@ -992,6 +1056,9 @@ int Set_TxBfProfileTag_SNR(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_SNR\n");
 
 	rv = sscanf(prInBuf, "%d:%d:%d:%d", &aucInput[0],
@@ -1021,6 +1088,9 @@ int Set_TxBfProfileTag_SmartAnt(struct net_device *prNetDev,
 	uint32_t ucSmartAnt;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_SmartAnt\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucSmartAnt);
@@ -1044,6 +1114,9 @@ int Set_TxBfProfileTag_SeIdx(struct net_device *prNetDev,
 	uint32_t ucSeIdx;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_SeIdx\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucSeIdx);
@@ -1065,6 +1138,9 @@ int Set_TxBfProfileTag_RmsdThrd(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	uint32_t ucRmsdThrd;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_RmsdThrd\n");
 
@@ -1089,6 +1165,9 @@ int Set_TxBfProfileTag_McsThrd(struct net_device *prNetDev,
 	uint8_t ucMcsLss[3], ucMcsSss[3];
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_McsThrd\n");
 
@@ -1123,6 +1202,9 @@ int Set_TxBfProfileTag_TimeOut(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_TimeOut\n");
 
 	rv = kstrtouint(prInBuf, 0, &ucTimeOut);
@@ -1145,6 +1227,9 @@ int Set_TxBfProfileTag_DesiredBW(struct net_device
 	uint32_t ucDesiredBW;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_DesiredBW\n");
 
@@ -1169,6 +1254,9 @@ int Set_TxBfProfileTag_DesiredNc(struct net_device
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_DesiredNc\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucDesiredNc);
@@ -1192,6 +1280,9 @@ int Set_TxBfProfileTag_DesiredNr(struct net_device
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTag_DesiredNr\n");
 
 	rv = kstrtoint(prInBuf, 0, &ucDesiredNr);
@@ -1208,58 +1299,15 @@ int Set_TxBfProfileTag_DesiredNr(struct net_device
 	return i4Status;
 }
 
-
-int Set_TxBfProfileTagPartialBw(struct net_device *prNetDev,
-			    uint8_t *prInBuf)
-{
-	uint8_t uBitmap, uResolution;
-	int32_t i4Status = 0;
-	int32_t rv;
-
-	DBGLOG(RFTEST, INFO, "Set_TxBfProfileTagPartialBw\n");
-
-	rv = sscanf(prInBuf, "%d:%d", &uBitmap, &uResolution);
-	if (rv == 2) {
-		DBGLOG(RFTEST, INFO,
-		       "Set_TxBfProfileTagPartialBw prInBuf = %s, u4Bitmap = %d, u4Resolution = %d\n",
-		       prInBuf, uBitmap, uResolution);
-		i4Status = TxBfProfileTagPartialBw(prNetDev, &g_rPfmuTag1,
-			uBitmap, uResolution);
-	} else {
-		return -EINVAL;
-	}
-
-	return i4Status;
-}
-
-int Set_TxBfProfileTag_BandIdx(struct net_device *prNetDev,
-			    uint8_t *prInBuf)
-{
-	uint32_t uBandIdx;
-	int32_t i4Status = 0;
-	int32_t rv;
-
-	DBGLOG(RFTEST, INFO, "Set_TxBfProfileTag_BandIdx\n");
-
-	rv = kstrtoint(prInBuf, 0, &uBandIdx);
-	if (rv == 0) {
-		DBGLOG(RFTEST, INFO,
-		       "Set_TxBfProfileTag_BandIdx prInBuf = %s, uBandIdx = %d\n",
-		       prInBuf, uBandIdx);
-		i4Status = TxBfProfileTag_BandIdx(prNetDev, uBandIdx);
-	} else {
-		return -EINVAL;
-	}
-
-	return i4Status;
-}
-
 int Set_TxBfProfileTagWrite(struct net_device *prNetDev,
 			    uint8_t *prInBuf)
 {
 	uint32_t profileIdx;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTagWrite\n");
 
@@ -1284,6 +1332,9 @@ int Set_TxBfProfileTagRead(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileTagRead\n");
 
 	rv = sscanf(prInBuf, "%d:%d", &profileIdx, &fgBFer);
@@ -1305,6 +1356,9 @@ int Set_TxBfProfileDataRead(struct net_device *prNetDev,
 		 subcarrierIdxLsb;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileDataRead\n");
 
@@ -1339,6 +1393,9 @@ int Set_TxBfProfileDataWrite(struct net_device *prNetDev,
 	int32_t rv;
 
 	int32_t i4Status = 0;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "TxBfProfileDataWrite\n");
 
@@ -1382,6 +1439,9 @@ int Set_TxBfProfilePnRead(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfilePnRead\n");
 
 	rv = kstrtoint(prInBuf, 0, &profileIdx);
@@ -1405,6 +1465,9 @@ int Set_TxBfProfilePnWrite(struct net_device *prNetDev,
 	int32_t rv;
 
 	int32_t i4Status = 0;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "TxBfProfilePnWrite\n");
 
@@ -1440,6 +1503,9 @@ int Set_Trigger_Sounding_Proc(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_Trigger_Sounding_Proc\n");
 
 	rv = sscanf
@@ -1452,7 +1518,7 @@ int Set_Trigger_Sounding_Proc(struct net_device *prNetDev,
 		       prInBuf, ucSuMu, ucNumSta, ucSndInterval, ucWLan0,
 		       ucWLan1, ucWLan2, ucWLan3);
 		i4Status = TxBfSounding(prNetDev, ucSuMu, ucNumSta,
-			(ucSndInterval << 2), ucWLan0, ucWLan1, ucWLan2, ucWLan3);
+			ucSndInterval, ucWLan0, ucWLan1, ucWLan2, ucWLan3);
 	} else
 		return -EINVAL;
 
@@ -1475,20 +1541,22 @@ int Set_TxBfTxApply(struct net_device *prNetDev,
 		    uint8_t *prInBuf)
 {
 	uint32_t u4WlanId, u4ETxBf, u4ITxBf, u4MuTxBf;
-	uint32_t u4PhaseCali = 0;
 	int32_t i4Status = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "TxBfTxApply\n");
 
-	rv = sscanf(prInBuf, "%d:%d:%d:%d:%d", &u4WlanId, &u4ETxBf,
-		    &u4ITxBf, &u4MuTxBf, &u4PhaseCali);
-	if (rv >= 4) {
+	rv = sscanf(prInBuf, "%d:%d:%d:%d", &u4WlanId, &u4ETxBf,
+		    &u4ITxBf, &u4MuTxBf);
+	if (rv == 4) {
 		DBGLOG(RFTEST, ERROR,
 		       "TxBfTxApply prInBuf = %s, u4WlanId = %d, u4ETxBf = %d, u4ITxBf = %d, u4MuTxBf = %d\n",
 		       prInBuf, u4WlanId, u4ETxBf, u4ITxBf, u4MuTxBf);
 		i4Status = TxBfTxApply(prNetDev, u4WlanId, u4ETxBf, u4ITxBf,
-				       u4MuTxBf, u4PhaseCali);
+				       u4MuTxBf);
 	} else
 		return -EINVAL;
 
@@ -1499,36 +1567,39 @@ int Set_TxBfManualAssoc(struct net_device *prNetDev,
 			uint8_t *prInBuf)
 {
 	int32_t au4Mac[MAC_ADDR_LEN];
-	int32_t u4Type, u4Wtbl, u4Ownmac, u4Bw, u4Nss,
-		u4PfmuId, u4Mode, u4Marate, u4SpeIdx, ucaid;
+	int32_t u4Type, u4Wtbl, u4Ownmac, u4PhyMode, u4Bw, u4Nss,
+		u4PfmuId, u4Mode, u4Marate, u4SpeIdx, ucaid, u4Rv;
 	int8_t aucMac[MAC_ADDR_LEN];
 	int32_t i4Status = 0;
 	int32_t i = 0;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "TxBfManualAssoc\n");
 
 	rv = sscanf(prInBuf,
-		    "%x:%x:%x:%x:%x:%x:%x:%d:%x:%x:%x:%d:%x:%x:%x:%d",
+		    "%x:%x:%x:%x:%x:%x:%x:%d:%x:%x:%x:%x:%d:%x:%x:%x:%d:%x",
 		    &au4Mac[0], &au4Mac[1], &au4Mac[2], &au4Mac[3], &au4Mac[4],
 		    &au4Mac[5],
-		    &u4Type, &u4Wtbl, &u4Ownmac, &u4Bw,
-		    &u4Nss, &u4PfmuId, &u4Mode, &u4Marate, &u4SpeIdx,
-		    &ucaid);
-	if (rv == 16) {
+		    &u4Type, &u4Wtbl, &u4Ownmac, &u4PhyMode, &u4Bw, &u4Nss,
+		    &u4PfmuId, &u4Mode, &u4Marate, &u4SpeIdx,
+		    &ucaid, &u4Rv);
+	if (rv == 18) {
 		DBGLOG(RFTEST, ERROR,
-		       "TxBfManualAssoc au4Mac[0] = %x, au4Mac[1] = %x, au4Mac[2] = %xau4Mac[3] = %x, au4Mac[4] = %x, au4Mac[5] = %x, u4Type = %x, u4Wtbl = %d, u4Ownmac = %x, u4Bw = %x, u4Nss = %x, u4PfmuId = %d, u4Mode = %x, u4Marate = %x, u4SpeIdx = %d, ucaid = %d",
+		       "TxBfManualAssoc au4Mac[0] = %x, au4Mac[1] = %x, au4Mac[2] = %xau4Mac[3] = %x, au4Mac[4] = %x, au4Mac[5] = %x, u4Type = %x, u4Wtbl = %d, u4Ownmac = %x, u4PhyMode = %x u4Bw = %x, u4Nss = %x, u4PfmuId = %d, u4Mode = %x, u4Marate = %x, u4SpeIdx = %d, ucaid = %d, u4Rv = %x",
 		       au4Mac[0], au4Mac[1], au4Mac[2], au4Mac[3], au4Mac[4],
 		       au4Mac[5], u4Type, u4Wtbl, u4Ownmac,
-		       u4Bw, u4Nss, u4PfmuId, u4Mode, u4Marate,
-		       u4SpeIdx, ucaid);
+		       u4PhyMode, u4Bw, u4Nss, u4PfmuId, u4Mode, u4Marate,
+		       u4SpeIdx, ucaid, u4Rv);
 		for (i = 0; i < MAC_ADDR_LEN; i++)
 			aucMac[i] = au4Mac[i];
 
 		i4Status =
-			TxBfManualAssoc(prNetDev, aucMac, u4Type,
-				u4Wtbl,	u4Ownmac, u4Mode, u4Bw, u4Nss,
-				u4PfmuId, u4Marate, u4SpeIdx, ucaid);
+			TxBfManualAssoc(prNetDev, aucMac, u4Type, u4Wtbl,
+				u4Ownmac, u4Mode, u4Bw, u4Nss, u4PfmuId,
+				u4Marate, u4SpeIdx, ucaid, u4Rv);
 	} else
 		return -EINVAL;
 
@@ -1541,6 +1612,9 @@ int Set_TxBfPfmuMemAlloc(struct net_device *prNetDev,
 	uint32_t ucSuMuMode, ucWlanIdx;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "TxBfPfmuMemAlloc\n");
 
@@ -1563,6 +1637,9 @@ int Set_TxBfPfmuMemRelease(struct net_device *prNetDev,
 	uint32_t ucWlanId;
 	int32_t i4Status = 0;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "TxBfPfmuMemRelease\n");
 
@@ -1587,6 +1664,9 @@ int Set_DevInfoUpdate(struct net_device *prNetDev,
 	uint32_t i;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "DevInfoUpdate\n");
 
 	rv = sscanf
@@ -1602,8 +1682,6 @@ int Set_DevInfoUpdate(struct net_device *prNetDev,
 		       OwnMacAddr[4], OwnMacAddr[5]);
 		for (i = 0; i < MAC_ADDR_LEN; i++)
 			aucMacAddr[i] = OwnMacAddr[i];
-
-		g_rBandIdx = fgBand;
 
 		i4Status = DevInfoUpdate(prNetDev, u4OwnMacIdx, fgBand,
 					 aucMacAddr);
@@ -1623,6 +1701,9 @@ int Set_BssInfoUpdate(struct net_device *prNetDev,
 	uint32_t i;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "BssInfoUpdate\n");
 
 	rv = sscanf
@@ -1638,16 +1719,8 @@ int Set_BssInfoUpdate(struct net_device *prNetDev,
 		for (i = 0; i < MAC_ADDR_LEN; i++)
 			aucBssId[i] = au4BssId[i];
 
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-		i4Status = BssInfoUpdateUnify(prNetDev, u4OwnMacIdx, u4BssIdx,
-					 g_rBandIdx, aucBssId);
-#else
-		i4Status = BssInfoConnectOwnDev(prNetDev, u4OwnMacIdx, u4BssIdx,
-					 g_rBandIdx);
-
 		i4Status = BssInfoUpdate(prNetDev, u4OwnMacIdx, u4BssIdx,
 					 aucBssId);
-#endif
 	} else
 		return -EINVAL;
 
@@ -1663,6 +1736,9 @@ int Set_StaRecCmmUpdate(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	uint32_t i;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_StaRecCmmUpdate\n");
 
@@ -1697,10 +1773,13 @@ int Set_StaRecBfUpdate(struct net_device *prNetDev,
 	uint32_t i;
 	int32_t rv;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(RFTEST, ERROR, "Set_StaRecBfUpdate\n");
 
 	rv = sscanf(prInBuf,
-		    "%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
+		    "%x:%x:%x:%x:%x:%d:%d:%d:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
 		    &rStaRecBfUpdArg.u4WlanId, &rStaRecBfUpdArg.u4BssId,
 		    &rStaRecBfUpdArg.u4PfmuId,
 		    &rStaRecBfUpdArg.u4SuMu, &rStaRecBfUpdArg.u4eTxBfCap,
@@ -1733,147 +1812,13 @@ int Set_StaRecBfUpdate(struct net_device *prNetDev,
 			aucMemRow[i] = rStaRecBfUpdArg.au4MemRow[i];
 			aucMemCol[i] = rStaRecBfUpdArg.au4MemCol[i];
 		}
-
-		/* Default setting */
-		rStaRecBfUpdArg.u4SmartAnt     = 0;
-		/* 0: legacy, 1: OFDM, 2: HT, 4: VHT */
-		rStaRecBfUpdArg.u4SoundingPhy  = 1;
-		rStaRecBfUpdArg.u4iBfTimeOut   = 0xFF;
-		rStaRecBfUpdArg.u4iBfDBW       = 0;
-		rStaRecBfUpdArg.u4iBfNcol      = 0;
-		rStaRecBfUpdArg.u4iBfNrow      = 0;
-		rStaRecBfUpdArg.u4RuStartIdx   = 0;
-		rStaRecBfUpdArg.u4RuEndIdx     = 0;
-		rStaRecBfUpdArg.u4TriggerSu    = 0;
-		rStaRecBfUpdArg.u4TriggerMu    = 0;
-		rStaRecBfUpdArg.u4Ng16Su       = 0;
-		rStaRecBfUpdArg.u4Ng16Mu       = 0;
-		rStaRecBfUpdArg.u4Codebook42Su = 0;
-		rStaRecBfUpdArg.u4Codebook75Mu = 0;
-		rStaRecBfUpdArg.u4HeLtf        = 0;
-		rStaRecBfUpdArg.u4NrBw160      = 0;
-		rStaRecBfUpdArg.u4NcBw160      = 0;
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_SU_MU))
-			rStaRecBfUpdArg.u4SuMu = g_rPfmuHeInfo.fgSU_MU;
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_RU_RANGE)) {
-			rStaRecBfUpdArg.u4RuStartIdx =
-					g_rPfmuHeInfo.u1RuStartIdx;
-			rStaRecBfUpdArg.u4RuEndIdx = g_rPfmuHeInfo.u1RuEndIdx;
-		}
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_TRIGGER)) {
-			rStaRecBfUpdArg.u4TriggerSu = g_rPfmuHeInfo.fgTriggerSu;
-			rStaRecBfUpdArg.u4TriggerMu = g_rPfmuHeInfo.fgTriggerMu;
-		}
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_NG16)) {
-			rStaRecBfUpdArg.u4Ng16Su = g_rPfmuHeInfo.fgNg16Su;
-			rStaRecBfUpdArg.u4Ng16Mu = g_rPfmuHeInfo.fgNg16Mu;
-		}
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_CODEBOOK)) {
-			rStaRecBfUpdArg.u4Codebook42Su =
-					g_rPfmuHeInfo.fgCodebook42Su;
-			rStaRecBfUpdArg.u4Codebook75Mu =
-					g_rPfmuHeInfo.fgCodebook75Mu;
-		}
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_LTF))
-			rStaRecBfUpdArg.u4HeLtf = g_rPfmuHeInfo.u1HeLtf;
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_IBF)) {
-			rStaRecBfUpdArg.u4iBfNcol = g_rPfmuHeInfo.uciBfNcol;
-			rStaRecBfUpdArg.u4iBfNrow = g_rPfmuHeInfo.uciBfNrow;
-		}
-
-		if (g_rPfmuHeInfo.u4Config & BIT(MANUAL_HE_BW160)) {
-			rStaRecBfUpdArg.u4NrBw160 = g_rPfmuHeInfo.ucNrBw160;
-			rStaRecBfUpdArg.u4NcBw160 = g_rPfmuHeInfo.ucNcBw160;
-		}
-
-		i4Status = StaRecBfUpdate(prNetDev, &rStaRecBfUpdArg,
+		i4Status = StaRecBfUpdate(prNetDev, rStaRecBfUpdArg,
 					  aucMemRow, aucMemCol);
 	} else
 		return -EINVAL;
 
 	return i4Status;
 }
-
-int Set_StaRecBfRead(struct net_device *prNetDev,
-		       uint8_t *prInBuf)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	uint16_t u2WlanId;
-	int32_t rv;
-	int32_t i4Status = -EINVAL;
-	uint32_t u4BufLen = 0;
-
-	DBGLOG(RFTEST, INFO, "Set_StaRecBfRead\n");
-	prGlueInfo = *((struct GLUE_INFO **) netdev_priv(prNetDev));
-
-	rv = sscanf(prInBuf, "%x", &u2WlanId);
-
-	if (rv == 1)
-		i4Status = kalIoctl(prGlueInfo,
-				    wlanoidStaRecBFRead,
-				    &u2WlanId,
-				    sizeof(u2WlanId),
-				    &u4BufLen);
-	return i4Status;
-}
-
-int Set_StaRecBfHeUpdate(struct net_device *prNetDev,
-		       uint8_t *prInBuf)
-{
-	uint32_t au4Input[15];
-	uint32_t u4Config;
-	uint8_t ucSuMu, ucRuStartIdx, ucRuEndIdx, ucTriggerSu, ucTriggerMu,
-		ucNg16Su, ucNg16Mu, ucCodebook42Su, ucCodebook75Mu, ucHeLtf,
-		uciBfNcol, uciBfNrow, ucNrBw160, ucNcBw160;
-	int32_t i4Status = 0;
-	int32_t rv;
-
-	DBGLOG(RFTEST, ERROR, "Set_StaRecBfHeUpdate\n");
-
-	rv = sscanf(prInBuf,
-			"%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x:%x",
-			&au4Input[0], &au4Input[1], &au4Input[2], &au4Input[3],
-			&au4Input[4], &au4Input[5], &au4Input[6], &au4Input[7],
-			&au4Input[8], &au4Input[9], &au4Input[10],
-			&au4Input[11], &au4Input[12], &au4Input[13],
-			&au4Input[14]);
-
-	if (rv == 15) {
-		u4Config = au4Input[0];
-		ucSuMu = (uint8_t) au4Input[1];
-		ucRuStartIdx = (uint8_t) au4Input[2];
-		ucRuEndIdx = (uint8_t) au4Input[3];
-		ucTriggerSu = (uint8_t) au4Input[4];
-		ucTriggerMu = (uint8_t) au4Input[5];
-		ucNg16Su = (uint8_t) au4Input[6];
-		ucNg16Mu = (uint8_t) au4Input[7];
-		ucCodebook42Su = (uint8_t) au4Input[8];
-		ucCodebook75Mu = (uint8_t) au4Input[9];
-		ucHeLtf = (uint8_t) au4Input[10];
-		uciBfNcol = (uint8_t) au4Input[11];
-		uciBfNrow = (uint8_t) au4Input[12];
-		ucNrBw160 = (uint8_t) au4Input[13];
-		ucNcBw160 = (uint8_t) au4Input[14];
-
-		i4Status = StaRecBfHeUpdate(prNetDev, &g_rPfmuHeInfo, u4Config,
-				ucSuMu,	ucRuStartIdx, ucRuEndIdx, ucTriggerSu,
-				ucTriggerMu, ucNg16Su, ucNg16Mu,
-				ucCodebook42Su, ucCodebook75Mu,
-				ucHeLtf, uciBfNcol, uciBfNrow,
-				ucNrBw160, ucNcBw160);
-	} else
-		return -EINVAL;
-
-	return i4Status;
-}
-
 
 #if CFG_SUPPORT_MU_MIMO
 int Set_MUGetInitMCS(struct net_device *prNetDev,
@@ -1886,6 +1831,9 @@ int Set_MUGetInitMCS(struct net_device *prNetDev,
 
 	uint32_t u4groupIdx;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUGetInitMCS\n");
 
@@ -1909,7 +1857,7 @@ int Set_MUGetInitMCS(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    TRUE, TRUE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -1928,6 +1876,9 @@ int Set_MUCalInitMCS(struct net_device *prNetDev,
 		 u4NssOfUser1, u4PfMuIdOfUser0, u4PfMuIdOfUser1, u4NumOfTxer,
 		 u4SpeIndex, u4GroupIndex;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUCalInitMCS\n");
 
@@ -1972,7 +1923,7 @@ int Set_MUCalInitMCS(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -1991,6 +1942,9 @@ int Set_MUCalLQ(struct net_device *prNetDev,
 		 u4NssOfUser1, u4PfMuIdOfUser0, u4PfMuIdOfUser1,
 		 u4NumOfTxer, u4SpeIndex, u4GroupIndex;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUCalLQ\n");
 
@@ -2038,7 +1992,7 @@ int Set_MUCalLQ(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -2074,7 +2028,7 @@ int Set_MUGetLQ(struct net_device *prNetDev,
 			    wlanoidMuMimoAction,
 			    &rMuMimoActionInfo,
 			    sizeof(rMuMimoActionInfo),
-			    &u4BufLen);
+			    TRUE, TRUE, TRUE, &u4BufLen);
 	/* }
 	 * else
 	 * {
@@ -2095,6 +2049,9 @@ int Set_MUSetSNROffset(struct net_device *prNetDev,
 
 	uint32_t u4Val;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetSNROffset\n");
 
@@ -2117,7 +2074,7 @@ int Set_MUSetSNROffset(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -2134,6 +2091,9 @@ int Set_MUSetZeroNss(struct net_device *prNetDev,
 
 	uint32_t u4Val;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetZeroNss\n");
 
@@ -2155,7 +2115,7 @@ int Set_MUSetZeroNss(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -2172,6 +2132,8 @@ int Set_MUSetSpeedUpLQ(struct net_device *prNetDev,
 
 	uint32_t u4Val;
 	int32_t rv;
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetSpeedUpLQ\n");
 
@@ -2193,7 +2155,7 @@ int Set_MUSetSpeedUpLQ(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -2210,6 +2172,9 @@ int Set_MUSetMUTable(struct net_device *prNetDev,
 	/*uint32_t i;
 	 *uint32_t u4Type, u4Length;
 	 */
+
+	if (prTable == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetMUTable\n");
 
@@ -2240,7 +2205,7 @@ int Set_MUSetMUTable(struct net_device *prNetDev,
 			    wlanoidMuMimoAction,
 			    &rMuMimoActionInfo,
 			    sizeof(rMuMimoActionInfo),
-			    &u4BufLen);
+			    FALSE, FALSE, TRUE, &u4BufLen);
 	/* } */
 	/* else */
 	/* { */
@@ -2261,6 +2226,9 @@ int Set_MUSetGroup(struct net_device *prNetDev,
 
 	uint32_t aucUser0MacAddr[PARAM_MAC_ADDR_LEN],
 		 aucUser1MacAddr[PARAM_MAC_ADDR_LEN];
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetGroup\n");
 
@@ -2330,7 +2298,8 @@ int Set_MUSetGroup(struct net_device *prNetDev,
 	}
 
 	i4Status = kalIoctl(prGlueInfo, wlanoidMuMimoAction, &rMuMimoActionInfo,
-			    sizeof(rMuMimoActionInfo), &u4BufLen);
+			    sizeof(rMuMimoActionInfo),
+			    FALSE, FALSE, TRUE, &u4BufLen);
 
 	return i4Status;
 }
@@ -2344,6 +2313,9 @@ int Set_MUGetQD(struct net_device *prNetDev,
 	uint32_t u4BufLen = 0;
 
 	uint32_t u4SubcarrierIndex, u4Length;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUGetQD\n");
 
@@ -2373,7 +2345,7 @@ int Set_MUGetQD(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    TRUE, TRUE, TRUE, &u4BufLen);
 	} else {
 		return -EINVAL;
 	}
@@ -2391,6 +2363,9 @@ int Set_MUSetEnable(struct net_device *prNetDev,
 
 	uint32_t u4Val;
 	int32_t rv;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetEnable\n");
 
@@ -2412,7 +2387,7 @@ int Set_MUSetEnable(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else
 		return -EINVAL;
 
@@ -2426,6 +2401,9 @@ int Set_MUSetGID_UP(struct net_device *prNetDev,
 	struct PARAM_CUSTOM_MUMIMO_ACTION_STRUCT rMuMimoActionInfo;
 	int32_t i4Status = 0;
 	uint32_t u4BufLen = 0;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUSetGID_UP\n");
 
@@ -2458,7 +2436,7 @@ int Set_MUSetGID_UP(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else {
 		return -EINVAL;
 	}
@@ -2478,6 +2456,9 @@ int Set_MUTriggerTx(struct net_device *prNetDev,
 	uint32_t u4IsRandomPattern, u4MsduPayloadLength0,
 		 u4MsduPayloadLength1, u4MuPacketCount, u4NumOfSTAs;
 	uint32_t au4MacAddrs[2][6];
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_MUTriggerTx\n");
 
@@ -2531,7 +2512,7 @@ int Set_MUTriggerTx(struct net_device *prNetDev,
 				    wlanoidMuMimoAction,
 				    &rMuMimoActionInfo,
 				    sizeof(rMuMimoActionInfo),
-				    &u4BufLen);
+				    FALSE, FALSE, TRUE, &u4BufLen);
 	} else {
 		return -EINVAL;
 	}
@@ -2547,6 +2528,9 @@ int Set_TxBfProfileSwTagWrite(struct net_device *prNetDev,
 	int32_t i4Status = 0;
 	int32_t rv;
 	uint32_t u4Lm, u4Nc, u4Nr, u4Bw, u4Codebook, u4Group;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(RFTEST, ERROR, "Set_TxBfProfileSwTagWrite\n");
 
@@ -2594,6 +2578,9 @@ int WriteEfuse(struct net_device *prNetDev,
 	uint32_t addr[2];
 	uint16_t addr2[2];
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO, "ATE_AGENT iwpriv WriteEfuse, buf: %s\n",
 	       prInBuf);
 
@@ -2640,6 +2627,9 @@ int SetTxTargetPower(struct net_device *prNetDev,
 	DBGLOG(REQ, INFO,
 	       "ATE_AGENT iwpriv Set Tx Target Power, buf: %s\n", prInBuf);
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	/* rv = sscanf(prInBuf, "%u", &addr);*/
 	rv = kstrtoint(prInBuf, 0, &addr);
 
@@ -2679,6 +2669,9 @@ int SetRddReport(struct net_device *prNetDev,
 	int32_t rv;
 	int dbdcIdx;
 	uint8_t ucDbdcIdx;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO,
 	       "ATE_AGENT iwpriv Set RDD Report, buf: %s\n", prInBuf);
@@ -2735,6 +2728,9 @@ int SetByPassCac(struct net_device *prNetDev,
 	int32_t i4ByPassCacTime;
 	uint32_t u4ByPassCacTime;
 
+	if (prInBuf == NULL)
+		return -EINVAL;
+
 	DBGLOG(REQ, INFO,
 	       "ATE_AGENT iwpriv Set By Pass Cac, buf: %s\n", prInBuf);
 
@@ -2782,6 +2778,9 @@ int SetRadarDetectMode(struct net_device *prNetDev,
 	int32_t rv;
 	int radarDetectMode;
 	uint8_t ucRadarDetectMode;
+
+	if (prInBuf == NULL)
+		return -EINVAL;
 
 	DBGLOG(REQ, INFO,
 	       "ATE_AGENT iwpriv Set Radar Detect Mode, buf: %s\n",

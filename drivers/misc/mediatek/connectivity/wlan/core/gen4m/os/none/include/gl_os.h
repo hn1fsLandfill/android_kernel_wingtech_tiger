@@ -139,9 +139,6 @@ typedef uint8_t u8;
  * should we just but it in wlan_lib.h
  */
 extern u_int8_t fgIsBusAccessFailed;
-#if IS_ENABLED(CFG_MTK_WIFI_CONNV3_SUPPORT)
-extern u_int8_t fgTriggerDebugSop;
-#endif
 
 /*******************************************************************************
  *                         C O M P I L E R   F L A G S
@@ -189,9 +186,6 @@ extern u_int8_t fgTriggerDebugSop;
 #define	GLUE_INFO_WSCIE_LENGTH		(500)
 /* for non-wfa vendor specific IE buffer */
 #define NON_WFA_VENDOR_IE_MAX_LEN	(128)
-
-#define STR_HELPER(x) #x
-#define STR(x) STR_HELPER(x)
 
 #define FW_LOG_CMD_ON_OFF		0
 #define FW_LOG_CMD_SET_LEVEL		1
@@ -267,6 +261,9 @@ extern u_int8_t fgTriggerDebugSop;
 #define WAKE_LOCK_RX_TIMEOUT                            300	/* ms */
 #define WAKE_LOCK_THREAD_WAKEUP_TIMEOUT                 50	/* ms */
 
+#define STR_HELPER(x) #x
+#define STR(x) STR_HELPER(x)
+
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -285,9 +282,6 @@ struct GL_WPA_INFO {
 	uint8_t ucRSNMfpCap;
 #endif
 	uint16_t u2RSNXCap;
-	uint8_t aucKek[NL80211_KEK_LEN];
-	uint8_t aucKck[NL80211_KCK_LEN];
-	uint8_t aucReplayCtr[NL80211_REPLAY_CTR_LEN];
 };
 
 #if CFG_SUPPORT_REPLAY_DETECTION
@@ -340,6 +334,7 @@ enum ENUM_PKT_FLAG {
 	ENUM_PKT_802_11,	/* 802.11 or non-802.11 */
 	ENUM_PKT_802_3,		/* 802.3 or ethernetII */
 	ENUM_PKT_1X,		/* 1x frame or not */
+	ENUM_PKT_PROTECTED_1X,	/* protected 1x frame */
 	ENUM_PKT_NON_PROTECTED_1X,	/* Non protected 1x frame */
 	ENUM_PKT_VLAN_EXIST,	/* VLAN tag exist */
 	ENUM_PKT_DHCP,		/* DHCP frame */
@@ -347,10 +342,7 @@ enum ENUM_PKT_FLAG {
 	ENUM_PKT_ICMP,		/* ICMP */
 	ENUM_PKT_TDLS,		/* TDLS */
 	ENUM_PKT_DNS,		/* DNS */
-#if CFG_SUPPORT_TPENHANCE_MODE
-	ENUM_PKT_TCP_ACK,	/* TCP ACK */
-#endif /* CFG_SUPPORT_TPENHANCE_MODE */
-	ENUM_PKT_ICMPV6,	/* ICMPV6 */
+
 	ENUM_PKT_FLAG_NUM
 };
 
@@ -414,18 +406,6 @@ struct GL_SCAN_CACHE_INFO {
 };
 #endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
 
-#if CFG_SUPPORT_PERF_IND
-struct GL_PERF_IND_INFO {
-	uint32_t u4CurTxBytes[BSSID_NUM]; /* Byte */
-	uint32_t u4CurRxBytes[BSSID_NUM]; /* Byte */
-	uint16_t u2CurRxRate[BSSID_NUM]; /* Unit 500 Kbps */
-	uint8_t ucCurRxRCPI0[BSSID_NUM];
-	uint8_t ucCurRxRCPI1[BSSID_NUM];
-	uint8_t ucCurRxNss[BSSID_NUM]; /* 1NSS Data Counter */
-	uint8_t ucCurRxNss2[BSSID_NUM]; /* 2NSS Data Counter */
-};
-#endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
-
 struct FT_IES {
 	uint16_t u2MDID;
 	struct IE_MOBILITY_DOMAIN *prMDIE;
@@ -450,24 +430,33 @@ struct GLUE_INFO {
 
 	/* OID related */
 	struct QUE rCmdQueue;
+
+	spinlock_t rSpinLock[SPIN_LOCK_NUM];
+
 	/* Number of pending frames, also used for debuging if any frame is
 	 * missing during the process of unloading Driver.
 	 *
 	 * NOTE(Kevin): In Linux, we also use this variable as the threshold
 	 * for manipulating the netif_stop(wake)_queue() func.
 	 */
-	uint32_t u4TxStopTh[MAX_BSSID_NUM];
-	uint32_t u4TxStartTh[MAX_BSSID_NUM];
 	int32_t ai4TxPendingFrameNumPerQueue[MAX_BSSID_NUM][CFG_MAX_TXQ_NUM];
 	int32_t i4TxPendingFrameNum;
-	int32_t i4TxPendingCmdDataFrameNum;
+	int32_t i4TxPendingSecurityFrameNum;
 	int32_t i4TxPendingCmdNum;
+
+	/*! \brief wext wpa related information */
+	struct GL_WPA_INFO rWpaInfo[KAL_AIS_NUM];
+#if CFG_SUPPORT_REPLAY_DETECTION
+	struct GL_DETECT_REPLAY_INFO prDetRplyInfo[KAL_AIS_NUM];
+#endif
 
 	uint32_t u4RoamFailCnt;
 	uint64_t u8RoamFailTime;
 
 	/* 11R */
 	struct FT_IES rFtIeForTx;
+	struct cfg80211_ft_event_params rFtEventParam;
+
 	uint32_t IsrAbnormalCnt;
 	uint32_t IsrSoftWareCnt;
 
@@ -521,6 +510,16 @@ struct GLUE_INFO {
 	 * common/cmm_asic_connac.c
 	 */
 	uint32_t u4InfType;
+
+	/*
+	 * needed by
+	 * mgmt/tdls.c
+	 */
+	/* Device handle */
+	struct net_device *prDevHandler;
+
+	/* Device */
+	struct device *prDev;
 	/* not necessary for built */
 	/* TODO: os-related */
 	uint32_t u4ReadyFlag;	/* check if card is ready */
@@ -533,29 +532,288 @@ struct GLUE_INFO {
 	uint8_t ucBand;
 	uint8_t ucChannelWidth;
 	uint8_t ucSco;
-	uint8_t ucBandIdx;
-	uint8_t fgDropFcsErrorFrame;
-	uint8_t aucBandIdxEn[CFG_MONITOR_BAND_NUM];
-	uint16_t u2Aid;
-	uint32_t u4AmpduRefNum[CFG_MONITOR_BAND_NUM];
-#endif
-#if (CFG_SUPPORT_PERF_IND == 1)
-	struct GL_PERF_IND_INFO PerfIndCache;
 #endif
 
-#if CFG_SUPPORT_SCHED_SCAN
-	struct PARAM_SCHED_SCAN_REQUEST *prSchedScanRequest;
-#endif
-	kal_completion rPendComp;	/* indicate main thread halt complete */
+#if 0
+
+	/* Device */
+	struct device *prDev;
+
+	/* Device Index(index of arWlanDevInfo[]) */
+	int32_t i4DevIdx;
+
+	/* Device statistics */
+	/* struct net_device_stats rNetDevStats; */
+
+	/* Wireless statistics struct net_device */
+	struct iw_statistics rIwStats;
+
+	/* spinlock to sync power save mechanism */
+	spinlock_t rSpinLock[SPIN_LOCK_NUM];
+
+	/* Mutex to protect interruptible section */
+	struct mutex arMutex[MUTEX_NUM];
+
+	/* semaphore for ioctl */
+	struct semaphore ioctl_sem;
+
+	uint64_t u8Cookie;
 
 	unsigned long ulFlag;		/* GLUE_FLAG_XXX */
+	uint32_t u4PendFlag;
+	/* UINT_32 u4TimeoutFlag; */
+	uint32_t u4OidCompleteFlag;
+	uint32_t u4ReadyFlag;	/* check if card is ready */
+
+	uint32_t u4OsMgmtFrameFilter;
+
+	/* Number of pending frames, also used for debuging if any frame is
+	 * missing during the process of unloading Driver.
+	 *
+	 * NOTE(Kevin): In Linux, we also use this variable as the threshold
+	 * for manipulating the netif_stop(wake)_queue() func.
+	 */
+	int32_t ai4TxPendingFrameNumPerQueue[MAX_BSSID_NUM][CFG_MAX_TXQ_NUM];
+	int32_t i4TxPendingFrameNum;
+	int32_t i4TxPendingSecurityFrameNum;
+	int32_t i4TxPendingCmdNum;
+
+	/* Tx: for NetDev to BSS index mapping */
+	struct NET_INTERFACE_INFO arNetInterfaceInfo[MAX_BSSID_NUM];
+
+	/* Rx: for BSS index to NetDev mapping */
+	/* P_NET_INTERFACE_INFO_T  aprBssIdxToNetInterfaceInfo[HW_BSSID_NUM]; */
+
+	/* current IO request for kalIoctl */
+	struct GL_IO_REQ OidEntry;
+
+	/* registry info */
+	struct REG_INFO rRegInfo;
+
+	/* firmware */
+	struct firmware *prFw;
 
 	/* Host interface related information */
 	/* defined in related hif header file */
 	struct GL_HIF_INFO rHifInfo;
 
-#if (CFG_SUPPORT_RETURN_TASK == 1)
-	uint32_t rRxRfbRetTask;
+	/*! \brief wext wpa related information */
+	struct GL_WPA_INFO rWpaInfo;
+#if CFG_SUPPORT_REPLAY_DETECTION
+	struct GL_DETECT_REPLAY_INFO prDetRplyInfo;
+#endif
+
+	/* Pointer to ADAPTER_T - main data structure of internal protocol
+	 * stack
+	 */
+	struct ADAPTER *prAdapter;
+
+#if WLAN_INCLUDE_PROC
+	struct proc_dir_entry *pProcRoot;
+#endif				/* WLAN_INCLUDE_PROC */
+
+	/* Indicated media state */
+	enum ENUM_PARAM_MEDIA_STATE eParamMediaStateIndicated;
+
+	/* Device power state D0~D3 */
+	enum PARAM_DEVICE_POWER_STATE ePowerState;
+
+	struct completion rScanComp;	/* indicate scan complete */
+	struct completion
+		rHaltComp;	/* indicate main thread halt complete */
+	struct completion
+		rPendComp;	/* indicate main thread halt complete */
+#if CFG_SUPPORT_MULTITHREAD
+	struct completion
+		rHifHaltComp;	/* indicate hif_thread halt complete */
+	struct completion
+		rRxHaltComp;	/* indicate hif_thread halt complete */
+
+	uint32_t u4TxThreadPid;
+	uint32_t u4RxThreadPid;
+	uint32_t u4HifThreadPid;
+#endif
+
+#if CFG_SUPPORT_NCHO
+	struct completion
+		rAisChGrntComp;	/* indicate Ais channel grant complete */
+#endif
+
+	uint32_t rPendStatus;
+
+	struct QUE rTxQueue;
+
+	/* OID related */
+	struct QUE rCmdQueue;
+	/* PVOID                   pvInformationBuffer; */
+	/* UINT_32                 u4InformationBufferLength; */
+	/* PVOID                   pvOidEntry; */
+	/* PUINT_8                 pucIOReqBuff; */
+	/* QUE_T                   rIOReqQueue; */
+	/* QUE_T                   rFreeIOReqQueue; */
+
+	wait_queue_head_t waitq;
+	struct task_struct *main_thread;
+
+#if CFG_SUPPORT_MULTITHREAD
+	wait_queue_head_t waitq_hif;
+	struct task_struct *hif_thread;
+
+	wait_queue_head_t waitq_rx;
+	struct task_struct *rx_thread;
+
+#endif
+	struct tasklet_struct rRxTask;
+	struct tasklet_struct rTxCompleteTask;
+
+	struct work_struct rTxMsduFreeWork;
+	struct delayed_work rRxPktDeAggWork;
+
+	struct timer_list tickfn;
+
+#if CFG_SUPPORT_EXT_CONFIG
+	uint16_t au2ExtCfg[256];	/* NVRAM data buffer */
+	uint32_t u4ExtCfgLength;	/* 0 means data is NOT valid */
+#endif
+
+#if 1				/* CFG_SUPPORT_WAPI */
+	/* Should be large than the PARAM_WAPI_ASSOC_INFO_T */
+	uint8_t aucWapiAssocInfoIEs[42];
+	uint16_t u2WapiAssocInfoIESz;
+#endif
+
+#if CFG_ENABLE_BT_OVER_WIFI
+	struct GL_BOW_INFO rBowInfo;
+#endif
+
+#if CFG_ENABLE_WIFI_DIRECT
+	struct GL_P2P_DEV_INFO *prP2PDevInfo;
+	struct GL_P2P_INFO *prP2PInfo[KAL_P2P_NUM];
+#if CFG_SUPPORT_P2P_RSSI_QUERY
+	/* Wireless statistics struct net_device */
+	struct iw_statistics rP2pIwStats;
+#endif
+#endif
+	u_int8_t fgWpsActive;
+	uint8_t aucWSCIE[GLUE_INFO_WSCIE_LENGTH];	/*for probe req */
+	uint16_t u2WSCIELen;
+	uint8_t aucWSCAssocInfoIE[200];	/*for Assoc req */
+	uint16_t u2WSCAssocInfoIELen;
+
+	/* NVRAM availability */
+	u_int8_t fgNvramAvailable;
+
+	u_int8_t fgMcrAccessAllowed;
+
+	/* MAC Address Overridden by IOCTL */
+	u_int8_t fgIsMacAddrOverride;
+	uint8_t rMacAddrOverride[PARAM_MAC_ADDR_LEN];
+
+	struct SET_TXPWR_CTRL rTxPwr;
+
+	/* for cfg80211 scan done indication */
+	struct cfg80211_scan_request *prScanRequest;
+
+	/* for cfg80211 scheduled scan */
+	struct cfg80211_sched_scan_request *prSchedScanRequest;
+
+	/* to indicate registered or not */
+	u_int8_t fgIsRegistered;
+
+	/* for cfg80211 connected indication */
+	uint32_t u4RspIeLength;
+	uint8_t aucRspIe[CFG_CFG80211_IE_BUF_LEN];
+
+	uint32_t u4ReqIeLength;
+	uint8_t aucReqIe[CFG_CFG80211_IE_BUF_LEN];
+
+	/*
+	 * Buffer to hold non-wfa vendor specific IEs set
+	 * from wpa_supplicant. This is used in sending
+	 * Association Request in AIS mode.
+	 */
+	uint16_t non_wfa_vendor_ie_len;
+	uint8_t non_wfa_vendor_ie_buf[NON_WFA_VENDOR_IE_MAX_LEN];
+
+#if CFG_SUPPORT_SDIO_READ_WRITE_PATTERN
+	u_int8_t fgEnSdioTestPattern;
+	u_int8_t fgSdioReadWriteMode;
+	u_int8_t fgIsSdioTestInitialized;
+	uint8_t aucSdioTestBuffer[256];
+#endif
+
+	u_int8_t fgIsInSuspendMode;
+
+#if CFG_SUPPORT_PASSPOINT
+	uint8_t aucHS20AssocInfoIE[200];	/*for Assoc req */
+	uint16_t u2HS20AssocInfoIELen;
+	uint8_t ucHotspotConfig;
+	u_int8_t fgConnectHS20AP;
+
+	u_int8_t fgIsDad;
+	uint8_t aucDADipv4[4];
+	u_int8_t fgIs6Dad;
+	uint8_t aucDADipv6[16];
+#endif				/* CFG_SUPPORT_PASSPOINT */
+
+	KAL_WAKE_LOCK_T rIntrWakeLock;
+	KAL_WAKE_LOCK_T rTimeoutWakeLock;
+
+#if CFG_MET_PACKET_TRACE_SUPPORT
+	u_int8_t fgMetProfilingEn;
+	uint16_t u2MetUdpPort;
+#endif
+
+	int32_t i4RssiCache;
+	uint32_t u4LinkSpeedCache;
+
+
+	uint32_t u4InfType;
+
+	uint32_t IsrCnt;
+	uint32_t IsrPassCnt;
+	uint32_t TaskIsrCnt;
+
+	uint32_t IsrAbnormalCnt;
+	uint32_t IsrSoftWareCnt;
+	uint32_t IsrTxCnt;
+	uint32_t IsrRxCnt;
+	uint64_t u8HifIntTime;
+
+	/* save partial scan channel information */
+	/* PARTIAL_SCAN_INFO rScanChannelInfo; */
+	uint8_t *pucScanChannel;
+
+#if CFG_SUPPORT_SCAN_CACHE_RESULT
+	struct GL_SCAN_CACHE_INFO scanCache;
+#endif /* CFG_SUPPORT_SCAN_CACHE_RESULT */
+
+	/* Full2Partial */
+	OS_SYSTIME u4LastFullScanTime;
+	/* full scan or partial scan */
+	uint8_t ucTrScanType;
+	/* UINT_8 aucChannelNum[FULL_SCAN_MAX_CHANNEL_NUM]; */
+	/* PARTIAL_SCAN_INFO rFullScanApChannel; */
+	uint8_t *pucFullScan2PartialChannel;
+
+	uint32_t u4RoamFailCnt;
+	uint64_t u8RoamFailTime;
+	u_int8_t fgTxDoneDelayIsARP;
+	uint32_t u4ArriveDrvTick;
+	uint32_t u4EnQueTick;
+	uint32_t u4DeQueTick;
+	uint32_t u4LeaveDrvTick;
+	uint32_t u4CurrTick;
+	uint64_t u8CurrTime;
+
+	/* FW Roaming */
+	/* store the FW roaming enable state which FWK determines */
+	/* if it's = 0, ignore the black/whitelists settings from FWK */
+	uint32_t u4FWRoamingEnable;
+
+	/* 11R */
+	struct FT_IES rFtIeForTx;
+	struct cfg80211_ft_event_params rFtEventParam;
 #endif
 };
 
@@ -673,7 +931,6 @@ struct NETDEV_PRIVATE_GLUE_INFO {
 #if CFG_ENABLE_UNIFY_WIPHY
 	u_int8_t ucIsP2p;
 #endif
-	u_int8_t ucMddpSupport;
 };
 
 struct PACKET_PRIVATE_DATA {
@@ -706,32 +963,6 @@ struct CMD_CONNSYS_FW_LOG {
 	int32_t fgCmd;
 	int32_t fgValue;
 	u_int8_t fgEarlySet;
-};
-
-enum ENUM_NVRAM_STATE {
-	NVRAM_STATE_INIT = 0,
-	NVRAM_STATE_READY, /*power on or update*/
-	NVRAM_STATE_SEND_TO_FW,
-	NVRAM_STATE_NUM
-};
-
-/* WMM QOS user priority from 802.1D/802.11e */
-enum ENUM_WMM_UP {
-	WMM_UP_BE_INDEX = 0,
-	WMM_UP_BK_INDEX,
-	WMM_UP_RESV_INDEX,
-	WMM_UP_EE_INDEX,
-	WMM_UP_CL_INDEX,
-	WMM_UP_VI_INDEX,
-	WMM_UP_VO_INDEX,
-	WMM_UP_NC_INDEX,
-	WMM_UP_INDEX_NUM
-};
-
-/* add for wlanSuspendRekeyOffload command because not include nl80211 */
-enum nl80211_wpa_versions {
-	NL80211_WPA_VERSION_1 = 1 << 0,
-	NL80211_WPA_VERSION_2 = 1 << 1,
 };
 
 /*******************************************************************************
@@ -833,7 +1064,7 @@ enum nl80211_wpa_versions {
 
 /* TODO: os-related implementation */
 #define GLUE_GET_PKT_PRIVATE_RX_DATA(_p) \
-	((struct PACKET_PRIVATE_RX_DATA *)0)
+	((struct PACKET_PRIVATE_RX_DATA *)(&(((struct sk_buff *)(_p))->cb[24])))
 
 #define GLUE_RX_SET_PKT_INT_TIME(_p, _rTime) \
 	(GLUE_GET_PKT_PRIVATE_RX_DATA(_p)->u8IntTime = (uint64_t)(_rTime))
@@ -879,15 +1110,6 @@ enum nl80211_wpa_versions {
 #define GLUE_LOOKUP_FUN(fun_name) \
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
 
-#define GLUE_COPY_PRIV_DATA(_pDst, _pSrc) \
-	(kalMemCopy(GLUE_GET_PKT_PRIVATE_DATA(_pDst), \
-	GLUE_GET_PKT_PRIVATE_DATA(_pSrc), sizeof(struct PACKET_PRIVATE_DATA)))
-
-#define GLUE_GET_INDEPENDENT_PKT(_p)    \
-	(GLUE_GET_PKT_PRIVATE_DATA(_p)->fgIsIndependentPkt)
-
-#define GLUE_SET_INDEPENDENT_PKT(_p, _fgIsIndePkt) \
-	(GLUE_GET_PKT_PRIVATE_DATA(_p)->fgIsIndependentPkt = _fgIsIndePkt)
 
 #if CFG_MET_TAG_SUPPORT
 #define GL_MET_TAG_START(_id, _name)	met_tag_start(_id, _name)
@@ -975,11 +1197,11 @@ u16 wlanSelectQueue(struct net_device *dev,
 void wlanDebugInit(void);
 #endif
 
-uint32_t wlanSetDriverDbgLevel(uint32_t u4DbgIdx,
-			       uint32_t u4DbgMask);
+uint32_t wlanSetDriverDbgLevel(IN uint32_t u4DbgIdx,
+			       IN uint32_t u4DbgMask);
 
-uint32_t wlanGetDriverDbgLevel(uint32_t u4DbgIdx,
-			       uint32_t *pu4DbgMask);
+uint32_t wlanGetDriverDbgLevel(IN uint32_t u4DbgIdx,
+			       OUT uint32_t *pu4DbgMask);
 
 void wlanSetSuspendMode(struct GLUE_INFO *prGlueInfo,
 			u_int8_t fgEnable);
@@ -996,26 +1218,15 @@ uint32_t wlanDownloadBufferBin(struct ADAPTER *prAdapter);
 uint32_t wlanConnacDownloadBufferBin(struct ADAPTER
 				     *prAdapter);
 
-uint32_t wlanConnac2XDownloadBufferBin(struct ADAPTER *prAdapter);
-
-void *wlanGetAisNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucAisIndex);
-
-void *wlanGetP2pNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucP2pIndex);
-
-void *wlanGetNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucBssIndex);
-
 /*******************************************************************************
  *			 E X T E R N A L   F U N C T I O N S / V A R I A B L E
  *******************************************************************************
  */
+extern struct net_device *gPrP2pDev[KAL_P2P_NUM];
+extern struct net_device *gPrDev;
+extern struct wireless_dev *gprWdev[KAL_AIS_NUM];
 extern uint32_t g_u4DevIdx[KAL_P2P_NUM];
 extern enum ENUM_NVRAM_STATE g_NvramFsm;
-
-extern uint8_t g_aucNvram[];
-extern uint8_t g_aucNvram_OnlyPreCal[];
 
 #ifdef CFG_DRIVER_INF_NAME_CHANGE
 extern char *gprifnameap;
@@ -1048,9 +1259,6 @@ extern const uint8_t *kalFindIeMatchMask(uint8_t eid,
 				int match_len, int match_offset,
 				const uint8_t *match_mask);
 
-extern const uint8_t *kalFindVendorIe(uint32_t oui, int type,
-				const uint8_t *ies, int len);
-
 extern const uint8_t *kalFindIeExtIE(uint8_t eid,
 				uint8_t exteid,
 				const uint8_t *ies, int len);
@@ -1060,11 +1268,11 @@ extern const uint8_t *kalFindIeExtIE(uint8_t eid,
 #define kalMetTagPacket(_prGlueInfo, _prPacket, _eTag) \
 KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
 #else
-void kalMetTagPacket(struct GLUE_INFO *prGlueInfo,
-		     void *prPacket, enum ENUM_TX_PROFILING_TAG eTag);
+void kalMetTagPacket(IN struct GLUE_INFO *prGlueInfo,
+		     IN void *prPacket, IN enum ENUM_TX_PROFILING_TAG eTag);
 #endif
 
-void kalMetInit(struct GLUE_INFO *prGlueInfo);
+void kalMetInit(IN struct GLUE_INFO *prGlueInfo);
 #endif
 
 #ifdef CFG_REMIND_IMPLEMENT
@@ -1109,10 +1317,6 @@ extern void connectivity_arch_setup_dma_ops(
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(arr) \
-	(sizeof(arr) / sizeof((arr)[0]))
+	(sizeof(arr) / sizeof(((typeof(arr)){})[0]))
 #endif
-
-#define wlanNvramSetState(_state) \
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
-
 #endif /* _GL_OS_H */

@@ -37,7 +37,6 @@ void gps_dl_hal_conn_infra_driver_off(void);
 void gps_dl_hal_conn_infra_driver_debug_dump(void);
 void gps_dl_hal_link_confirm_dma_stop(enum gps_dl_link_id_enum link_id);
 int gps_dl_hal_conn_power_ctrl(enum gps_dl_link_id_enum link_id, int op);
-void gps_dl_hal_may_set_link_power_flag(enum gps_dl_link_id_enum link_id, bool power_ctrl);
 int gps_dl_hal_link_power_ctrl(enum gps_dl_link_id_enum link_id,
 	enum gps_dl_hal_power_ctrl_op_enum op);
 int gps_dl_hal_link_power_ctrl_inner(enum gps_dl_link_id_enum link_id,
@@ -110,7 +109,6 @@ int gps_dl_hal_get_clock_flag(void);
 void gps_dl_hal_load_clock_flag(void);
 bool gps_dl_hal_get_deep_stop_mode_revert_for_mvcd(enum gps_dl_link_id_enum link_id);
 void gps_dl_hal_set_deep_stop_mode_revert_for_mvcd(enum gps_dl_link_id_enum link_id, bool revert_for_mvcd);
-void gps_dl_hal_gps_wait_wakeup_done_or_timeout(enum gps_dl_link_id_enum link_id);
 
 void gps_dl_hal_set_conn_infra_ver(unsigned int ver);
 unsigned int gps_dl_hal_get_conn_infra_ver(void);

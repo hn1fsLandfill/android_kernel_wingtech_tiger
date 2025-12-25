@@ -112,7 +112,6 @@
 #define IOC_AP_STA_DISASSOC     (SIOCIWFIRSTPRIV+25)
 #define IOC_AP_SET_NSS           (SIOCIWFIRSTPRIV+27)
 #define IOC_AP_SET_BW           (SIOCIWFIRSTPRIV+29)
-#define IOC_AP_SET_AX_MODE      (SIOCIWFIRSTPRIV+31)
 
 #define PRIV_CMD_REG_DOMAIN             0
 #define PRIV_CMD_BEACON_PERIOD          1
@@ -201,7 +200,6 @@
 #endif
 #define PRIV_CMD_SHOW_CHANNEL		46
 
-#define PRIV_CMD_SET_MDVT		47
 
 
 
@@ -294,9 +292,12 @@
 /* Define magic key of test mode (Don't change it for future compatibity) */
 #define PRIV_CMD_TEST_MAGIC_KEY                         2011
 #define PRIV_CMD_TEST_MAGIC_KEY_ICAP                         2013
+#ifdef CFG_MODIFY_TX_POWER_BY_BAT_VOLT
+#define TX_POWER_PERCENTAGE_CTRL                        0x1
+#define TX_POWER_DROP_CTRL                              0x2
+#endif
 
-#define IW_PRIV_SET_BUF_SIZE			2000
-#define IW_PRIV_GET_BUF_SIZE			2047
+#define IW_PRIV_BUF_SIZE			2000
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -307,55 +308,10 @@ struct PRIV_CONFIG_ENTRY {
 	uint8_t ucValue;
 };
 
-#if CFG_SUPPORT_ADVANCE_CONTROL
-enum {
-		CMD_ADVCTL_NOISE_ID = 1,
-		CMD_ADVCTL_POP_ID,
-		CMD_ADVCTL_ED_ID,
-		CMD_ADVCTL_PD_ID,
-		CMD_ADVCTL_MAX_RFGAIN_ID,
-		CMD_ADVCTL_ADM_CTRL_ID,
-		CMD_ADVCTL_BCN_TH_ID = 9,
-		CMD_ADVCTL_DEWEIGHTING_TH_ID,
-		CMD_ADVCTL_DEWEIGHTING_NOISE_ID,
-		CMD_ADVCTL_DEWEIGHTING_WEIGHT_ID,
-		CMD_ADVCTL_ACT_INTV_ID,
-		CMD_ADVCTL_1RPD,
-		CMD_ADVCTL_MMPS,
-		CMD_ADVCTL_RXC_ID = 17,
-		CMD_ADVCTL_SNR_ID = 18,
-		CMD_ADVCTL_BCNTIMOUT_NUM_ID = 19,
-		CMD_ADVCTL_EVERY_TBTT_ID = 20,
-		CMD_ADVCTL_MAX
-};
-#endif /* CFG_SUPPORT_ADVANCE_CONTROL */
-
-#if CFG_AP_80211KVR_INTERFACE
-extern struct sock *nl_sk;
-#define EV_WLAN_MULTIAP_START \
-	((0xA000 | 0x200) + 0x50)
-#define EV_WLAN_MULTIAP_BSS_METRICS_RESPONSE \
-	(EV_WLAN_MULTIAP_START + 0x09)
-#define EV_WLAN_MULTIAP_STA_TOPOLOGY_NOTIFY \
-	(EV_WLAN_MULTIAP_START + 0x08)
-#define EV_WLAN_MULTIAP_ASSOC_STA_METRICS_RESPONSE \
-	(EV_WLAN_MULTIAP_START + 0x0a)
-#define EV_WLAN_MULTIAP_UNASSOC_STA_METRICS_RESPONSE \
-	(EV_WLAN_MULTIAP_START + 0x0b)
-#define EV_WLAN_MULTIAP_BEACON_METRICS_RESPONSE \
-	(EV_WLAN_MULTIAP_START + 0x0c)
-#define EV_WLAN_MULTIAP_STEERING_BTM_REPORT \
-	(EV_WLAN_MULTIAP_START + 0x0d)
-#define EV_WLAN_MULTIAP_TOPOLOGY_RESPONSE \
-	(EV_WLAN_MULTIAP_START + 0x0e)
-#define EV_WLAN_MULTIAP_BSS_STATUS_REPORT \
-	(EV_WLAN_MULTIAP_START + 0x0f)
-#endif /*CFG_AP_80211KVR_INTERFACE*/
-
 typedef uint32_t(*PFN_OID_HANDLER_FUNC_REQ) (
-	void *prAdapter,
-	void *pvBuf, uint32_t u4BufLen,
-	uint32_t *pu4OutInfoLen);
+	IN void *prAdapter,
+	IN OUT void *pvBuf, IN uint32_t u4BufLen,
+	OUT uint32_t *pu4OutInfoLen);
 
 enum ENUM_OID_METHOD {
 	ENUM_OID_GLUE_ONLY,
@@ -379,11 +335,7 @@ struct NDIS_TRANSPORT_STRUCT {
 	uint32_t ndisOidCmd;
 	uint32_t inNdisOidlength;
 	uint32_t outNdisOidLength;
-#if CFG_SUPPORT_QA_TOOL
-	uint8_t ndisOidContent[20];
-#else
 	uint8_t ndisOidContent[16];
-#endif	/* CFG_SUPPORT_QA_TOOL */
 };
 
 #if CFG_SUPPORT_NAN
@@ -449,13 +401,6 @@ enum AGG_RANGE_TYPE_T {
  *			P U B L I C   D A T A
  *******************************************************************************
  */
- /* To indocate if WFA test bed */
-extern uint8_t g_IsWfaTestBed;
-extern uint8_t g_IsTwtLogo;
-
-#if (CFG_SUPPORT_802_11AX == 1)
-extern uint8_t  g_fgHTSMPSEnabled;
-#endif
 
 /*******************************************************************************
  *			P R I V A T E   D A T A
@@ -473,92 +418,81 @@ extern uint8_t  g_fgHTSMPSEnabled;
  */
 
 int
-priv_set_int(struct net_device *prNetDev,
-	     struct iw_request_info *prIwReqInfo,
-	     union iwreq_data *prIwReqData, char *pcExtra);
+priv_set_int(IN struct net_device *prNetDev,
+	     IN struct iw_request_info *prIwReqInfo,
+	     IN union iwreq_data *prIwReqData, IN char *pcExtra);
 
 int
-priv_get_int(struct net_device *prNetDev,
-	     struct iw_request_info *prIwReqInfo,
-	     union iwreq_data *prIwReqData, char *pcExtra);
+priv_get_int(IN struct net_device *prNetDev,
+	     IN struct iw_request_info *prIwReqInfo,
+	     IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 
 int
-priv_set_ints(struct net_device *prNetDev,
-	      struct iw_request_info *prIwReqInfo,
-	      union iwreq_data *prIwReqData, char *pcExtra);
+priv_set_ints(IN struct net_device *prNetDev,
+	      IN struct iw_request_info *prIwReqInfo,
+	      IN union iwreq_data *prIwReqData, IN char *pcExtra);
 
 int
-priv_get_ints(struct net_device *prNetDev,
-	      struct iw_request_info *prIwReqInfo,
-	      union iwreq_data *prIwReqData, char *pcExtra);
+priv_get_ints(IN struct net_device *prNetDev,
+	      IN struct iw_request_info *prIwReqInfo,
+	      IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 
 int
-priv_set_struct(struct net_device *prNetDev,
-		struct iw_request_info *prIwReqInfo,
-		union iwreq_data *prIwReqData, char *pcExtra);
+priv_set_struct(IN struct net_device *prNetDev,
+		IN struct iw_request_info *prIwReqInfo,
+		IN union iwreq_data *prIwReqData, IN char *pcExtra);
 
 int
-priv_get_struct(struct net_device *prNetDev,
-		struct iw_request_info *prIwReqInfo,
-		union iwreq_data *prIwReqData, char *pcExtra);
+priv_get_struct(IN struct net_device *prNetDev,
+		IN struct iw_request_info *prIwReqInfo,
+		IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 
 /* fos_change begin */
 int
-priv_get_string(struct net_device *prNetDev,
-		struct iw_request_info *prIwReqInfo,
-		union iwreq_data *prIwReqData, char *pcExtra);
+priv_get_string(IN struct net_device *prNetDev,
+		IN struct iw_request_info *prIwReqInfo,
+		IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 /* fos_change end */
 
 int
-priv_set_driver(struct net_device *prNetDev,
-		struct iw_request_info *prIwReqInfo,
-		union iwreq_data *prIwReqData, char *pcExtra);
+priv_set_driver(IN struct net_device *prNetDev,
+		IN struct iw_request_info *prIwReqInfo,
+		IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 
 int
-priv_set_ap(struct net_device *prNetDev,
-		struct iw_request_info *prIwReqInfo,
-		union iwreq_data *prIwReqData, char *pcExtra);
+priv_set_ap(IN struct net_device *prNetDev,
+		IN struct iw_request_info *prIwReqInfo,
+		IN union iwreq_data *prIwReqData, IN OUT char *pcExtra);
 
-int priv_support_ioctl(struct net_device *prDev,
-		       struct ifreq *prReq, int i4Cmd);
+int priv_support_ioctl(IN struct net_device *prDev,
+		       IN OUT struct ifreq *prReq, IN int i4Cmd);
 
-int priv_support_driver_cmd(struct net_device *prDev,
-			    struct ifreq *prReq, int i4Cmd);
+int priv_support_driver_cmd(IN struct net_device *prDev,
+			    IN OUT struct ifreq *prReq, IN int i4Cmd);
 
 #ifdef CFG_ANDROID_AOSP_PRIV_CMD
-int android_private_support_driver_cmd(struct net_device *prDev,
-struct ifreq *prReq, int i4Cmd);
+int android_private_support_driver_cmd(IN struct net_device *prDev,
+IN OUT struct ifreq *prReq, IN int i4Cmd);
 #endif /* CFG_ANDROID_AOSP_PRIV_CMD */
 
-#if CFG_SUPPORT_MDNS_OFFLOAD
-int priv_support_mdns_offload(struct net_device *prDev,
-				struct ifreq *prReq, int i4Cmd);
-#endif
+int32_t priv_driver_cmds(IN struct net_device *prNetDev,
+			 IN int8_t *pcCommand, IN int32_t i4TotalLen);
 
-int32_t priv_driver_cmds(struct net_device *prNetDev,
-			 int8_t *pcCommand, int32_t i4TotalLen);
-
-int priv_driver_set_cfg(struct net_device *prNetDev,
-			char *pcCommand, int i4TotalLen);
+int priv_driver_set_cfg(IN struct net_device *prNetDev,
+			IN char *pcCommand, IN int i4TotalLen);
 
 #if CFG_SUPPORT_QA_TOOL
 int
-priv_ate_set(struct net_device *prNetDev,
-	     struct iw_request_info *prIwReqInfo,
-	     union iwreq_data *prIwReqData, char *pcExtra);
+priv_ate_set(IN struct net_device *prNetDev,
+	     IN struct iw_request_info *prIwReqInfo,
+	     IN union iwreq_data *prIwReqData, IN char *pcExtra);
 #endif
 
 #if CFG_SUPPORT_NAN
-int priv_nan_struct(struct net_device *prNetDev,
-		    struct iw_request_info *prIwReqInfo,
-		    union iwreq_data *prIwReqData, char *pcExtra);
+int priv_nan_struct(IN struct net_device *prNetDev,
+		    IN struct iw_request_info *prIwReqInfo,
+		    IN union iwreq_data *prIwReqData, IN char *pcExtra);
 #endif
-
-#if CFG_AP_80211KVR_INTERFACE
-int32_t MulAPAgentMontorSendMsg(uint16_t msgtype,
-	void *pvmsgbuf, int32_t i4TotalLen);
-#endif /* CFG_AP_80211KVR_INTERFACE */
-
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************

@@ -107,6 +107,9 @@ static INT32 wmt_plat_uart_rx_ctrl(ENUM_PIN_STATE state);
 #if CFG_WMT_LTE_COEX_HANDLING
 static INT32 wmt_plat_tdm_req_ctrl(ENUM_PIN_STATE state);
 #endif
+/* begin ,prize-lifenfen-20181211, add FM_LNA_EN */
+static INT32 wmt_plat_fm_lna_ctrl(ENUM_PIN_STATE state);
+/* end ,prize-lifenfen-20181211, add FM_LNA_EN */
 static INT32 wmt_plat_dump_pin_conf(VOID);
 
 
@@ -154,6 +157,9 @@ static const fp_set_pin gfp_set_pin_table[] = {
 #if CFG_WMT_LTE_COEX_HANDLING
 	[PIN_TDM_REQ] = wmt_plat_tdm_req_ctrl,
 #endif
+/* begin ,prize-lifenfen-20181211, add FM_LNA_EN */
+	[PIN_FM_LNA] = wmt_plat_fm_lna_ctrl,
+/* end ,prize-lifenfen-20181211, add FM_LNA_EN */
 };
 
 /*******************************************************************************
@@ -299,10 +305,11 @@ static VOID wmt_plat_bgf_eirq_cb(VOID)
 irqreturn_t wmt_plat_bgf_irq_isr(INT32 irq, PVOID arg)
 {
 #if CFG_WMT_PS_SUPPORT
+	mtk_wcn_consys_wakeup_btif_irq_pull_low();
 	wmt_plat_eirq_ctrl(PIN_BGF_EINT, PIN_STA_EINT_DIS);
 	wmt_plat_bgf_eirq_cb();
 #else
-	WMT_PLAT_PR_INFO("skip irq handing because psm is disable");
+	WMT_PLAT_PR_DBG("skip irq handing because psm is disable");
 #endif
 
 	return IRQ_HANDLED;
@@ -1489,6 +1496,62 @@ static INT32 wmt_plat_gps_lna_ctrl(ENUM_PIN_STATE state)
 	return ret;
 }
 
+/* begin ,prize-lifenfen-20181211, add FM_LNA_EN */
+static INT32 wmt_plat_fm_lna_ctrl(ENUM_PIN_STATE state)
+{
+	INT32 ret = -1;
+	struct pinctrl_state *fm_lna_init;
+	struct pinctrl_state *fm_lna_oh;
+	struct pinctrl_state *fm_lna_ol;
+	struct pinctrl *consys_pinctrl;
+
+	WMT_PLAT_PR_DBG("ENTER++\n");
+	consys_pinctrl = mtk_wcn_consys_get_pinctrl();
+	if (!consys_pinctrl) {
+		WMT_PLAT_PR_ERR("get consys pinctrl fail\n");
+		return 0;
+	}
+
+	fm_lna_init = pinctrl_lookup_state(consys_pinctrl, "fm_lna_state_init");
+	if (IS_ERR(fm_lna_init)) {
+		WMT_PLAT_PR_ERR("Cannot find fm lna pin init state!\n");
+		return 0;
+	}
+
+	fm_lna_oh = pinctrl_lookup_state(consys_pinctrl, "fm_lna_state_oh");
+	if (IS_ERR(fm_lna_oh)) {
+		WMT_PLAT_PR_ERR("Cannot find fm lna pin oh state!\n");
+		return 0;
+	}
+
+	fm_lna_ol = pinctrl_lookup_state(consys_pinctrl, "fm_lna_state_ol");
+	if (IS_ERR(fm_lna_ol)) {
+		WMT_PLAT_PR_ERR("Cannot find fm lna pin ol state!\n");
+		return 0;
+	}
+
+	switch (state) {
+	case PIN_STA_INIT:
+	case PIN_STA_DEINIT:
+		pinctrl_select_state(consys_pinctrl, fm_lna_init);
+		WMT_PLAT_PR_DBG("set fm lna to init\n");
+		break;
+	case PIN_STA_OUT_H:
+		pinctrl_select_state(consys_pinctrl, fm_lna_oh);
+		WMT_PLAT_PR_DBG("set fm lna to oh\n");
+		break;
+	case PIN_STA_OUT_L:
+		pinctrl_select_state(consys_pinctrl, fm_lna_ol);
+		WMT_PLAT_PR_DBG("set fm lna to ol\n");
+		break;
+	default:
+		WMT_PLAT_PR_WARN("%d mode not defined for  fm lna pin !!!\n", state);
+		break;
+	}
+
+	return ret;
+}
+/* end ,prize-lifenfen-20181211, add FM_LNA_EN */
 static INT32 wmt_plat_uart_rx_ctrl(ENUM_PIN_STATE state)
 {
 	if (gpio_ctrl_info.gpio_ctrl_state[GPIO_COMBO_URXD_PIN].gpio_num == DEFAULT_PIN_ID) {
@@ -1668,7 +1731,7 @@ VOID wmt_plat_BGF_irq_dump_status(VOID)
 {
 	mt_irq_dump_status(269);/*tag3 wujun rainier is enabled */
 
-	WMT_PLAT_PR_INFO("this function is null in MT6735\n");
+	WMT_PLAT_PR_DBG("this function is null in MT6735\n");
 }
 
 MTK_WCN_BOOL wmt_plat_dump_BGF_irq_status(VOID)
@@ -1726,7 +1789,7 @@ UINT32 wmt_plat_force_trigger_assert(ENUM_FORCE_TRG_ASSERT_T type)
 	switch (type) {
 	case STP_FORCE_TRG_ASSERT_EMI:
 
-		WMT_PLAT_PR_INFO("[Force Assert] stp_trigger_firmware_assert_via_emi -->\n");
+		WMT_PLAT_PR_DBG("[Force Assert] stp_trigger_firmware_assert_via_emi -->\n");
 		p_virtual_addr = wmt_plat_get_emi_virt_add(EXP_APMEM_CTRL_HOST_OUTBAND_ASSERT_W1);
 		if (!p_virtual_addr) {
 			WMT_PLAT_PR_ERR("get virtual address fail\n");
@@ -1734,7 +1797,7 @@ UINT32 wmt_plat_force_trigger_assert(ENUM_FORCE_TRG_ASSERT_T type)
 		}
 
 		CONSYS_REG_WRITE(p_virtual_addr, EXP_APMEM_HOST_OUTBAND_ASSERT_MAGIC_W1);
-		WMT_PLAT_PR_INFO("[Force Assert] stp_trigger_firmware_assert_via_emi <--\n");
+		WMT_PLAT_PR_DBG("[Force Assert] stp_trigger_firmware_assert_via_emi <--\n");
 		break;
 	case STP_FORCE_TRG_ASSERT_DEBUG_PIN:
 		mtk_wcn_force_trigger_assert_debug_pin();
@@ -1817,7 +1880,7 @@ INT32 wmt_plat_consys_hw_init(VOID)
 #if CFG_WMT_LTE_COEX_HANDLING
 INT32 wmt_plat_get_tdm_antsel_index(VOID)
 {
-	WMT_PLAT_PR_INFO("not support LTE in this platform\n");
+	WMT_PLAT_PR_DBG("not support LTE in this platform\n");
 	return 0;
 }
 #endif
@@ -1839,7 +1902,7 @@ INT32 wmt_plat_set_dbg_mode(UINT32 flag)
 		CONSYS_REG_WRITE(vir_addr, 0x0);
 		ret = 1;
 	}
-	WMT_PLAT_PR_INFO("fw dbg mode register value(0x%08x)\n", CONSYS_REG_READ(vir_addr));
+	WMT_PLAT_PR_DBG("fw dbg mode register value(0x%08x)\n", CONSYS_REG_READ(vir_addr));
 
 	return ret;
 }
@@ -1854,7 +1917,7 @@ INT32 wmt_plat_set_dynamic_dumpmem(PUINT32 str_buf)
 		return -1;
 	}
 	memcpy(vir_addr, str_buf, DYNAMIC_DUMP_GROUP_NUM*8);
-	WMT_PLAT_PR_INFO("dynamic dump register value(0x%08x)\n", CONSYS_REG_READ(vir_addr));
+	WMT_PLAT_PR_DBG("dynamic dump register value(0x%08x)\n", CONSYS_REG_READ(vir_addr));
 
 	return 0;
 }

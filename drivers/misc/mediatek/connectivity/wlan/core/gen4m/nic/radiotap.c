@@ -1,54 +1,9 @@
-/******************************************************************************
- *
- * This file is provided under a dual license.  When you use or
- * distribute this software, you may choose to be licensed under
- * version 2 of the GNU General Public License ("GPLv2 License")
- * or BSD License.
- *
- * GPLv2 License
- *
- * Copyright(C) 2016 MediaTek Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
- *
- * BSD LICENSE
- *
- * Copyright(C) 2016 MediaTek Inc. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
- *  * Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
- * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
- * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- *****************************************************************************/
+/* SPDX-License-Identifier: GPL-2.0 */
+
+/*
+ * Copyright (c) 2022 MediaTek Inc.
+ */
+
 
 /*! \file   radiotap.c
  *    \brief  Functions that provide many rx-related functions
@@ -104,9 +59,12 @@
  *                              F U N C T I O N S
  *******************************************************************************
  */
-static void radiotap_fill_vendor(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_vendor(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
-	struct VENDOR_NAMESPACE *p_vendor = (struct VENDOR_NAMESPACE *)p_data;
+	struct VENDOR_NAMESPACE *p_vendor =
+		(struct VENDOR_NAMESPACE *)p_data;
 	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
 
 	p_vendor->aucOUI[0] = aucMtkOui[0];
@@ -116,13 +74,16 @@ static void radiotap_fill_vendor(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info
 	p_vendor->u2DataLen = p_radiotap_info->u2VendorLen;
 }
 
-static void radiotap_fill_he_mu(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_he_mu(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct HE_MU *heMu = (struct HE_MU *)p_data;
 	uint16_t flags1 = 0;
 	uint16_t flags2 = 0;
 
-	flags1 = p_radiotap_info->u2DataDcm << IEEE80211_RADIOTAP_HE_MU_DCM_SHFT;
+	flags1 = p_radiotap_info->u2DataDcm
+			<< IEEE80211_RADIOTAP_HE_MU_DCM_SHFT;
 	flags1 |= (IEEE80211_RADIOTAP_HE_MU_MCS_KNOWN_MASK |
 		IEEE80211_RADIOTAP_HE_MU_DCM_KNOWN_MASK |
 		IEEE80211_RADIOTAP_HE_MU_CH1_RU_KNOWN_MASK |
@@ -151,13 +112,17 @@ static void radiotap_fill_he_mu(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
 
 	flags2 = p_radiotap_info->ucFrMode;
 	flags2 |= IEEE80211_RADIOTAP_HE_MU_BW_KNOWN_MASK;
-	flags2 |= (IEEE80211_RADIOTAP_HE_MU_USER_MASK & (p_radiotap_info->ucNumUser << IEEE80211_RADIOTAP_HE_MU_USER_SHFT));
+	flags2 |= (IEEE80211_RADIOTAP_HE_MU_USER_MASK &
+			(p_radiotap_info->ucNumUser <<
+			IEEE80211_RADIOTAP_HE_MU_USER_SHFT));
 
 	heMu->u2Flag1 = flags1;
 	heMu->u2Flag2 = flags2;
 }
 
-static void radiotap_fill_he(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_he(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct HE *he = (struct HE *)p_data;
 	uint16_t bw_ru_alloc;
@@ -167,34 +132,45 @@ static void radiotap_fill_he(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, ui
 	switch (p_radiotap_info->ucTxMode) {
 	case TX_RATE_MODE_HE_SU:
 		he->u2Data1 = IEEE80211_RADIOTAP_HE_SU;
-		he->u2Data1 |= IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1;
+		he->u2Data1 |=
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1;
 		spatial_reuse = p_radiotap_info->u2SpatialReuse1;
 		break;
 	case TX_RATE_MODE_EHT_ER:
 	case TX_RATE_MODE_HE_ER:
 		he->u2Data1 = IEEE80211_RADIOTAP_HE_EXT_SU;
-		he->u2Data1 |= IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1;
+		he->u2Data1 |=
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1;
 		spatial_reuse = p_radiotap_info->u2SpatialReuse1;
 		break;
 	case TX_RATE_MODE_EHT_TRIG:
 	case TX_RATE_MODE_HE_TRIG:
 		he->u2Data1 = IEEE80211_RADIOTAP_HE_TRIG;
-		he->u2Data1 |= (IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1 |
-						IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE2 |
-						IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE3 |
-						IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE4);
-		spatial_reuse = (p_radiotap_info->u2SpatialReuse1 |
-						(p_radiotap_info->u2SpatialReuse2 << IEEE80211_RADIOTAP_HE_SPATIAL_REUSE2_SHFT) |
-						(p_radiotap_info->u2SpatialReuse3 << IEEE80211_RADIOTAP_HE_SPATIAL_REUSE3_SHFT) |
-						(p_radiotap_info->u2SpatialReuse4 << IEEE80211_RADIOTAP_HE_SPATIAL_REUSE4_SHFT));
+		he->u2Data1 |= (
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1 |
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE2 |
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE3 |
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE4);
+		spatial_reuse = (
+		p_radiotap_info->u2SpatialReuse1
+		| (p_radiotap_info->u2SpatialReuse2 <<
+			IEEE80211_RADIOTAP_HE_SPATIAL_REUSE2_SHFT)
+		| (p_radiotap_info->u2SpatialReuse3 <<
+			IEEE80211_RADIOTAP_HE_SPATIAL_REUSE3_SHFT)
+		| (p_radiotap_info->u2SpatialReuse4 <<
+			IEEE80211_RADIOTAP_HE_SPATIAL_REUSE4_SHFT)
+		);
 		break;
 	case TX_RATE_MODE_EHT_MU:
 	case TX_RATE_MODE_HE_MU:
 		he->u2Data1 = IEEE80211_RADIOTAP_HE_MU;
-		he->u2Data1 |= (IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1 |
-						IEEE80211_RADIOTAP_HE_KNOWN_STAID);
-		spatial_reuse = (p_radiotap_info->u2SpatialReuse1 |
-						(p_radiotap_info->u2VhtPartialAid << IEEE80211_RADIOTAP_HE_SPATIAL_REUSE2_SHFT));
+		he->u2Data1 |= (
+			IEEE80211_RADIOTAP_HE_KNOWN_SPATIAL_REUSE1 |
+			IEEE80211_RADIOTAP_HE_KNOWN_STAID);
+		spatial_reuse = (
+			p_radiotap_info->u2SpatialReuse1 |
+			(p_radiotap_info->u2VhtPartialAid <<
+			IEEE80211_RADIOTAP_HE_SPATIAL_REUSE2_SHFT));
 		break;
 	default:
 		break;
@@ -204,53 +180,79 @@ static void radiotap_fill_he(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, ui
 
 	/* Data 2 */
 	he->u2Data2 = IEEE80211_RADIOTAP_HE_KNOWN_DATA2;
-	he->u2Data2 |= ((p_radiotap_info->u2RuAllocation << IEEE80211_RADIOTAP_HE_RU_ALLOC_OFFSET_OFFSET) &
+	he->u2Data2 |= ((p_radiotap_info->u2RuAllocation <<
+		IEEE80211_RADIOTAP_HE_RU_ALLOC_OFFSET_OFFSET) &
 		IEEE80211_RADIOTAP_HE_RU_ALLOC_OFFSET_MASK);
 
 	/* Data 3 */
 	he->u2Data3 = ((p_radiotap_info->u2BssClr) |
-		(p_radiotap_info->u2BeamChange << IEEE80211_RADIOTAP_HE_BEAM_CHANGE_SHFT) |
-		(p_radiotap_info->u2UlDl << IEEE80211_RADIOTAP_HE_UL_DL_SHFT) |
-		((p_radiotap_info->ucMcs << IEEE80211_RADIOTAP_HE_DATA_MCS_SHFT) & IEEE80211_RADIOTAP_HE_DATA_MCS_MASK) |
-		(p_radiotap_info->u2DataDcm << IEEE80211_RADIOTAP_HE_DATA_DCM_SHFT) |
-		(p_radiotap_info->ucLDPC << IEEE80211_RADIOTAP_HE_CODING_SHFT) |
-		(p_radiotap_info->ucLdpcExtraOfdmSym << IEEE80211_RADIOTAP_HE_LDPC_EXTRA_SHFT) |
-		(p_radiotap_info->ucSTBC << IEEE80211_RADIOTAP_HE_STBC_SHFT));
+		(p_radiotap_info->u2BeamChange <<
+			IEEE80211_RADIOTAP_HE_BEAM_CHANGE_SHFT) |
+		(p_radiotap_info->u2UlDl <<
+			IEEE80211_RADIOTAP_HE_UL_DL_SHFT) |
+		((p_radiotap_info->ucMcs <<
+			IEEE80211_RADIOTAP_HE_DATA_MCS_SHFT) &
+			IEEE80211_RADIOTAP_HE_DATA_MCS_MASK) |
+		(p_radiotap_info->u2DataDcm <<
+			IEEE80211_RADIOTAP_HE_DATA_DCM_SHFT) |
+		(p_radiotap_info->ucLDPC <<
+			IEEE80211_RADIOTAP_HE_CODING_SHFT) |
+		(p_radiotap_info->ucLdpcExtraOfdmSym <<
+			IEEE80211_RADIOTAP_HE_LDPC_EXTRA_SHFT) |
+		(p_radiotap_info->ucSTBC <<
+			IEEE80211_RADIOTAP_HE_STBC_SHFT));
 
 	/* Data 4 */
 	he->u2Data4 = spatial_reuse;
 
 	/* Data 5 */
-	if (p_radiotap_info->u2RuAllocation <= IEEE80211_RADIOTAP_HE_RU_IDX_26_RU37)
+	if (p_radiotap_info->ucTxMode == TX_RATE_MODE_HE_SU)
+		bw_ru_alloc = p_radiotap_info->ucFrMode;
+	else if (p_radiotap_info->u2RuAllocation <=
+		IEEE80211_RADIOTAP_HE_RU_IDX_26_RU37)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_26;
-	else if (p_radiotap_info->u2RuAllocation <= IEEE80211_RADIOTAP_HE_RU_IDX_52_RU16)
+	else if (p_radiotap_info->u2RuAllocation <=
+		IEEE80211_RADIOTAP_HE_RU_IDX_52_RU16)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_52;
-	else if (p_radiotap_info->u2RuAllocation <= IEEE80211_RADIOTAP_HE_RU_IDX_106_RU8)
+	else if (p_radiotap_info->u2RuAllocation <=
+		IEEE80211_RADIOTAP_HE_RU_IDX_106_RU8)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_106;
-	else if (p_radiotap_info->u2RuAllocation <= IEEE80211_RADIOTAP_HE_RU_IDX_242_RU4)
+	else if (p_radiotap_info->u2RuAllocation <=
+		IEEE80211_RADIOTAP_HE_RU_IDX_242_RU4)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_242;
-	else if (p_radiotap_info->u2RuAllocation <= IEEE80211_RADIOTAP_HE_RU_IDX_484_RU2)
+	else if (p_radiotap_info->u2RuAllocation <=
+		IEEE80211_RADIOTAP_HE_RU_IDX_484_RU2)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_484;
-	else if (p_radiotap_info->u2RuAllocation == IEEE80211_RADIOTAP_HE_RU_IDX_996_RU1)
+	else if (p_radiotap_info->u2RuAllocation ==
+		IEEE80211_RADIOTAP_HE_RU_IDX_996_RU1)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_996;
-	else if (p_radiotap_info->u2RuAllocation == IEEE80211_RADIOTAP_HE_RU_IDX_2x_996_RU1)
+	else if (p_radiotap_info->u2RuAllocation ==
+		IEEE80211_RADIOTAP_HE_RU_IDX_2x_996_RU1)
 		bw_ru_alloc = IEEE80211_RADIOTAP_HE_RU_2x_996;
 	else
-		bw_ru_alloc = p_radiotap_info->ucFrMode;
+		bw_ru_alloc = 0xf;
 
 	he->u2Data5 = bw_ru_alloc |
-		(p_radiotap_info->ucShortGI << IEEE80211_RADIOTAP_HE_GI_SHFT) |
-		(p_radiotap_info->u2Ltf << IEEE80211_RADIOTAP_HE_LTF_SYMBO_SHFT) |
-		(p_radiotap_info->ucBeamFormed << IEEE80211_RADIOTAP_HE_TX_BF_SHFT) |
-		(p_radiotap_info->ucPeDisamb << IEEE80211_RADIOTAP_HE_PE_DISAMB_SHFT);
+		(p_radiotap_info->ucShortGI <<
+			IEEE80211_RADIOTAP_HE_GI_SHFT) |
+		(p_radiotap_info->u2Ltf <<
+			IEEE80211_RADIOTAP_HE_LTF_SYMBO_SHFT) |
+		(p_radiotap_info->ucBeamFormed <<
+			IEEE80211_RADIOTAP_HE_TX_BF_SHFT) |
+		(p_radiotap_info->ucPeDisamb <<
+			IEEE80211_RADIOTAP_HE_PE_DISAMB_SHFT);
 
 	/* Data 6 */
 	he->u2Data6 = (p_radiotap_info->ucNsts |
-		(p_radiotap_info->u2Doppler << IEEE80211_RADIOTAP_HE_DOPPLER_SHFT) |
-		(p_radiotap_info->u2Txop << IEEE80211_RADIOTAP_HE_TXOP_SHFT));
+		(p_radiotap_info->u2Doppler <<
+			IEEE80211_RADIOTAP_HE_DOPPLER_SHFT) |
+		(p_radiotap_info->u2Txop <<
+			IEEE80211_RADIOTAP_HE_TXOP_SHFT));
 }
 
-static void radiotap_fill_timestamp(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_timestamp(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct TIMESTAMP *p_timestamp = (struct TIMESTAMP *)p_data;
 
@@ -261,7 +263,9 @@ static void radiotap_fill_timestamp(struct IEEE80211_RADIOTAP_INFO *p_radiotap_i
 	p_timestamp->ucFlags = 0x1;
 }
 
-static void radiotap_fill_vht(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_vht(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct VHT *vht = (struct VHT *)p_data;
 	uint8_t flags = 0;
@@ -279,7 +283,8 @@ static void radiotap_fill_vht(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, u
 		flags |= IEEE80211_RADIOTAP_VHT_FLAG_SGI_NSYM_M10_9;
 
 	if (p_radiotap_info->ucLdpcExtraOfdmSym)
-		flags |= IEEE80211_RADIOTAP_VHT_FLAG_LDPC_EXTRA_OFDM_SYM;
+		flags |=
+		IEEE80211_RADIOTAP_VHT_FLAG_LDPC_EXTRA_OFDM_SYM;
 
 	if (p_radiotap_info->ucBeamFormed)
 		flags |= IEEE80211_RADIOTAP_VHT_FLAG_BEAMFORMED;
@@ -312,14 +317,18 @@ static void radiotap_fill_vht(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, u
 	vht->u2VhtPartialAid = p_radiotap_info->u2VhtPartialAid;
 }
 
-static void radiotap_fill_ampdu(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_ampdu(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct AMPDU *p_ampdu = (struct AMPDU *)p_data;
 
 	p_ampdu->u4AmpduRefNum = p_radiotap_info->u4AmpduRefNum;
 }
 
-static void radiotap_fill_mcs(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_mcs(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct MCS *p_mcs = (struct MCS *)p_data;
 	uint8_t flags = 0;
@@ -336,7 +345,8 @@ static void radiotap_fill_mcs(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, u
 	if (p_radiotap_info->ucLDPC)
 		flags |= IEEE80211_RADIOTAP_MCS_FEC_LDPC;
 
-	flags |= (p_radiotap_info->ucSTBC << IEEE80211_RADIOTAP_MCS_STBC);
+	flags |= (p_radiotap_info->ucSTBC <<
+		IEEE80211_RADIOTAP_MCS_STBC);
 
 	if (p_radiotap_info->ucNess & BIT(0))
 		flags |= IEEE80211_RADIOTAP_MCS_NESS;
@@ -351,24 +361,33 @@ static void radiotap_fill_mcs(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, u
 	p_mcs->ucMcsMcs = p_radiotap_info->ucMcs;
 }
 
-static void radiotap_fill_antenna(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_antenna(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct ANTENNA *p_antenna = (struct ANTENNA *)p_data;
 
 	p_antenna->ucAntIdx = 0;
 }
 
-static void radiotap_fill_ant_signal(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_ant_signal(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
-	struct ANT_SIGNAL *p_ant_signal = (struct ANT_SIGNAL *)p_data;
+	struct ANT_SIGNAL *p_ant_signal =
+		(struct ANT_SIGNAL *)p_data;
 
-	p_ant_signal->i1AntennaSignal = (int8_t)RCPI_TO_dBm(p_radiotap_info->ucRcpi0);
+	p_ant_signal->i1AntennaSignal =
+		(int8_t)RCPI_TO_dBm(p_radiotap_info->ucRcpi0);
 }
 
-static void radiotap_fill_channel(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_channel(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct CHANNEL *p_channel = (struct CHANNEL *)p_data;
-	enum ENUM_BAND eBand = (enum ENUM_BAND)p_radiotap_info->ucRfBand;
+	enum ENUM_BAND eBand =
+		(enum ENUM_BAND)p_radiotap_info->ucRfBand;
 	uint8_t ucChanNum = p_radiotap_info->ucChanNum;
 	uint16_t flags = 0;
 	uint32_t freq = 0;
@@ -381,11 +400,10 @@ static void radiotap_fill_channel(struct IEEE80211_RADIOTAP_INFO *p_radiotap_inf
 #if (CFG_SUPPORT_WIFI_6G == 1)
 	nicRxdChNumTranslate(eBand, &ucChanNum);
 #endif
-	if (eBand == BAND_2G4) {
+	if (eBand == BAND_2G4)
 		freq = (ucChanNum * 5 + 2407);
-	} else if (eBand == BAND_5G) {
+	else if (eBand == BAND_5G)
 		freq = (ucChanNum * 5 + 5000);
-	}
 #if (CFG_SUPPORT_WIFI_6G == 1)
 	else if (eBand == BAND_6G)
 		freq = (ucChanNum * 5 + 5950);
@@ -399,14 +417,19 @@ static void radiotap_fill_channel(struct IEEE80211_RADIOTAP_INFO *p_radiotap_inf
 	p_channel->u2ChFlags = flags;
 }
 
-static void radiotap_fill_rate(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_rate(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct RATE *p_rate = (struct RATE *)p_data;
 
-	p_rate->ucRate = nicGetHwRateByPhyRate(p_radiotap_info->ucMcs);
+	p_rate->ucRate = nicGetHwRateByPhyRate(
+				p_radiotap_info->ucMcs);
 }
 
-static void radiotap_fill_flags(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info, uint8_t *p_data)
+static void radiotap_fill_flags(
+	struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
+	uint8_t *p_data)
 {
 	struct FLAGS *p_flags = (struct FLAGS *)p_data;
 	uint8_t flags = 0;
@@ -423,26 +446,32 @@ static void radiotap_fill_flags(struct IEEE80211_RADIOTAP_INFO *p_radiotap_info,
 	p_flags->ucFlags = flags;
 }
 
-void radiotapFillRadiotap(struct ADAPTER *prAdapter,
-			    struct SW_RFB *prSwRfb)
+void radiotapFillRadiotap(IN struct ADAPTER *prAdapter,
+			    IN OUT struct SW_RFB *prSwRfb)
 {
 	struct RX_CTRL *prRxCtrl = &prAdapter->rRxCtrl;
+	struct sk_buff *prSkb =
+		(struct sk_buff *)(prSwRfb->pvPacket);
 	struct IEEE80211_RADIOTAP_INFO radiotapInfo;
 	struct IEEE80211_RADIOTAP_HEADER *header;
-	struct IEEE80211_RADIOTAP_FIELD_FUNC radiotap_fill_func[IEEE80211_RADIOTAP_SUPPORT_NUM];
-	struct RX_DESC_OPS_T *prRxDescOps = prAdapter->chip_info->prRxDescOps;
+	struct IEEE80211_RADIOTAP_FIELD_FUNC radiotap_fill_func[
+		IEEE80211_RADIOTAP_SUPPORT_NUM];
+	struct RX_DESC_OPS_T *prRxDescOps =
+		prAdapter->chip_info->prRxDescOps;
 	uint8_t ucFillRadiotap = FALSE;
 	uint8_t *p_base;
 	uint8_t *p_data;
 	uint8_t func_idx;
 	uint8_t func_num = 0;
-	uint16_t radiotap_len = sizeof(struct IEEE80211_RADIOTAP_HEADER);
+	uint16_t radiotap_len = sizeof(
+		struct IEEE80211_RADIOTAP_HEADER);
 	uint16_t padding_len = 0;
 	uint32_t present;
 
 	if (prRxDescOps->nic_rxd_fill_radiotap) {
 		prSwRfb->prRadiotapInfo = &radiotapInfo;
-		ucFillRadiotap = prRxDescOps->nic_rxd_fill_radiotap(prAdapter, prSwRfb);
+		ucFillRadiotap = prRxDescOps->nic_rxd_fill_radiotap(
+					prAdapter, prSwRfb);
 	}
 
 	if (ucFillRadiotap == FALSE) {
@@ -481,7 +510,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 1 FLAGS */
 	if (present & IEEE80211_RADIOTAP_FIELD_FLAGS) {
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_flags;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_flags;
 		radiotap_len += sizeof(struct FLAGS);
 		func_num++;
 	}
@@ -489,7 +519,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 2 RATE */
 	if (present & IEEE80211_RADIOTAP_FIELD_RATE) {
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_rate;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_rate;
 		radiotap_len += sizeof(struct RATE);
 		func_num++;
 	}
@@ -500,7 +531,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		padding_len = radiotap_len % 2;
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_channel;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_channel;
 		radiotap_len += sizeof(struct CHANNEL);
 		func_num++;
 	}
@@ -508,7 +540,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 5 ANT SIGNAL */
 	if (present & IEEE80211_RADIOTAP_FIELD_ANT_SIGNAL) {
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_ant_signal;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_ant_signal;
 		radiotap_len += sizeof(struct ANT_SIGNAL);
 		func_num++;
 	}
@@ -516,7 +549,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 11 ANTENNA */
 	if (present & IEEE80211_RADIOTAP_FIELD_ANTENNA) {
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_antenna;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_antenna;
 		radiotap_len += sizeof(struct ANTENNA);
 		func_num++;
 	}
@@ -524,7 +558,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 19 MCS */
 	if (present & IEEE80211_RADIOTAP_FIELD_MCS) {
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_mcs;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_mcs;
 		radiotap_len += sizeof(struct MCS);
 		func_num++;
 	}
@@ -532,10 +567,12 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 20 A-MPDU */
 	if (present & IEEE80211_RADIOTAP_FIELD_AMPDU) {
 		/* Required Alignment 4 bytes */
-		padding_len = ((radiotap_len % 4) == 0) ? 0 : (4 - (radiotap_len % 4));
+		padding_len = ((radiotap_len % 4) == 0) ? 0 :
+				(4 - (radiotap_len % 4));
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_ampdu;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_ampdu;
 		radiotap_len += sizeof(struct AMPDU);
 		func_num++;
 	}
@@ -546,7 +583,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		padding_len = radiotap_len % 2;
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_vht;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_vht;
 		radiotap_len += sizeof(struct VHT);
 		func_num++;
 	}
@@ -554,10 +592,12 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 	/* Bit Number 22 TIMESTAMP */
 	if (present & IEEE80211_RADIOTAP_FIELD_TIMESTAMP) {
 		/* Required Alignment 8 bytes */
-		padding_len = ((radiotap_len % 8) == 0) ? 0 : (8 - (radiotap_len % 8));
+		padding_len = ((radiotap_len % 8) == 0) ? 0 :
+				(8 - (radiotap_len % 8));
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_timestamp;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_timestamp;
 		radiotap_len += sizeof(struct TIMESTAMP);
 		func_num++;
 	}
@@ -568,7 +608,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		padding_len = radiotap_len % 2;
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_he;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_he;
 		radiotap_len += sizeof(struct HE);
 		func_num++;
 	}
@@ -579,7 +620,8 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		padding_len = radiotap_len % 2;
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_he_mu;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_he_mu;
 		radiotap_len += sizeof(struct HE_MU);
 		func_num++;
 	}
@@ -590,37 +632,57 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		padding_len = radiotap_len % 2;
 		radiotap_len += padding_len;
 		radiotap_fill_func[func_num].offset = radiotap_len;
-		radiotap_fill_func[func_num].radiotap_fill_func = radiotap_fill_vendor;
+		radiotap_fill_func[func_num].radiotap_fill_func =
+			radiotap_fill_vendor;
 		radiotap_len += sizeof(struct VENDOR_NAMESPACE);
 		func_num++;
 	}
 
-	if (!kalProcessRadiotap(prSwRfb->pvPacket, &p_base,
-			radiotap_len, prSwRfb->u2RxByteCount))
+	/* exceed skb headroom the kernel will panic */
+	if (skb_headroom(prSkb) < radiotap_len) {
+		DBGLOG(RX, ERROR, "radiotap exceed skb headroom!\n");
 		goto bypass;
+	}
+
+	skb_push(prSkb, radiotap_len);
+	p_base = (uint8_t *)(prSkb->data);
+	kalMemZero(p_base, radiotap_len);
+
+	skb_reset_tail_pointer(prSkb);
+	skb_trim(prSkb, 0);
+	skb_put(prSkb, (radiotap_len + prSwRfb->u2RxByteCount));
 
 	header = (struct IEEE80211_RADIOTAP_HEADER *)p_base;
 	header->ucItVersion = PKTHDR_RADIOTAP_VERSION;
 	radiotap_len += radiotapInfo.u2VendorLen;
-	header->u2ItLen = CPU_TO_LE16(radiotap_len);
+	header->u2ItLen = cpu_to_le16(radiotap_len);
 	header->u4ItPresent = present;
 
-	for (func_idx = 0; func_idx < func_num; func_idx++)	{
-		p_data = p_base + radiotap_fill_func[func_idx].offset;
-		radiotap_fill_func[func_idx].radiotap_fill_func(&radiotapInfo, p_data);
+	for (func_idx = 0; func_idx < func_num; func_idx++) {
+		p_data = p_base +
+			radiotap_fill_func[func_idx].offset;
+		radiotap_fill_func[func_idx].radiotap_fill_func(
+			&radiotapInfo, p_data);
 	}
 
 #if CFG_SUPPORT_MULTITHREAD
 	if (HAL_IS_RX_DIRECT(prAdapter)) {
-		kalRxIndicateOnePkt(prAdapter->prGlueInfo, prSwRfb->pvPacket);
+		kalRxIndicateOnePkt(prAdapter->prGlueInfo,
+			(void *) GLUE_GET_PKT_DESCRIPTOR(
+				GLUE_GET_PKT_QUEUE_ENTRY(
+					prSwRfb->pvPacket)));
 		RX_ADD_CNT(prRxCtrl, RX_DATA_INDICATION_COUNT, 1);
 	} else {
 		KAL_SPIN_LOCK_DECLARATION();
 
-		KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_RX_TO_OS_QUE);
+		KAL_ACQUIRE_SPIN_LOCK(prAdapter,
+			SPIN_LOCK_RX_TO_OS_QUE);
 		QUEUE_INSERT_TAIL(&(prAdapter->rRxQueue),
-				GLUE_GET_PKT_QUEUE_ENTRY(prSwRfb->pvPacket));
-		KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_RX_TO_OS_QUE);
+			(struct QUE_ENTRY *)
+				GLUE_GET_PKT_QUEUE_ENTRY(
+					prSwRfb->pvPacket));
+		KAL_RELEASE_SPIN_LOCK(prAdapter,
+			SPIN_LOCK_RX_TO_OS_QUE);
 
 		prRxCtrl->ucNumIndPacket++;
 		kalSetTxEvent2Rx(prAdapter->prGlueInfo);
@@ -634,11 +696,13 @@ void radiotapFillRadiotap(struct ADAPTER *prAdapter,
 		if (!timerPendingTimer(
 			    &prAdapter->rPacketDelaySetupTimer)) {
 			DBGLOG(RX, WARN,
-				"Start ReturnIndicatedRfb Timer (%ums)\n",
-			  RX_RETURN_INDICATED_RFB_TIMEOUT_MSEC);
+			  "Start ReturnIndicatedRfb Timer (%u)\n",
+			  RX_RETURN_INDICATED_RFB_TIMEOUT_SEC);
 			cnmTimerStartTimer(prAdapter,
 				&prAdapter->rPacketDelaySetupTimer,
-					RX_RETURN_INDICATED_RFB_TIMEOUT_MSEC);
+				SEC_TO_MSEC(
+				RX_RETURN_INDICATED_RFB_TIMEOUT_SEC
+				));
 		}
 	}
 #endif

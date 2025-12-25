@@ -91,8 +91,6 @@ extern const struct net_device_ops p2p_netdev_ops;
  ******************************************************************************
  */
 
-#define VENDOR_SPECIFIC_IE_LENGTH 400
-
 /******************************************************************************
  *                                 M A C R O S
  ******************************************************************************
@@ -116,6 +114,10 @@ extern const struct net_device_ops p2p_netdev_ops;
  ******************************************************************************
  */
 
+extern struct net_device *g_P2pPrDev;
+extern struct wireless_dev *gprP2pWdev[KAL_P2P_NUM];
+extern struct wireless_dev *gprP2pRoleWdev[KAL_P2P_NUM];
+
 /******************************************************************************
  *                           P R I V A T E   D A T A
  ******************************************************************************
@@ -125,11 +127,22 @@ extern const struct net_device_ops p2p_netdev_ops;
  *                  F U N C T I O N   D E C L A R A T I O N S
  ******************************************************************************
  */
+
 struct GL_P2P_INFO {
+
+	/* P2P Device interface handle */
+	/*only first p2p have this devhandler*/
+	struct net_device *prDevHandler;
+	/*struct net_device *prRoleDevHandler;*//* TH3 multiple P2P */
+
+	struct net_device *aprRoleHandler;
+
 	/* Todo : should move to the glueinfo or not*/
 	/*UINT_8 ucRoleInterfaceNum;*//* TH3 multiple P2P */
 
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
+	/* cfg80211 */
+	struct wireless_dev *prWdev;
 	/*struct wireless_dev *prRoleWdev[KAL_P2P_NUM];*//* TH3 multiple P2P */
 
 	/*struct cfg80211_scan_request *prScanRequest;*//* TH3 multiple P2P */
@@ -186,15 +199,10 @@ struct GL_P2P_INFO {
 	uint8_t aucWFDIE[400];
 	uint16_t u2WFDIELen;
 	/* Save the other IE for probe resp */
-#endif
 #if CFG_SUPPORT_CUSTOM_VENDOR_IE
 	uint8_t aucVenderIE[1024];
 	uint16_t u2VenderIELen;
 #endif
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	uint8_t aucMlIE[MAX_LEN_OF_MLIE];
-	uint16_t u2MlIELen;
 #endif
 
 	/*UINT_8 ucOperatingChnl;*//* TH3 multiple P2P */
@@ -211,6 +219,8 @@ struct GL_P2P_INFO {
 #endif
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)
+	struct cfg80211_chan_def chandefCsa;
+	struct ieee80211_channel chanCsa;
 	uint32_t cac_time_ms;
 #endif
 
@@ -229,6 +239,14 @@ struct GL_P2P_INFO {
 };
 
 struct GL_P2P_DEV_INFO {
+#if CFG_ENABLE_WIFI_DIRECT_CFG_80211
+	struct cfg80211_scan_request *prScanRequest;
+#if 0
+	struct cfg80211_scan_request rBackupScanRequest;
+#endif
+	uint64_t u8Cookie;
+	uint32_t u4OsMgmtFrameFilter;
+#endif
 	uint32_t u4PacketFilter;
 	uint8_t aucMCAddrList[MAX_NUM_GROUP_ADDR][PARAM_MAC_ADDR_LEN];
 	uint8_t ucWSCRunning;
@@ -332,23 +350,24 @@ u_int8_t p2pUnregisterToWlan(struct GLUE_INFO *prGlueInfo);
 
 #define p2pSetMode(_ucAPMode) \
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
-
-#define p2pGetMode(void)  \
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
 #else
 u_int8_t p2pLaunch(struct GLUE_INFO *prGlueInfo);
 
 u_int8_t p2pRemove(struct GLUE_INFO *prGlueInfo);
 
-void p2pSetMode(uint8_t ucAPMode);
-
-uint8_t p2pGetMode(void);
+void p2pSetMode(IN uint8_t ucAPMode);
 #endif
 
 u_int8_t glRegisterP2P(struct GLUE_INFO *prGlueInfo,
 		const char *prDevName,
 		const char *prDevName2,
 		uint8_t ucApMode);
+
+int glSetupP2P(struct GLUE_INFO *prGlueInfo,
+		struct wireless_dev *prP2pWdev,
+		struct net_device *prP2pDev,
+		uint8_t u4Idx,
+		u_int8_t fgIsApMode);
 
 u_int8_t glUnregisterP2P(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx);
 
@@ -359,7 +378,7 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
 		u_int8_t fgIsRtnlLockAcquired);
 
 
-u_int8_t p2PAllocInfo(struct GLUE_INFO *prGlueInfo, uint8_t ucIdex);
+u_int8_t p2PAllocInfo(IN struct GLUE_INFO *prGlueInfo, IN uint8_t ucIdex);
 u_int8_t p2PFreeInfo(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx);
 void p2PFreeMemSafe(struct GLUE_INFO *prGlueInfo,
 		void **pprMemInfo, uint32_t size);

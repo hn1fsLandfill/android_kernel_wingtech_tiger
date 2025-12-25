@@ -117,9 +117,6 @@ static const uint8_t *apucDebugNetdevState[] = {
 	(uint8_t *) DISP_STRING("NETDEV_UNREGISTER"),
 	(uint8_t *) DISP_STRING("NETDEV_CHANGEMTU"),
 	(uint8_t *) DISP_STRING("NETDEV_CHANGEADDR"),
-#if (KERNEL_VERSION(5, 0, 0) <= CFG80211_VERSION_CODE)
-	(uint8_t *) DISP_STRING("NETDEV_PRE_CHANGEADDR"),
-#endif
 	(uint8_t *) DISP_STRING("NETDEV_GOING_DOWN"),
 	(uint8_t *) DISP_STRING("NETDEV_CHANGENAME"),
 	(uint8_t *) DISP_STRING("NETDEV_FEAT_CHANGE"),
@@ -128,9 +125,7 @@ static const uint8_t *apucDebugNetdevState[] = {
 	(uint8_t *) DISP_STRING("NETDEV_PRE_TYPE_CHANGE"),
 	(uint8_t *) DISP_STRING("NETDEV_POST_TYPE_CHANGE"),
 	(uint8_t *) DISP_STRING("NETDEV_POST_INIT"),
-#if (KERNEL_VERSION(4, 17, 0) > CFG80211_VERSION_CODE)
 	(uint8_t *) DISP_STRING("NETDEV_UNREGISTER_FINAL"),
-#endif
 	(uint8_t *) DISP_STRING("NETDEV_RELEASE"),
 	(uint8_t *) DISP_STRING("NETDEV_NOTIFY_PEERS"),
 	(uint8_t *) DISP_STRING("NETDEV_JOIN"),
@@ -144,12 +139,6 @@ static const uint8_t *apucDebugNetdevState[] = {
 	(uint8_t *) DISP_STRING("NETDEV_UDP_TUNNEL_PUSH_INFO"),
 	(uint8_t *) DISP_STRING("NETDEV_UNKNOWN"),
 	(uint8_t *) DISP_STRING("NETDEV_CHANGE_TX_QUEUE_LEN"),
-#if (KERNEL_VERSION(4, 17, 0) <= CFG80211_VERSION_CODE)
-	(uint8_t *) DISP_STRING("NETDEV_CVLAN_FILTER_PUSH_INFO"),
-	(uint8_t *) DISP_STRING("NETDEV_CVLAN_FILTER_DROP_INFO"),
-	(uint8_t *) DISP_STRING("NETDEV_SVLAN_FILTER_PUSH_INFO"),
-	(uint8_t *) DISP_STRING("NETDEV_SVLAN_FILTER_DROP_INFO"),
-#endif
 };
 
 /*******************************************************************************
@@ -182,15 +171,15 @@ static int netdev_event(struct notifier_block *nb,
 	}
 
 	if ((strncmp(prDev->name, "p2p", 3) != 0)
-#ifdef CFG_COMBO_SLT_GOLDEN
-	    && (strncmp(prDev->name, "ra", 2) != 0)
-#endif
 	    && (strncmp(prDev->name, "wlan", 4) != 0)) {
 		/* DBGLOG(REQ, INFO, ("netdev_event: xxx\n")); */
 		return NOTIFY_DONE;
 	}
 #if 0				/* CFG_SUPPORT_PASSPOINT */
 	{
+		/* printk(KERN_INFO
+		 *        "[netdev_event] IPV4_DAD is unlock now!!\n");
+		 */
 		prGlueInfo->fgIsDad = FALSE;
 	}
 #endif /* CFG_SUPPORT_PASSPOINT */
@@ -206,10 +195,9 @@ static int netdev_event(struct notifier_block *nb,
 		 *  ("netdev_event: MEDIA_STATE_DISCONNECTED. (%d)\n",
 		 * prGlueInfo->eParamMediaStateIndicated));
 		 */
-		/* return NOTIFY_DONE; */
+		return NOTIFY_DONE;
 	}
 
-	DBGLOG(REQ, INFO, "netdev_event: set net addr\n");
 	kalSetNetAddressFromInterface(prGlueInfo, prDev, TRUE);
 
 	return NOTIFY_DONE;
@@ -230,9 +218,6 @@ static int net6dev_event(struct notifier_block *nb,
 	}
 
 	if ((strncmp(prDev->name, "p2p", 3) != 0)
-#ifdef CFG_COMBO_SLT_GOLDEN
-	    && (strncmp(prDev->name, "ra", 2) != 0)
-#endif
 	    && (strncmp(prDev->name, "wlan", 4) != 0)) {
 		DBGLOG(REQ, INFO, "net6dev_event: xxx\n");
 		return NOTIFY_DONE;
@@ -254,7 +239,7 @@ static int net6dev_event(struct notifier_block *nb,
 		DBGLOG(REQ, INFO, "netdev_event: prGlueInfo is empty.\n");
 		return NOTIFY_DONE;
 	}
-
+	/* printk(KERN_INFO "[net6dev_event] IPV6_DAD is unlock now!!\n"); */
 	prGlueInfo->fgIs6Dad = FALSE;
 
 	return NOTIFY_DONE;
@@ -371,9 +356,9 @@ int glUnregisterEarlySuspend(struct early_suspend *prDesc)
  *           FALSE
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t kalCfgDataRead(struct GLUE_INFO *prGlueInfo,
-			uint32_t u4Offset,
-			ssize_t len, uint16_t *pu2Data)
+u_int8_t kalCfgDataRead(IN struct GLUE_INFO *prGlueInfo,
+			IN uint32_t u4Offset,
+			IN ssize_t len, OUT uint16_t *pu2Data)
 {
 	if (pu2Data == NULL)
 		return FALSE;
@@ -407,8 +392,8 @@ u_int8_t kalCfgDataRead(struct GLUE_INFO *prGlueInfo,
  *           FALSE
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t kalCfgDataRead16(struct GLUE_INFO *prGlueInfo,
-			  uint32_t u4Offset, uint16_t *pu2Data)
+u_int8_t kalCfgDataRead16(IN struct GLUE_INFO *prGlueInfo,
+			  IN uint32_t u4Offset, OUT uint16_t *pu2Data)
 {
 	if (pu2Data == NULL)
 		return FALSE;
@@ -443,7 +428,7 @@ u_int8_t kalCfgDataRead16(struct GLUE_INFO *prGlueInfo,
  *           FALSE
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t kalCfgDataWrite16(struct GLUE_INFO *prGlueInfo,
+u_int8_t kalCfgDataWrite16(IN struct GLUE_INFO *prGlueInfo,
 			   uint32_t u4Offset, uint16_t u2Data)
 {
 	if (u4Offset + sizeof(unsigned short) > MAX_CFG_FILE_WIFI_REC_SIZE)
@@ -476,8 +461,8 @@ u_int8_t kalCfgDataWrite16(struct GLUE_INFO *prGlueInfo,
  */
 /*----------------------------------------------------------------------------*/
 
-u_int8_t kalCfgDataWrite8(struct GLUE_INFO *prGlueInfo,
-			   uint32_t u4Offset, uint8_t u1Data)
+u_int8_t kalCfgDataWrite8(IN struct GLUE_INFO *prGlueInfo,
+			   IN uint32_t u4Offset, IN uint8_t u1Data)
 {
 	if (u4Offset + sizeof(unsigned char) > MAX_CFG_FILE_WIFI_REC_SIZE)
 		return FALSE;
@@ -503,9 +488,6 @@ static int wlan_netdev_notifier_call(struct notifier_block *nb,
 		return NOTIFY_DONE;
 
 	if ((strncmp(dev->name, "wlan", 4) != 0) &&
-#ifdef CFG_COMBO_SLT_GOLDEN
-			(strncmp(dev->name, "ra", 2) != 0) &&
-#endif
 			(strncmp(dev->name, "p2p", 3) != 0) &&
 			(strncmp(dev->name, "ap", 2) != 0)) {
 		return NOTIFY_DONE;

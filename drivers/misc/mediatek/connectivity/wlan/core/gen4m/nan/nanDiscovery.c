@@ -345,13 +345,21 @@ nanPublishRequest(struct ADAPTER *prAdapter, struct NanPublishRequest *msg) {
 	prPublishReq->ttl = msg->ttl;
 	prPublishReq->rssi_threshold_flag = msg->rssi_threshold_flag;
 	prPublishReq->recv_indication_cfg = msg->recv_indication_cfg;
+
+	if (msg->service_name_len > NAN_FW_MAX_SERVICE_NAME_LEN) {
+		DBGLOG(NAN, ERROR,
+			"Service name length error:%d\n",
+			msg->service_name_len);
+		msg->service_name_len = NAN_FW_MAX_SERVICE_NAME_LEN;
+	}
 	prPublishReq->service_name_len = msg->service_name_len;
 	kalMemCopy(prPublishReq->service_name, msg->service_name,
 		   msg->service_name_len);
 	kalMemZero(aucServiceName, sizeof(aucServiceName));
 	kalMemCopy(aucServiceName,
 			msg->service_name,
-			NAN_FW_MAX_SERVICE_NAME_LEN);
+			msg->service_name_len);
+	aucServiceName[msg->service_name_len] = '\0';
 	for (u4Idx = 0; u4Idx < kalStrLen(aucServiceName); u4Idx++) {
 		if ((aucServiceName[u4Idx] >= 'A') &&
 		    (aucServiceName[u4Idx] <= 'Z'))
@@ -360,10 +368,12 @@ nanPublishRequest(struct ADAPTER *prAdapter, struct NanPublishRequest *msg) {
 	nan_rdf_sha256_init(&r_SHA_256_state);
 	sha256_process(&r_SHA_256_state, aucServiceName,
 		       kalStrLen(aucServiceName));
-	kalMemZero(auc_tk, sizeof(auc_tk));
 	sha256_done(&r_SHA_256_state, auc_tk);
 	kalMemCopy(prPublishReq->service_name_hash, auc_tk,
 		   NAN_SERVICE_HASH_LENGTH);
+	kalMemCopy(g_aucNanServiceId,
+			prPublishReq->service_name_hash,
+			6);
 	nanUtilDump(prAdapter, "service hash", auc_tk, NAN_SERVICE_HASH_LENGTH);
 
 	prPublishReq->service_specific_info_len =
@@ -650,13 +660,20 @@ nanSubscribeRequest(struct ADAPTER *prAdapter,
 	prSubscribeReq->recv_indication_cfg = msg->recv_indication_cfg;
 	prSubscribeReq->period = msg->period;
 
+	if (msg->service_name_len > NAN_FW_MAX_SERVICE_NAME_LEN) {
+		DBGLOG(NAN, ERROR,
+			"Service name length error:%d\n",
+			msg->service_name_len);
+		msg->service_name_len = NAN_FW_MAX_SERVICE_NAME_LEN;
+	}
 	prSubscribeReq->service_name_len = msg->service_name_len;
 	kalMemCopy(prSubscribeReq->service_name, msg->service_name,
 		   msg->service_name_len);
 	kalMemZero(aucServiceName, sizeof(aucServiceName));
 	kalMemCopy(aucServiceName,
 			msg->service_name,
-			NAN_FW_MAX_SERVICE_NAME_LEN);
+			msg->service_name_len);
+	aucServiceName[msg->service_name_len] = '\0';
 	for (u4Idx = 0; u4Idx < kalStrLen(aucServiceName); u4Idx++) {
 		if ((aucServiceName[u4Idx] >= 'A') &&
 		    (aucServiceName[u4Idx] <= 'Z'))
@@ -665,11 +682,12 @@ nanSubscribeRequest(struct ADAPTER *prAdapter,
 	nan_rdf_sha256_init(&r_SHA_256_state);
 	sha256_process(&r_SHA_256_state, aucServiceName,
 		       kalStrLen(aucServiceName));
-	kalMemZero(auc_tk, sizeof(auc_tk));
 	sha256_done(&r_SHA_256_state, auc_tk);
 	kalMemCopy(prSubscribeReq->service_name_hash, auc_tk,
 		   NAN_SERVICE_HASH_LENGTH);
-
+	kalMemCopy(g_aucNanServiceId,
+			prSubscribeReq->service_name_hash,
+			6);
 	prSubscribeReq->service_specific_info_len =
 		msg->service_specific_info_len;
 	if (prSubscribeReq->service_specific_info_len >
@@ -751,7 +769,7 @@ nanSubscribeRequest(struct ADAPTER *prAdapter,
 }
 
 void
-nanCmdAddCsid(struct ADAPTER *prAdapter, uint8_t ucPubID, uint8_t ucNumCsid,
+nanCmdAddCsid(IN struct ADAPTER *prAdapter, uint8_t ucPubID, uint8_t ucNumCsid,
 	      uint8_t *pucCsidList) {
 	uint32_t rStatus;
 	void *prCmdBuffer;
@@ -807,7 +825,7 @@ nanCmdAddCsid(struct ADAPTER *prAdapter, uint8_t ucPubID, uint8_t ucNumCsid,
 }
 
 void
-nanCmdManageScid(struct ADAPTER *prAdapter, unsigned char fgAddDelete,
+nanCmdManageScid(IN struct ADAPTER *prAdapter, unsigned char fgAddDelete,
 		 uint8_t ucPubID, uint8_t *pucScid) {
 	uint32_t rStatus;
 	void *prCmdBuffer;

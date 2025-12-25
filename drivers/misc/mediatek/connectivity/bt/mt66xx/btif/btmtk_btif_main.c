@@ -794,7 +794,6 @@ static int32_t bt_receive_data_cb(uint8_t *buf, uint32_t count)
 {
 	struct btmtk_btif_dev *cif_dev = (struct btmtk_btif_dev *)g_sbdev->cif_dev;
 
-	BTMTK_LIMIT("%s: get Rx", __func__);
 	if (g_bt_trace_pt)
 		bt_dbg_tp_evt(TP_ACT_RD_CB, 0, count, buf);
 	BTMTK_DBG_RAW(buf, count, "%s: len[%d] RX: ", __func__, count);
@@ -1951,12 +1950,10 @@ int32_t btmtk_tx_thread(void * arg)
 						break;
 					else
 						usleep_range(USLEEP_1MS_L, USLEEP_1MS_H);
-					if (ii == 4)
-						BTMTK_INFO("%s mtk_btif_is_tx_complete run 5 times", state_tag);
 				}
 				// re-run while loop
-				if (ii == 4) {
-					BTMTK_INFO("%s mtk_btif_is_tx_complete run 5 times", state_tag);
+				if (ii == 5) {
+					BTMTK_INFO("%s mtk_btif_is_tx_complete run 5 times, Exit while", state_tag);
 					break;
 				}
 

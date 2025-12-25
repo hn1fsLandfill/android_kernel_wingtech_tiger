@@ -112,17 +112,15 @@
  */
 
 void
-scanP2pProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
-		 struct SW_RFB *prSwRfb,
-		 uint32_t *prStatus,
-		 struct BSS_DESC *prBssDesc,
-		 struct WLAN_BEACON_FRAME *prWlanBeaconFrame)
+scanP2pProcessBeaconAndProbeResp(IN struct ADAPTER *prAdapter,
+		 IN struct SW_RFB *prSwRfb,
+		 IN uint32_t *prStatus,
+		 IN struct BSS_DESC *prBssDesc,
+		 IN struct WLAN_BEACON_FRAME *prWlanBeaconFrame)
 {
 	u_int8_t fgIsBeacon = FALSE;
 	u_int8_t fgIsSkipThisBeacon = FALSE;
 	u_int8_t fgIsP2pNetRegistered = FALSE;
-	u_int8_t fgScanSpecificSSID = FALSE;
-	void *prScanRequest = NULL;
 
 	/* Sanity check for p2p net device state */
 	GLUE_SPIN_LOCK_DECLARATION();
@@ -157,7 +155,8 @@ scanP2pProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
 			prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 					(uint8_t) u4Idx);
 
-			if ((!prP2pBssInfo) || (!IS_BSS_ACTIVE(prP2pBssInfo)))
+			if (!prP2pBssInfo ||
+				!IS_BSS_ACTIVE(prP2pBssInfo))
 				continue;
 
 			if ((prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P) ||
@@ -190,23 +189,10 @@ scanP2pProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
 
 	}
 
-	/* Skip report beacon to upper layer if no p2p scan. Note that a p2p
-	 * device may scan a specific SSID when it tries to join the GO. The
-	 * scan requests may be mixed up with wlan's scan requests. In this
-	 * case, we still need to report beacon to supplicant. Otherwise,
-	 * supplicant may not be able to find WPS IE and result in inviation
-	 * fails.
-	 */
-	prScanRequest = kalGetP2pDevScanReq(prAdapter->prGlueInfo);
-	fgScanSpecificSSID =
-		kalGetP2pDevScanSpecificSSID(prAdapter->prGlueInfo);
-	if (fgIsBeacon && prScanRequest == NULL && !fgScanSpecificSSID) {
-		DBGLOG(P2P, TRACE,
-			"Skip beacon, p2pScanRequest=%d, scanSpecificSSID=%d\n",
-			prScanRequest,
-			fgScanSpecificSSID);
+	/* Skip report beacon to upper layer if no p2p scan */
+	if (prAdapter->prGlueInfo->prP2PDevInfo->prScanRequest == NULL &&
+			fgIsBeacon)
 		fgIsSkipThisBeacon = TRUE;
-	}
 
 	if (fgIsBeacon && fgIsSkipThisBeacon) {
 		/* Only report Probe Response frame
@@ -240,9 +226,6 @@ scanP2pProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
 			prBssDesc->ucRCPI,
 			prBssDesc->rUpdateTime);
 
-		DBGLOG_MEM8(P2P, TRACE, prSwRfb->pvHeader,
-				prSwRfb->u2PacketLen);
-
 		kalP2PIndicateBssInfo(prAdapter->prGlueInfo,
 				(uint8_t *) prSwRfb->pvHeader,
 				(uint32_t) prSwRfb->u2PacketLen,
@@ -252,15 +235,17 @@ scanP2pProcessBeaconAndProbeResp(struct ADAPTER *prAdapter,
 	} while (FALSE);
 }
 
-void scnEventReturnChannel(struct ADAPTER *prAdapter,
-		uint8_t ucScnSeqNum)
+void scnEventReturnChannel(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucScnSeqNum)
 {
 
-	struct CMD_SCAN_CANCEL rCmdScanCancel = {0};
+	struct CMD_SCAN_CANCEL rCmdScanCancel;
 
 	/* send cancel message to firmware domain */
 	rCmdScanCancel.ucSeqNum = ucScnSeqNum;
 	rCmdScanCancel.ucIsExtChannel = (uint8_t) FALSE;
+	rCmdScanCancel.aucReserved[0] = 0;
+	rCmdScanCancel.aucReserved[1] = 0;
 
 	wlanSendSetQueryCmd(prAdapter,
 			    CMD_ID_SCAN_CANCEL,
@@ -270,7 +255,7 @@ void scnEventReturnChannel(struct ADAPTER *prAdapter,
 			    (uint8_t *)&rCmdScanCancel, NULL, 0);
 }				/* scnEventReturnChannel */
 
-void scanRemoveAllP2pBssDesc(struct ADAPTER *prAdapter)
+void scanRemoveAllP2pBssDesc(IN struct ADAPTER *prAdapter)
 {
 	struct LINK *prBSSDescList;
 	struct BSS_DESC *prBssDesc;
@@ -287,14 +272,13 @@ void scanRemoveAllP2pBssDesc(struct ADAPTER *prAdapter)
 	}
 }				/* scanRemoveAllP2pBssDesc */
 
-void scanRemoveP2pBssDesc(struct ADAPTER *prAdapter,
-		struct BSS_DESC *prBssDesc)
+void scanRemoveP2pBssDesc(IN struct ADAPTER *prAdapter,
+		IN struct BSS_DESC *prBssDesc)
 {
 }				/* scanRemoveP2pBssDesc */
 
-struct BSS_DESC *scanP2pSearchDesc(struct ADAPTER *prAdapter,
-		struct P2P_CONNECTION_REQ_INFO *prConnReqInfo,
-		struct BSS_DESC_SET *prBssDescSet)
+struct BSS_DESC *scanP2pSearchDesc(IN struct ADAPTER *prAdapter,
+		IN struct P2P_CONNECTION_REQ_INFO *prConnReqInfo)
 {
 	struct BSS_DESC *prCandidateBssDesc = (struct BSS_DESC *) NULL,
 		*prBssDesc = (struct BSS_DESC *) NULL;
@@ -374,22 +358,6 @@ struct BSS_DESC *scanP2pSearchDesc(struct ADAPTER *prAdapter,
 		}
 
 	} while (FALSE);
-
-	if (prBssDescSet) {
-		if (prCandidateBssDesc) {
-			/* setup primary link */
-			prBssDescSet->ucLinkNum = 1;
-			prBssDescSet->aprBssDesc[0] = prCandidateBssDesc;
-			prBssDescSet->prMainBssDesc = prCandidateBssDesc;
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-			p2pScanFillSecondaryLink(prAdapter, prBssDescSet);
-#endif
-		} else {
-			prBssDescSet->ucLinkNum = 0;
-			prBssDescSet->prMainBssDesc = NULL;
-		}
-	}
 
 	return prCandidateBssDesc;
 }				/* scanP2pSearchDesc */

@@ -70,10 +70,6 @@
  */
 #include "precomp.h"
 
-#if (CFG_SUPPORT_802_11AX == 1)
-#include "he_rlm.h"
-#endif
-
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************
@@ -195,9 +191,7 @@ static uint8_t *apucDebugMsg[] = {
 	(uint8_t *) DISP_STRING("MID_TWT_REQ_IND_INFOFRM"),
 	(uint8_t *) DISP_STRING("MID_TWT_PARAMS_SET"),
 #endif
-#if (CFG_SUPPORT_802_11AX == 1)
-	(uint8_t *) DISP_STRING("MID_SMPS_ACTION_SET"),
-#endif
+
 };
 
 /*lint -restore */
@@ -308,8 +302,11 @@ static struct MSG_HNDL_ENTRY arMsgMapTable[] = {
 	{MID_MNY_P2P_WFD_CFG_UPDATE, p2pFsmRunEventWfdSettingUpdate},
 #endif
 	{MID_MNY_P2P_ACTIVE_BSS, p2pDevFsmRunEventActiveDevBss},
-	{MID_MNY_P2P_GC_CSA, cnmOwnGcCsaHandler},
 #endif
+
+#if CFG_SUPPORT_ADHOC
+	{MID_SCN_AIS_FOUND_IBSS, aisFsmRunEventFoundIBSSPeer},
+#endif /* CFG_SUPPORT_ADHOC */
 
 	{MID_SAA_AIS_FSM_ABORT, aisFsmRunEventAbort},
 	{MID_MNY_AIS_REMAIN_ON_CHANNEL,
@@ -339,32 +336,10 @@ static struct MSG_HNDL_ENTRY arMsgMapTable[] = {
 	{MID_TWT_REQ_IND_INFOFRM, twtPlannerRxInfoFrm},
 	{MID_TWT_PARAMS_SET, twtPlannerSetParams},
 #endif
-#if (CFG_SUPPORT_802_11AX == 1)
-	{MID_SMPS_ACTION_SET, heRlmProcessSMPSAction},
-#endif
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-	{MID_TWT_RESP_PARAMS_SET, twtHotspotPlannerSetParams},
-	{MID_TWT_RESP_SETUP_AGRT_TO_FW, twtHotspotPlannerSetupAgrtToFW},
-	{MID_TWT_RESP_TEARDOWN_TO_FW, twtHotspotPlannerTeardownToFW},
-#endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-	{MID_BTWT_REQ_FSM_START, btwtReqFsmRunEventStart},
-	{MID_BTWT_REQ_FSM_TEARDOWN, btwtReqFsmRunEventTeardown},
-	{MID_BTWT_REQ_IND_TEARDOWN_DONE, btwtPlannerTeardownDone},
-#endif
-
-#if (CFG_SUPPORT_802_11BE_ML_TWT == 1)
-	{MID_ML_TWT_REQ_FSM_START_ALL_LINKS, mltwtReqFsmRunEventStartAllLinks},
-	{MID_ML_TWT_REQ_FSM_START_ONE_BY_ONE, mltwtReqFsmRunEventStart},
-#endif
 
 #if (CFG_SUPPORT_NAN == 1)
-	{MID_CNM_NAN_CH_GRANT, nanDevSendEnableRequest},
+	{MID_CNM_NAN_CH_GRANT, nanDevSendEnableRequest}
 #endif
-#if ARP_MONITER_ENABLE
-	{MID_QM_ARP_MONITOR, qmArpMonitorHandleMsg},
-#endif /* ARP_MONITER_ENABLE */
 };
 
 /*******************************************************************************
@@ -482,8 +457,8 @@ void mboxInitMsgMap(void)
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void mboxSetup(struct ADAPTER *prAdapter,
-	       enum ENUM_MBOX_ID eMboxId)
+void mboxSetup(IN struct ADAPTER *prAdapter,
+	       IN enum ENUM_MBOX_ID eMboxId)
 {
 	struct MBOX *prMbox;
 
@@ -509,9 +484,9 @@ void mboxSetup(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-mboxSendMsg(struct ADAPTER *prAdapter,
-	    enum ENUM_MBOX_ID eMboxId, struct MSG_HDR *prMsg,
-	    enum EUNM_MSG_SEND_METHOD eMethod)
+mboxSendMsg(IN struct ADAPTER *prAdapter,
+	    IN enum ENUM_MBOX_ID eMboxId, IN struct MSG_HDR *prMsg,
+	    IN enum EUNM_MSG_SEND_METHOD eMethod)
 {
 	struct MBOX *prMbox;
 
@@ -562,7 +537,7 @@ mboxSendMsg(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void mboxRcvAllMsg(struct ADAPTER *prAdapter,
+void mboxRcvAllMsg(IN struct ADAPTER *prAdapter,
 		   enum ENUM_MBOX_ID eMboxId)
 {
 	struct MBOX *prMbox;
@@ -603,7 +578,7 @@ void mboxRcvAllMsg(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void mboxInitialize(struct ADAPTER *prAdapter)
+void mboxInitialize(IN struct ADAPTER *prAdapter)
 {
 	uint32_t i;
 
@@ -627,7 +602,7 @@ void mboxInitialize(struct ADAPTER *prAdapter)
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void mboxDestroy(struct ADAPTER *prAdapter)
+void mboxDestroy(IN struct ADAPTER *prAdapter)
 {
 	struct MBOX *prMbox;
 	struct MSG_HDR *prMsg;
@@ -662,8 +637,8 @@ void mboxDestroy(struct ADAPTER *prAdapter)
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void mboxDummy(struct ADAPTER *prAdapter,
-	       struct MSG_HDR *prMsgHdr)
+void mboxDummy(IN struct ADAPTER *prAdapter,
+	       IN struct MSG_HDR *prMsgHdr)
 {
 	ASSERT(prAdapter);
 

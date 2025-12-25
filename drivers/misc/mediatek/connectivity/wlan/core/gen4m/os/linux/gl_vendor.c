@@ -75,9 +75,6 @@
 #include "gl_cfg80211.h"
 #include "gl_vendor.h"
 #include "wlan_oid.h"
-#if CFG_SUPPORT_CSI
-#include "gl_csi.h"
-#endif
 
 #if KERNEL_VERSION(3, 16, 0) <= LINUX_VERSION_CODE
 
@@ -95,9 +92,6 @@
  *                            P U B L I C   D A T A
  *******************************************************************************
  */
-uint8_t g_GetResultsBufferedCnt;
-uint8_t g_GetResultsCmdCnt;
-
 const struct nla_policy mtk_scan_param_policy[
 		WIFI_ATTR_SCAN_MAX + 1] = {
 	[WIFI_ATTR_SCAN_IFACE_TYPE] = {.type = NLA_U8},
@@ -133,12 +127,11 @@ const struct nla_policy nla_parse_wifi_attribute[
 	[WIFI_ATTRIBUTE_COUNTRY_CODE] = {.type = NLA_STRING},
 	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_NUM] = {.type = NLA_U32},
 #if KERNEL_VERSION(5, 9, 0) <= CFG80211_VERSION_CODE
-	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID] = NLA_POLICY_MIN_LEN(0),
-#elif KERNEL_VERSION(5, 4, 0) <= CFG80211_VERSION_CODE
-	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID] = {
-		.type = NLA_MIN_LEN, .len = 0 },
+	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID] =
+		NLA_POLICY_EXACT_LEN_WARN(MAC_ADDR_LEN),
 #else
-	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID] = {.type = NLA_BINARY},
+	[WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID] = {
+		.type = NLA_BINARY, .len = MAC_ADDR_LEN},
 #endif
 	[WIFI_ATTRIBUTE_ROAMING_WHITELIST_NUM] = {.type = NLA_U32},
 #if KERNEL_VERSION(5, 9, 0) <= CFG80211_VERSION_CODE
@@ -226,11 +219,6 @@ const struct nla_policy nla_get_acs_policy[
 #endif
 };
 
-const struct nla_policy nla_string_cmd_policy[
-		STRING_ATTRIBUTE_MAX + 1] = {
-	[STRING_ATTRIBUTE_DATA] = { .type = NLA_STRING },
-};
-
 const struct nla_policy nla_get_apf_policy[
 		APF_ATTRIBUTE_MAX + 1] = {
 	[APF_ATTRIBUTE_VERSION] = {.type = NLA_U32},
@@ -244,48 +232,6 @@ const struct nla_policy nla_get_apf_policy[
 #endif
 	[APF_ATTRIBUTE_PROGRAM_LEN] = {.type = NLA_U32},
 };
-
-const struct nla_policy nla_set_rtt_config_policy[
-		RTT_ATTRIBUTE_TARGET_BW + 1] = {
-	[RTT_ATTRIBUTE_TARGET_CNT] = {.type = NLA_U8},
-	[RTT_ATTRIBUTE_TARGET_INFO] = {.type = NLA_NESTED},
-#if KERNEL_VERSION(5, 9, 0) <= CFG80211_VERSION_CODE
-	[RTT_ATTRIBUTE_TARGET_MAC] = NLA_POLICY_MIN_LEN(0),
-#elif KERNEL_VERSION(5, 4, 0) <= CFG80211_VERSION_CODE
-	[RTT_ATTRIBUTE_TARGET_MAC] = { .type = NLA_MIN_LEN, .len = 0 },
-#else
-	[RTT_ATTRIBUTE_TARGET_MAC] = {.type = NLA_UNSPEC},
-#endif
-	[RTT_ATTRIBUTE_TARGET_TYPE] = {.type = NLA_U8},
-	[RTT_ATTRIBUTE_TARGET_PEER] = {.type = NLA_U8},
-#if KERNEL_VERSION(5, 9, 0) <= CFG80211_VERSION_CODE
-	[RTT_ATTRIBUTE_TARGET_CHAN] = NLA_POLICY_MIN_LEN(0),
-#elif KERNEL_VERSION(5, 4, 0) <= CFG80211_VERSION_CODE
-	[RTT_ATTRIBUTE_TARGET_CHAN] = { .type = NLA_MIN_LEN, .len = 0 },
-#else
-	[RTT_ATTRIBUTE_TARGET_CHAN] = {.type = NLA_UNSPEC},
-#endif
-	[RTT_ATTRIBUTE_TARGET_PERIOD] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_NUM_BURST] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_NUM_FTM_BURST] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTM] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTMR] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_LCI] = {.type = NLA_U8},
-	[RTT_ATTRIBUTE_TARGET_LCR] = {.type = NLA_U8},
-	[RTT_ATTRIBUTE_TARGET_BURST_DURATION] = {.type = NLA_U32},
-	[RTT_ATTRIBUTE_TARGET_PREAMBLE] = {.type = NLA_U8},
-	[RTT_ATTRIBUTE_TARGET_BW] = {.type = NLA_U8},
-};
-
-#if CFG_SUPPORT_CSI
-const struct nla_policy nla_get_csi_policy[
-		WIFI_ATTRIBUTE_CSI_MAX + 1] = {
-	[WIFI_ATTRIBUTE_CSI_CONTROL_MODE] = {.type = NLA_U8},
-	[WIFI_ATTRIBUTE_CSI_CONFIG_ITEM] = {.type = NLA_U8},
-	[WIFI_ATTRIBUTE_CSI_VALUE_1] = {.type = NLA_U8},
-	[WIFI_ATTRIBUTE_CSI_VALUE_2] = {.type = NLA_U32},
-};
-#endif
 
 /*******************************************************************************
  *                           P R I V A T E   D A T A
@@ -376,6 +322,11 @@ int mtk_cfg80211_vendor_get_channel_list(struct wiphy *wiphy,
 	prGlueInfo = wlanGetGlueInfo();
 	if (!prGlueInfo)
 		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	aucChannelList = (struct RF_CHANNEL_INFO *)
 		kalMemAlloc(sizeof(struct RF_CHANNEL_INFO)*MAX_CHN_NUM,
@@ -486,7 +437,8 @@ int mtk_cfg80211_vendor_set_country_code(struct wiphy
 	       wdev->iftype);
 
 	attr = (struct nlattr *)data;
-	if (attr->nla_type == WIFI_ATTRIBUTE_COUNTRY_CODE) {
+	if (attr->nla_type == WIFI_ATTRIBUTE_COUNTRY_CODE &&
+			nla_len(attr) >= 2) {
 		country[0] = *((uint8_t *)nla_data(attr));
 		country[1] = *((uint8_t *)nla_data(attr) + 1);
 	}
@@ -498,8 +450,13 @@ int mtk_cfg80211_vendor_set_country_code(struct wiphy
 	if (!prGlueInfo)
 		return -EFAULT;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	rStatus = kalIoctl(prGlueInfo, wlanoidSetCountryCode,
-			country, 2, &u4BufLen);
+			   country, 2, FALSE, FALSE, TRUE, &u4BufLen);
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "Set country code error: %x\n", rStatus);
 		return -EFAULT;
@@ -567,32 +524,14 @@ int mtk_cfg80211_vendor_set_scan_mac_oui(struct wiphy *wiphy,
 		rParamMacOui.ucMacOui[2]);
 
 	rStatus = kalIoctl(prGlueInfo, wlanoidSetScanMacOui,
-		&rParamMacOui, sizeof(rParamMacOui), &u4BufLen);
+		&rParamMacOui, sizeof(rParamMacOui),
+		FALSE, FALSE, FALSE, &u4BufLen);
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		log_dbg(REQ, ERROR, "Set MAC oui error: 0x%X\n", rStatus);
 		return -EFAULT;
 	}
 
 	return 0;
-}
-
-int mtk_cfg80211_vendor_string_cmd(struct wiphy *wiphy,
-	struct wireless_dev *wdev, const void *data, int data_len)
-{
-	struct nlattr *attr;
-	char cmd[1024] = {0};
-
-	if ((data == NULL) || !data_len)
-		return -EINVAL;
-
-	attr = (struct nlattr *)data;
-#if KERNEL_VERSION(5, 11, 0) <= LINUX_VERSION_CODE
-	nla_strscpy(cmd, attr, sizeof(cmd));
-#else
-	nla_strlcpy(cmd, attr, sizeof(cmd));
-#endif
-
-	return mtk_cfg80211_process_str_cmd(wiphy, wdev, cmd, data_len);
 }
 
 int mtk_cfg80211_vendor_set_scan_param(struct wiphy *wiphy,
@@ -616,6 +555,11 @@ int mtk_cfg80211_vendor_set_scan_param(struct wiphy *wiphy,
 
 	if (!prGlueInfo)
 		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	prAdapter = prGlueInfo->prAdapter;
 
@@ -694,7 +638,8 @@ int mtk_cfg80211_vendor_set_scan_param(struct wiphy *wiphy,
 	rChipConfigInfo.aucCmd[CHIP_CONFIG_RESP_SIZE - 1] = '\0';
 
 	rStatus = kalIoctl(prAdapter->prGlueInfo, wlanoidSetChipConfig,
-		&rChipConfigInfo, sizeof(rChipConfigInfo), &u4BufLen);
+		&rChipConfigInfo, sizeof(rChipConfigInfo),
+		FALSE, FALSE, TRUE, &u4BufLen);
 
 	if (rStatus != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "%s: kalIoctl ret=%d\n", __func__,
@@ -802,6 +747,11 @@ int mtk_cfg80211_vendor_config_roaming(struct wiphy *wiphy,
 	if (!prGlueInfo)
 		return -EINVAL;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	if (prGlueInfo->u4FWRoamingEnable == 0) {
 		DBGLOG(REQ, INFO,
 		       "FWRoaming is disabled (FWRoamingEnable=%d)\n",
@@ -831,15 +781,15 @@ int mtk_cfg80211_vendor_config_roaming(struct wiphy *wiphy,
 	for (i = 0; i < numOfList[0]; i++) {
 		if (attrlist->nla_type ==
 		    WIFI_ATTRIBUTE_ROAMING_BLACKLIST_BSSID) {
+			aucBSSID = nla_data(attrlist);
 			prBssDesc =
 				scanSearchBssDescByBssid(prGlueInfo->prAdapter,
-							nla_data(attrlist));
+							aucBSSID);
 			len_shift += NLA_ALIGN(attrlist->nla_len);
 			attrlist =
 				(struct nlattr *)((uint8_t *) data + len_shift);
 
 			if (prBssDesc == NULL) {
-				aucBSSID = nla_data(attrlist);
 				DBGLOG(REQ, ERROR, "No found blacklist BSS="
 					MACSTR "\n",
 					MAC2STR(aucBSSID));
@@ -900,6 +850,11 @@ int mtk_cfg80211_vendor_enable_roaming(struct wiphy *wiphy,
 	if (!prGlueInfo)
 		return -EFAULT;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	attr = (struct nlattr *)data;
 	if (attr->nla_type == WIFI_ATTRIBUTE_ROAMING_STATE)
 		prGlueInfo->u4FWRoamingEnable = nla_get_u32(attr);
@@ -915,279 +870,52 @@ int mtk_cfg80211_vendor_get_rtt_capabilities(
 	const void *data, int data_len)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
-	uint32_t rStatus, u4BufLen;
-	struct RTT_CAPABILITIES rRttCapabilities;
+	int32_t i4Status = -EINVAL;
+	struct PARAM_WIFI_RTT_CAPABILITIES rRttCapabilities;
 	struct sk_buff *skb;
 
-	DBGLOG(REQ, INFO, "vendor command\r\n");
+	DBGLOG(REQ, TRACE, "vendor command\r\n");
 
 	ASSERT(wiphy);
 	ASSERT(wdev);
 	WIPHY_PRIV(wiphy, prGlueInfo);
 
+	if (!prGlueInfo)
+		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
 			sizeof(rRttCapabilities));
 	if (!skb) {
-		DBGLOG(REQ, ERROR, "%s allocate skb failed:\n", __func__);
+		DBGLOG(REQ, ERROR, "%s allocate skb failed:%x\n",
+		       __func__, i4Status);
 		return -ENOMEM;
 	}
 
 	kalMemZero(&rRttCapabilities, sizeof(rRttCapabilities));
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidGetRttCapabilities,
-			   &rRttCapabilities,
-			   sizeof(struct RTT_CAPABILITIES),
-			   &u4BufLen);
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(REQ, WARN, "RTT get capabilities error:%x\n", rStatus);
-		goto failure;
-	}
+	/* RTT Capabilities return from driver not firmware */
+	rRttCapabilities.rtt_one_sided_supported = 0;
+	rRttCapabilities.rtt_ftm_supported = 1;
+	rRttCapabilities.lci_support = 1;
+	rRttCapabilities.lcr_support = 1;
+	rRttCapabilities.preamble_support = 0x07;
+	rRttCapabilities.bw_support = 0x1c;
 
-		DBGLOG(RTT, INFO,
-			"one_sided=%hhu, ftm=%hhu, lci=%hhu, lcr=%hhu, preamble=%hhu, bw=%hhu, responder=%hhu, ver=%hhu",
-			rRttCapabilities.fgRttOneSidedSupported,
-			rRttCapabilities.fgRttFtmSupported,
-			rRttCapabilities.fgLciSupported,
-			rRttCapabilities.fgLcrSupported,
-			rRttCapabilities.ucPreambleSupport,
-			rRttCapabilities.ucBwSupport,
-			rRttCapabilities.fgResponderSupported,
-			rRttCapabilities.fgMcVersion);
+	if (unlikely(nla_put(skb, RTT_ATTRIBUTE_CAPABILITIES,
+			     sizeof(rRttCapabilities), &rRttCapabilities) < 0))
+		goto nla_put_failure;
 
+	i4Status = cfg80211_vendor_cmd_reply(skb);
+	return i4Status;
 
-	if (unlikely(nla_put_nohdr(skb,
-		sizeof(rRttCapabilities), &rRttCapabilities) < 0)) {
-		DBGLOG(REQ, ERROR, "nla_put_nohdr failed\n");
-		goto failure;
-	}
-
-	return cfg80211_vendor_cmd_reply(skb);
-failure:
+nla_put_failure:
 	kfree_skb(skb);
-	return -EFAULT;
-}
-
-int mtk_cfg80211_vendor_set_rtt_config(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	struct nlattr *attrs[RTT_ATTRIBUTE_TARGET_INFO + 1];
-	struct nlattr *tb[RTT_ATTRIBUTE_TARGET_BW + 1];
-	struct nlattr *attr;
-	uint32_t rStatus, u4BufLen;
-	int tmp, err;
-	uint8_t i = 0;
-	struct PARAM_RTT_REQUEST request;
-
-	DBGLOG(REQ, INFO, "vendor command\r\n");
-
-	ASSERT(wiphy);
-	ASSERT(wdev);
-
-	if ((data == NULL) || (data_len == 0))
-		return -EINVAL;
-
-	WIPHY_PRIV(wiphy, prGlueInfo);
-	if (!prGlueInfo)
-		return -EFAULT;
-
-	if (NLA_PARSE(attrs, RTT_ATTRIBUTE_TARGET_INFO,
-			data, data_len, nla_set_rtt_config_policy)) {
-		DBGLOG(RTT, ERROR, "Invalid ATTR.\n");
-		return -EINVAL;
-	}
-
-	request.fgEnable = true;
-
-	if (attrs[RTT_ATTRIBUTE_TARGET_CNT]) {
-		request.ucConfigNum =
-			nla_get_u8(attrs[RTT_ATTRIBUTE_TARGET_CNT]);
-		DBGLOG(RTT, INFO, "TARGET_CNT = %u\n", request.ucConfigNum);
-	} else {
-		DBGLOG(RTT, ERROR, "No RTT_ATTRIBUTE_TARGET_CNT\n");
-		return -EINVAL;
-	}
-
-	if (!attrs[RTT_ATTRIBUTE_TARGET_INFO]) {
-		DBGLOG(RTT, ERROR, "No RTT_ATTRIBUTE_TARGET_INFO\n");
-		return -EINVAL;
-	}
-
-	nla_for_each_nested(attr, attrs[RTT_ATTRIBUTE_TARGET_INFO], tmp) {
-		struct RTT_CONFIG *config = NULL;
-
-		if (i >= request.ucConfigNum || i >= CFG_RTT_MAX_CANDIDATES) {
-			DBGLOG(RTT, ERROR, "Wrong num %hhu/%hhu/%d\n",
-				i, request.ucConfigNum, CFG_RTT_MAX_CANDIDATES);
-			return -EINVAL;
-		}
-
-		err = NLA_PARSE(tb, RTT_ATTRIBUTE_TARGET_BW,
-				nla_data(attr), nla_len(attr),
-				nla_set_rtt_config_policy);
-		if (err) {
-			DBGLOG(RTT, WARN, "Wrong RTT ATTR, %d\n", err);
-			return err;
-		}
-
-		config = &request.arRttConfigs[i++];
-		if (tb[RTT_ATTRIBUTE_TARGET_MAC]) {
-			COPY_MAC_ADDR(config->aucAddr,
-				nla_data(tb[RTT_ATTRIBUTE_TARGET_MAC]));
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_TYPE]) {
-			config->eType =
-				nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_TYPE]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_PEER]) {
-			config->ePeer =
-				nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_PEER]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_CHAN]) {
-			kalMemCopy(&config->rChannel,
-				nla_data(tb[RTT_ATTRIBUTE_TARGET_CHAN]),
-				sizeof(config->rChannel));
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_PERIOD]) {
-			config->ucBurstPeriod =
-				nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_PERIOD]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_NUM_BURST]) {
-			config->ucNumBurst =
-				nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_NUM_BURST]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_NUM_FTM_BURST]) {
-			config->ucNumFramesPerBurst =
-			    nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_NUM_FTM_BURST]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTM]) {
-			config->ucNumRetriesPerRttFrame =
-			    nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTM]);
-
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTMR]) {
-			config->ucNumRetriesPerFtmr =
-			   nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_NUM_RETRY_FTMR]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_LCI]) {
-			config->ucLciRequest =
-				nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_LCI]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_LCR]) {
-			config->ucLcrRequest =
-				nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_LCR]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_BURST_DURATION]) {
-			config->ucBurstDuration =
-			   nla_get_u32(tb[RTT_ATTRIBUTE_TARGET_BURST_DURATION]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_PREAMBLE]) {
-			config->ePreamble =
-				nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_PREAMBLE]);
-		}
-		if (tb[RTT_ATTRIBUTE_TARGET_BW])
-			config->eBw = nla_get_u8(tb[RTT_ATTRIBUTE_TARGET_BW]);
-
-		DBGLOG(RTT, INFO,
-			"#%d: MAC=" MACSTR
-			" TYPE=%hhu,PEER=%hhu, PRD=%hhu,CHL=(%d,%d),BRST=%hhu,NFTM=%hhu,RFTM=%hhu, RFTMR=%hhu,LCI=%hhu,LCR=%hhu,DUR=%hhu,PRB=%hhu,BW=%hhu\n",
-			i - 1, MAC2STR(config->aucAddr), config->eType,
-			config->ePeer, config->ucBurstPeriod,
-			config->rChannel.width, config->rChannel.center_freq,
-			config->ucNumBurst, config->ucNumFramesPerBurst,
-			config->ucNumRetriesPerRttFrame,
-			config->ucNumRetriesPerFtmr, config->ucLciRequest,
-			config->ucLcrRequest, config->ucBurstDuration,
-			config->ePreamble, config->eBw);
-	}
-
-	if (i != request.ucConfigNum) {
-		DBGLOG(RTT, ERROR, "Config Num not match %hhu/%hhu\n",
-			i, request.ucConfigNum);
-		return -EINVAL;
-	}
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidHandleRttRequest,
-			   &request,
-			   sizeof(struct PARAM_RTT_REQUEST),
-			   &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(RTT, ERROR, "RTT request error:%x\n", rStatus);
-		return -EFAULT;
-	}
-
-	return WLAN_STATUS_SUCCESS;
-}
-
-int mtk_cfg80211_vendor_cancel_rtt_config(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len)
-{
-	struct GLUE_INFO *prGlueInfo = NULL;
-	struct PARAM_RTT_REQUEST request;
-	struct nlattr *attr;
-	struct nlattr *attrs = (struct nlattr *) data;
-	int tmp;
-	uint8_t i = 0;
-	uint32_t rStatus, u4BufLen;
-
-	DBGLOG(REQ, INFO, "vendor command\r\n");
-
-	ASSERT(wiphy);
-	ASSERT(wdev);
-	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wiphy);
-
-	if ((data == NULL) || (data_len == 0))
-		return -EINVAL;
-
-	prGlueInfo = (struct GLUE_INFO *) wiphy_priv(wiphy);
-	if (!prGlueInfo)
-		return -EINVAL;
-
-	request.fgEnable = false;
-
-	attr = nla_find(attrs, data_len, RTT_ATTRIBUTE_TARGET_CNT);
-	if (attr) {
-		request.ucConfigNum = nla_get_u8(attr);
-		DBGLOG(RTT, INFO, "TARGET_CNT = %u\n", request.ucConfigNum);
-	} else {
-		DBGLOG(RTT, ERROR, "No RTT_ATTRIBUTE_TARGET_CNT\n");
-		return -EINVAL;
-	}
-
-	DBGLOG(RTT, INFO, "Cancel RTT=%u\n", request.ucConfigNum);
-
-	nla_for_each_attr(attr, attrs, data_len, tmp) {
-		if (attr->nla_type == RTT_ATTRIBUTE_TARGET_MAC) {
-			struct RTT_CONFIG *config = NULL;
-
-			if (i >= request.ucConfigNum ||
-				i >= CFG_RTT_MAX_CANDIDATES)
-				return -EINVAL;
-
-			config = &request.arRttConfigs[i++];
-			COPY_MAC_ADDR(config->aucAddr, nla_data(attr));
-			DBGLOG(RTT, TRACE, "MAC=" MACSTR "\n",
-				MAC2STR(config->aucAddr));
-		}
-	}
-
-	if (i != request.ucConfigNum)
-		return -EINVAL;
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidHandleRttRequest,
-			   &request,
-			   sizeof(struct PARAM_RTT_REQUEST),
-			   &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(RTT, WARN, "RTT request error:%x\n", rStatus);
-		return -EFAULT;
-	}
-
-	return WLAN_STATUS_SUCCESS;
+	return i4Status;
 }
 
 
@@ -1212,7 +940,7 @@ void dumpLinkStatsIface(struct STATS_LLS_WIFI_IFACE_STAT *iface)
 			iface->info.country_str[1],
 			iface->info.country_str[2]);
 
-	DBGLOG(REQ, INFO, "%u %u %llu %u %u %u %u %u %u %d %d %d [%u]",
+	DBGLOG(REQ, INFO, "%u %u %llu %u %u %u %u %u %u %u %u %u [%u]",
 			iface->info.time_slicing_duty_cycle_percent,
 			iface->beacon_rx,
 			iface->average_tsf_offset,
@@ -1273,11 +1001,11 @@ void dumpLinkStatsPeerInfo(struct STATS_LLS_PEER_INFO *peer, uint32_t idx)
 void dumpLinkStatsRate(struct STATS_LLS_RATE_STAT *rate, uint32_t idx)
 {
 	static const char * const preamble[] = {
-		"OFDM", "CCK", "HT", "VHT", "HE", "EHT", "", ""};
+		"OFDM", "CCK", "HT", "VHT", "HE", "", "", ""};
 
 	DBGLOG(REQ, INFO, "Rate(%u) %u(%s) %u %u %u %u %u %u %u %u %u %u",
 			idx,
-			rate->rate.preamble, rate->rate.preamble > 5 ? "" :
+			rate->rate.preamble, rate->rate.preamble > 4 ? "" :
 			preamble[rate->rate.preamble],
 			rate->rate.nss,
 			rate->rate.bw,
@@ -1300,7 +1028,7 @@ void dumpLinkStatsRadio(struct STATS_LLS_WIFI_RADIO_STAT *radio, uint32_t idx)
 			radio->tx_time,
 			radio->num_tx_levels,
 			radio->tx_time_per_levels,
-			radio->rx_time,
+			radio->tx_time,
 			radio->on_time_scan,
 			radio->on_time_nbd,
 			radio->on_time_gscan,
@@ -1310,28 +1038,19 @@ void dumpLinkStatsRadio(struct STATS_LLS_WIFI_RADIO_STAT *radio, uint32_t idx)
 			radio->num_channels);
 }
 
-void dumpLinkStatsPowerLevels(uint8_t *ptr, uint8_t band, uint32_t size)
-{
-	DBGLOG(REQ, INFO, "PowerLevels: %p, #%u, size=%u\n",
-			ptr, band, size);
-	DBGLOG_HEX(REQ, INFO, ptr, size);
-}
-
 void dumpLinkStatsChannel(struct STATS_LLS_CHANNEL_STAT *channel, uint32_t idx)
 {
 	DBGLOG(REQ, INFO, "Channel(%u) %u %d %d %d %u %u",
 			idx,
-			channel->channel.width,
 			channel->channel.center_freq,
+			channel->channel.width,
 			channel->channel.center_freq0,
 			channel->channel.center_freq1,
 			channel->on_time,
 			channel->cca_busy_time);
 }
 
-/**
- * find_peer_starec() - return a station record by matching peer's MAC address
- */
+
 struct STA_RECORD *find_peer_starec(struct ADAPTER *prAdapter,
 		struct STATS_LLS_PEER_INFO *peer_info)
 {
@@ -1355,33 +1074,26 @@ struct STA_RECORD *find_peer_starec(struct ADAPTER *prAdapter,
 	return prStaRec;
 }
 
-/**
- * Return the accumulated MPDU count of the given rate parameters.
- */
 uint32_t receivedMpduCount(struct STA_RECORD *sta_rec,
 		struct STATS_LLS_RATE_STAT *rate_stats,
 		uint32_t ofdm_idx, uint32_t cck_idx)
 {
 	struct STATS_LLS_WIFI_RATE *rate = &rate_stats->rate;
 	uint32_t n = 0;
-	uint32_t mcsIdx;
 
 	if (!sta_rec)
 		return 0;
 
-	mcsIdx = rate->rateMcsIdx;
 	if (rate->preamble == LLS_MODE_OFDM)
 		n = sta_rec->u4RxMpduOFDM[rate->nss][rate->bw][ofdm_idx];
 	else if (rate->preamble == LLS_MODE_CCK)
 		n = sta_rec->u4RxMpduCCK[rate->nss][rate->bw][cck_idx];
 	else if (rate->preamble == LLS_MODE_HT)
-		n = sta_rec->u4RxMpduHT[rate->nss][rate->bw][mcsIdx];
+		n = sta_rec->u4RxMpduHT[rate->nss][rate->bw][rate->rateMcsIdx];
 	else if (rate->preamble == LLS_MODE_VHT)
-		n = sta_rec->u4RxMpduVHT[rate->nss][rate->bw][mcsIdx];
+		n = sta_rec->u4RxMpduVHT[rate->nss][rate->bw][rate->rateMcsIdx];
 	else if (rate->preamble == LLS_MODE_HE)
-		n = sta_rec->u4RxMpduHE[rate->nss][rate->bw][mcsIdx];
-	else if (rate->preamble == LLS_MODE_EHT)
-		n = sta_rec->u4RxMpduEHT[rate->nss][rate->bw][mcsIdx];
+		n = sta_rec->u4RxMpduHE[rate->nss][rate->bw][rate->rateMcsIdx];
 	return n;
 }
 
@@ -1421,12 +1133,6 @@ uint8_t isValidRate(struct STATS_LLS_RATE_STAT *rate_stats,
 		    rate->rateMcsIdx >= STATS_LLS_HE_NUM)
 			goto invalid_rate;
 		break;
-	case LLS_MODE_EHT:
-		if (rate->nss >= STATS_LLS_MAX_NSS_NUM ||
-		    rate->bw >= STATS_LLS_MAX_EHT_BW_NUM ||
-		    rate->rateMcsIdx >= STATS_LLS_EHT_NUM)
-			goto invalid_rate;
-		break;
 	default:
 		goto invalid_rate;
 	}
@@ -1449,13 +1155,9 @@ invalid_rate:
  *          ...
  *          num_rate
  *          STATS_LLS_RATE_STAT[] <- up to 200 () *rx_mpdu
- *
- * TODO: MLO support. bss_idx -> MLD -(?)-> other bss_idx.
- *       Counters can be collected and summed up, but
- *       no idea for the merged link information stored in multiple BSS INFO.
  */
 uint32_t fill_peer_info(uint8_t *dst, struct PEER_INFO_RATE_STAT *src,
-		uint32_t *num_peers, struct ADAPTER *prAdapter, uint8_t bss_idx)
+		uint32_t *num_peers, struct ADAPTER *prAdapter)
 {
 	struct STATS_LLS_PEER_INFO *dst_peer;
 	struct STATS_LLS_PEER_INFO *src_peer;
@@ -1469,7 +1171,6 @@ uint32_t fill_peer_info(uint8_t *dst, struct PEER_INFO_RATE_STAT *src,
 	int32_t ofdm_idx;
 	int32_t cck_idx;
 	uint32_t rxMpduCount;
-	struct STATS_LLS_PEER_INFO peer_info = {0};
 
 	*num_peers = 0;
 	for (i = 0; i < CFG_STA_REC_NUM; i++, src++) {
@@ -1477,31 +1178,23 @@ uint32_t fill_peer_info(uint8_t *dst, struct PEER_INFO_RATE_STAT *src,
 		if (src_peer->type >= STATS_LLS_WIFI_PEER_INVALID)
 			continue;
 
-		kalMemCopyFromIo(&peer_info, src_peer,
-				sizeof(struct STATS_LLS_PEER_INFO));
-
-		DBGLOG(REQ, TRACE, "Peer MAC: " MACSTR,
-				MAC2STR(peer_info.peer_mac_address));
-		sta_rec = find_peer_starec(prAdapter, &peer_info);
-		if (sta_rec == NULL && prWifiVar->fgLinkStatsDump) {
-			DBGLOG(REQ, WARN, "MAC not found: " MACSTR,
-					MAC2STR(peer_info.peer_mac_address));
-		}
-		if (!sta_rec)
-			continue;
-
-		if (prAdapter->ucLinkStatsBssNum == BSSID_NUM &&
-		    sta_rec->ucBssIndex != bss_idx)
-			continue; /* Not a collecting one */
-
 		if (prWifiVar->fgLinkStatsDump)
-			DBGLOG(REQ, INFO, "Peer=%u type=%u", i, peer_info.type);
+			DBGLOG(REQ, INFO, "Peer=%u type=%u", i, src_peer->type);
 
 		(*num_peers)++;
 		dst_peer = (struct STATS_LLS_PEER_INFO *)dst;
-		*dst_peer = peer_info;
 
-		if (dst_peer->type == STATS_LLS_WIFI_PEER_AP) {
+		kalMemCopyFromIo(dst_peer, src_peer,
+				sizeof(struct STATS_LLS_PEER_INFO));
+
+		DBGLOG(REQ, TRACE, "Peer MAC: " MACSTR,
+				MAC2STR(dst_peer->peer_mac_address));
+		sta_rec = find_peer_starec(prAdapter, dst_peer);
+		if (sta_rec == NULL && prWifiVar->fgLinkStatsDump) {
+			DBGLOG(REQ, WARN, "MAC not found: " MACSTR,
+					MAC2STR(dst_peer->peer_mac_address));
+		}
+		if (src_peer->type == STATS_LLS_WIFI_PEER_AP) {
 			struct STATS_LLS_PEER_AP_REC *prPeerApRec = NULL;
 
 			for (j = 0, prPeerApRec = prAdapter->rPeerApRec;
@@ -1533,8 +1226,8 @@ uint32_t fill_peer_info(uint8_t *dst, struct PEER_INFO_RATE_STAT *src,
 
 			if (!isValidRate(src_rate, ofdm_idx, cck_idx))
 				continue;
-			rxMpduCount = receivedMpduCount(sta_rec,
-					src_rate, ofdm_idx >= 0 ? ofdm_idx : 0,
+			rxMpduCount = receivedMpduCount(sta_rec, src_rate,
+					ofdm_idx >= 0 ? ofdm_idx : 0,
 					cck_idx >= 0 ? cck_idx : 0);
 			if (src_rate->tx_mpdu || src_rate->mpdu_lost ||
 			    src_rate->retries || rxMpduCount) {
@@ -1564,27 +1257,6 @@ uint32_t fill_peer_info(uint8_t *dst, struct PEER_INFO_RATE_STAT *src,
 	return dst - orig;
 }
 
-static void fill_iface_ac_mpdu(struct ADAPTER *prAdapter, uint8_t bss_idx,
-	struct STATS_LLS_WIFI_IFACE_STAT *iface)
-{
-	struct BSS_INFO *prBssInfo;
-	uint32_t *pu4RxMpduAc;
-	uint8_t ac = 0;
-	uint32_t i;
-
-	for (i = 0; i < MAX_BSSID_NUM + 1; i++) {
-		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, bss_idx);
-		if (prAdapter->ucLinkStatsBssNum == BSSID_NUM && i != bss_idx)
-			continue; /* Get only specific BSS */
-
-		if (!prBssInfo)
-			continue;
-
-		pu4RxMpduAc = prBssInfo->u4RxMpduAc;
-		for (ac = 0; ac < STATS_LLS_WIFI_AC_MAX; ac++)
-			iface->ac[ac].rx_mpdu += pu4RxMpduAc[ac];
-	}
-}
 
 /**
  * STATS_LLS_WIFI_IFACE_STAT
@@ -1596,99 +1268,64 @@ static void fill_iface_ac_mpdu(struct ADAPTER *prAdapter, uint8_t bss_idx,
  *          ...
  *          num_rate
  *          STATS_LLS_RATE_STAT[] <- up to 200 () *rx_mpdu
- *
- * TODO: MLO support. bss_idx -> MLD -(?)-> other bss_idx.
- *       Counters can be collected and summed up, but
- *       no idea for the merged link information stored in multiple BSS INFO.
  */
-uint32_t fill_iface(uint8_t *dst, struct HAL_LLS_FW_REPORT *src,
-		struct ADAPTER *prAdapter, uint8_t bss_idx)
+uint32_t fill_iface(uint8_t *dst, struct HAL_LLS_FULL_REPORT *src,
+		struct ADAPTER *prAdapter)
 {
 	struct STATS_LLS_WIFI_IFACE_STAT *iface;
 	uint8_t *orig = dst;
-	uint8_t ac = 0;
-	uint32_t iface_offset = bss_idx;
 
-	if (prAdapter->ucLinkStatsBssNum == 1)
-		iface_offset = 0;
-	kalMemCopyFromIo(dst, &src->iface[iface_offset],
-			sizeof(struct STATS_LLS_WIFI_IFACE_STAT));
+	kalMemCopyFromIo(dst, src, sizeof(struct STATS_LLS_WIFI_IFACE_STAT));
 	iface = (struct STATS_LLS_WIFI_IFACE_STAT *)dst;
 
-	fill_iface_ac_mpdu(prAdapter, bss_idx, iface);
+	iface->ac[STATS_LLS_WIFI_AC_VO].rx_mpdu =
+				prAdapter->u4RxMpduAc[STATS_LLS_WIFI_AC_VO];
+	iface->ac[STATS_LLS_WIFI_AC_VI].rx_mpdu =
+				prAdapter->u4RxMpduAc[STATS_LLS_WIFI_AC_VI];
+	iface->ac[STATS_LLS_WIFI_AC_BE].rx_mpdu =
+				prAdapter->u4RxMpduAc[STATS_LLS_WIFI_AC_BE];
+	iface->ac[STATS_LLS_WIFI_AC_BK].rx_mpdu =
+				prAdapter->u4RxMpduAc[STATS_LLS_WIFI_AC_BK];
 
 	if (prAdapter->rWifiVar.fgLinkStatsDump) {
+		int i = 0;
+
 		dumpLinkStatsIface(iface);
-		for (ac = 0; ac < STATS_LLS_WIFI_AC_MAX; ac++)
-			dumpLinkStatsAc(iface->ac, ac);
+		for (i = 0; i < STATS_LLS_WIFI_AC_MAX; i++)
+			dumpLinkStatsAc(iface->ac, i);
 	}
 	dst += sizeof(struct STATS_LLS_WIFI_IFACE_STAT);
 
 	dst += fill_peer_info(dst, src->peer_info,
-			&iface->num_peers, prAdapter, bss_idx);
+			&iface->num_peers, prAdapter);
 
 	DBGLOG(REQ, TRACE, "advanced %u bytes, %u peers",
 			dst - orig, iface->num_peers);
-
 	return dst - orig;
 }
 
-static uint8_t bandMaskByBssIdx(struct ADAPTER *prAdapter, uint8_t bss_idx)
-{
-	struct BSS_INFO *prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, bss_idx);
-	uint8_t ucHwBandIdxBitmap = 0;
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	struct MLD_BSS_INFO *prMldBssInfo;
-#endif
-
-	if (!prBssInfo)
-		return 0;
-
-	if (prBssInfo->eHwBandIdx < ENUM_BAND_NUM)
-		ucHwBandIdxBitmap = BIT(prBssInfo->eHwBandIdx);
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	prMldBssInfo = mldBssGetByBss(prAdapter, prBssInfo);
-	if (prMldBssInfo)
-		ucHwBandIdxBitmap |= prMldBssInfo->ucHwBandBitmap;
-#endif
-
-	return ucHwBandIdxBitmap;
-}
 
 /**
- * STATS_LLS_WIFI_RADIO_STAT[] <-- check by eBand considering MLO as well
+ * STATS_LLS_WIFI_RADIO_STAT[] <-- 2
  *     ...
  *     num_channels
  *     STATS_LLS_CHANNEL_STAT[] <-- up to 46 (2.4 + 5G; 6G will be more)
  */
 uint32_t fill_radio(uint8_t *dst, struct WIFI_RADIO_CHANNEL_STAT *src,
-		uint32_t num_radio, struct ADAPTER *prAdapter,
-		uint8_t bss_idx, uint8_t band_hint)
+		uint32_t num_radio, struct ADAPTER *prAdapter)
 {
 	struct STATS_LLS_WIFI_RADIO_STAT *radio;
 	struct STATS_LLS_CHANNEL_STAT *src_ch;
 	struct STATS_LLS_CHANNEL_STAT *dst_ch;
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
-	uint8_t band = bandMaskByBssIdx(prAdapter, bss_idx);
+
 	uint8_t *orig = dst;
 	uint32_t i, j;
 
-
-	*(uint32_t *)orig = 0;
-	dst += sizeof(uint32_t);
-
-	band |= band_hint;
 	for (i = 0; i < num_radio; i++, src++) {
-		if ((band & 1 << i) == 0)
-			continue;
-
-		(*(uint32_t *)orig)++;
-
 		kalMemCopyFromIo(dst, src,
 				sizeof(struct STATS_LLS_WIFI_RADIO_STAT));
 		radio = (struct STATS_LLS_WIFI_RADIO_STAT *)dst;
-		radio->num_tx_levels = TX_POWER_LEVELS;
 		dst += sizeof(struct STATS_LLS_WIFI_RADIO_STAT);
 
 		if (prWifiVar->fgLinkStatsDump)
@@ -1718,39 +1355,6 @@ uint32_t fill_radio(uint8_t *dst, struct WIFI_RADIO_CHANNEL_STAT *src,
 	DBGLOG(REQ, TRACE, "advanced %u bytes", dst - orig);
 	return dst - orig;
 }
-
-/**
- * Stored in pu4TxTimePerLevels in (uint32_t * size).
- */
-uint32_t fill_power_levels(uint8_t *dst, struct ADAPTER *prAdapter,
-		uint32_t num_radio, uint8_t bss_idx, uint8_t band_hint,
-		uint32_t *pu4TxTimePerLevels, uint32_t u4TxTimePerLevelsSize)
-{
-	uint8_t *orig = dst;
-	uint8_t i = 0;
-	uint8_t band = bandMaskByBssIdx(prAdapter, bss_idx);
-
-	if (!pu4TxTimePerLevels)
-		return 0;
-
-	band |= band_hint;
-	for (i = 0; i < num_radio; i++) {
-		if ((band & 1 << i) == 0)
-			continue;
-
-		kalMemCopyFromIo(dst, pu4TxTimePerLevels + TX_POWER_LEVELS * i,
-				sizeof(uint32_t) * TX_POWER_LEVELS);
-
-		if (prAdapter->rWifiVar.fgLinkStatsDump)
-			dumpLinkStatsPowerLevels(dst, i,
-					sizeof(uint32_t) * TX_POWER_LEVELS);
-		dst += sizeof(uint32_t) * TX_POWER_LEVELS;
-	}
-
-	DBGLOG(REQ, INFO, "Copy power level %u bytes", dst - orig);
-
-	return dst - orig;
-}
 #endif /* CFG_SUPPORT_LLS */
 
 
@@ -1761,12 +1365,6 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 #if CFG_SUPPORT_LLS
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter;
-	/* 0: always copy from EMI w/o cmd/event
-	 * 1: check reuse cached buffer
-	 */
-	enum LLS_QUERY_MODE ucQueryMode;
-	struct PERF_MONITOR *perf;
-	struct LinkStatsBuffer *prLinkStatsCache;
 
 	union {
 		struct CMD_GET_STATS_LLS cmd;
@@ -1779,10 +1377,8 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 	uint8_t *buf = NULL;
 	struct sk_buff *skb = NULL;
 
-	uint8_t *ptr;
-	struct HAL_LLS_FW_REPORT *src;
-	uint8_t ucBssIdx;
-	uint8_t band_hint = 0xFF; /* report all band/radio info */
+	uint8_t *ptr = NULL;
+	struct HAL_LLS_FULL_REPORT *src;
 
 	ASSERT(wiphy);
 	ASSERT(wdev);
@@ -1792,21 +1388,9 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 		return -EFAULT;
 	}
 
-	prAdapter = prGlueInfo->prAdapter;
-	perf = &prAdapter->rPerMonitor;
-
-	ucBssIdx = wlanGetBssIdx(wdev->netdev);
-	if (ucBssIdx >= MAX_BSSID_NUM) {
-		DBGLOG(REQ, ERROR, "Invalid BSS Index ucBssIdx=%u\n", ucBssIdx);
-		return -EFAULT;
-	}
-
-	prLinkStatsCache = &prAdapter->rLinkStatsCache[ucBssIdx];
-	if (prAdapter->ucLinkStatsBssNum == BSSID_NUM)
-		band_hint = 0x00; /* select band/radio by Bss HW band index */
-
-	ucQueryMode = prAdapter->rWifiVar.ucLinkStatsQueryMode;
 	do {
+		prAdapter = prGlueInfo->prAdapter;
+
 		src = prAdapter->pucLinkStatsSrcBufferAddr;
 		if (!src) {
 			DBGLOG(REQ, ERROR, "EMI mapping not done");
@@ -1815,77 +1399,49 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 		}
 
 		buf = (uint8_t *)&prAdapter->rLinkStatsDestBuffer;
-		if (perf->fgIdle && prLinkStatsCache->pucLinkStatsBuffer &&
-		    ucQueryMode == SEND_CMD_ON_ACTIVE) {
-			/* use preserved stats in last valid collection */
-			buf = prLinkStatsCache->pucLinkStatsBuffer;
-			ptr = prLinkStatsCache->pucLinkStatsBufferEnd;
-			DBGLOG(REQ, TRACE, "Reuse %u bytes for LLS", ptr - buf);
-		} else { /* need to copy from EMI */
-			kalMemZero(buf,
-				sizeof(prAdapter->rLinkStatsDestBuffer));
+		kalMemZero(buf, sizeof(prAdapter->rLinkStatsDestBuffer));
 
-			if (ucQueryMode == SEND_CMD_ON_ACTIVE ||
-			    ucQueryMode == ALWAYS_SEND_CMD) {
-				/* Always read from EMI w/o sending cmd */
-				query.cmd.u4Tag = STATS_LLS_TAG_LLS_DATA;
-				rStatus = kalIoctl(prGlueInfo,
-					   wlanQueryLinkStats,
-					   &query, /* pvInfoBuf */
-					   u4QueryBufLen, /* u4InfoBufLen */
-					   &u4QueryInfoLen); /* pu4QryInfoLen */
-				DBGLOG(REQ, TRACE,
-					"kalIoctl=%x, %u bytes, status=%u",
+		query.cmd.u4Tag = STATS_LLS_TAG_LLS_DATA;
+		rStatus = kalIoctl(prGlueInfo,
+			   wlanQueryLinkStats, /* pfnOidHandler */
+			   &query, /* pvInfoBuf */
+			   u4QueryBufLen, /* u4InfoBufLen */
+			   TRUE, /* fgRead */
+			   TRUE, /* fgWaitResp */
+			   TRUE, /* fgCmd */
+			   &u4QueryInfoLen); /* pu4QryInfoLen */
+		DBGLOG(REQ, TRACE, "kalIoctl=%x, %u bytes, status=%u",
 					rStatus, u4QueryInfoLen,
 					query.data.eUpdateStatus);
 
-				if (rStatus != WLAN_STATUS_SUCCESS ||
-				    u4QueryInfoLen !=
-					sizeof(struct EVENT_STATS_LLS_DATA) ||
-				    query.data.eUpdateStatus !=
-					STATS_LLS_UPDATE_STATUS_SUCCESS) {
-					DBGLOG(REQ, WARN,
-						"kalIoctl=%x, %u bytes, status=%u",
-						rStatus, u4QueryInfoLen,
-						query.data.eUpdateStatus);
-					rStatus = -EFAULT;
-					break;
-				}
-
-				if (data) {
-					DBGLOG(REQ, WARN,
-						"kalIoctl=%x, %u bytes",
-						rStatus, u4QueryInfoLen);
-					rStatus = -EFAULT;
-					break;
-				}
-			}
-
-			/* Fill returning buffer from shared EMI address(src) */
-			ptr = buf;
-			ptr += fill_iface(ptr, src, prAdapter, ucBssIdx);
-
-			ptr += fill_radio(ptr, src->radio, ENUM_BAND_NUM,
-					prAdapter, ucBssIdx, band_hint);
-
-			ptr += fill_power_levels(ptr, prAdapter, ENUM_BAND_NUM,
-					ucBssIdx, band_hint,
-					prAdapter->pu4TxTimePerLevels,
-					prAdapter->u4TxTimePerLevelsSize);
-			DBGLOG(REQ, TRACE, "Collected %u bytes for LLS",
-					ptr - buf);
-
-			if (ucQueryMode == SEND_CMD_ON_ACTIVE &&
-			    prLinkStatsCache->pucLinkStatsBuffer) {
-				kalMemFree(
-					prLinkStatsCache->pucLinkStatsBuffer,
-					VIR_MEM_TYPE,
-					prLinkStatsCache->pucLinkStatsBufEnd -
-					prLinkStatsCache->pucLinkStatsBuffer);
-				prLinkStatsCache->pucLinkStatsBuffer = NULL;
-				prLinkStatsCache->pucLinkStatsBufferEnd = NULL;
-			}
+		if (rStatus != WLAN_STATUS_SUCCESS ||
+			u4QueryInfoLen !=
+				sizeof(struct EVENT_STATS_LLS_DATA) ||
+			query.data.eUpdateStatus !=
+				STATS_LLS_UPDATE_STATUS_SUCCESS) {
+			DBGLOG(REQ, WARN, "kalIoctl=%x, %u bytes, status=%u",
+					rStatus, u4QueryInfoLen,
+					query.data.eUpdateStatus);
+			rStatus = -EFAULT;
+			break;
 		}
+
+		if (data) {
+			DBGLOG(REQ, WARN, "kalIoctl=%x, %u bytes",
+					rStatus, u4QueryInfoLen);
+			rStatus = -EFAULT;
+			break;
+		}
+
+		/* Fill returning buffer */
+		ptr = buf;
+		ptr += fill_iface(ptr, src, prAdapter);
+
+		*(uint32_t *)ptr = ENUM_BAND_NUM;
+		ptr += sizeof(uint32_t);
+
+		ptr += fill_radio(ptr, src->radio, ENUM_BAND_NUM, prAdapter);
+		DBGLOG(REQ, TRACE, "Collected %u bytes for LLS", ptr - buf);
 
 		skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, ptr - buf);
 		if (!skb) {
@@ -1901,21 +1457,6 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 		}
 
 		rStatus = cfg80211_vendor_cmd_reply(skb);
-
-		/* Save a copy of collected stats from last report */
-		if (ucQueryMode == SEND_CMD_ON_ACTIVE &&
-		    prLinkStatsCache->pucLinkStatsBuffer == NULL) {
-			/* Update newly collected stats to cache buffer */
-			prLinkStatsCache->pucLinkStatsBuffer =
-					kalMemAlloc(ptr - buf, VIR_MEM_TYPE);
-			if (prLinkStatsCache->pucLinkStatsBuffer) {
-				kalMemCopy(prLinkStatsCache->pucLinkStatsBuffer,
-					buf, ptr - buf);
-				prLinkStatsCache->pucLinkStatsBufferEnd =
-					prLinkStatsCache->pucLinkStatsBuffer +
-					(ptr - buf);
-			}
-		}
 		return rStatus;
 	} while (0);
 
@@ -1924,72 +1465,6 @@ int mtk_cfg80211_vendor_llstats_get_info(struct wiphy *wiphy,
 #endif
 	return rStatus;
 }
-
-#if CFG_SUPPORT_LLS
-#if (CFG_WFD_SCC_BALANCE_SUPPORT == 1)
-int mtk_cfg80211_vendor_get_wfd_pred_tx_br(struct wiphy *wiphy,
-		struct wireless_dev *wdev, const void *data, int data_len)
-{
-	int32_t rStatus = -EOPNOTSUPP;
-	struct GLUE_INFO *prGlueInfo = NULL;
-	struct ADAPTER *prAdapter;
-	struct sk_buff *skb;
-	union {
-		struct CMD_GET_STATS_LLS cmd;
-		struct EVENT_STATS_LLS_TX_BIT_RATE bitrate;
-	} query = {0};
-	uint32_t u4QueryBufLen = sizeof(query);
-	uint32_t u4QueryInfoLen = sizeof(query.cmd);
-
-	if ((wiphy == NULL) || (wdev == NULL))
-		return -EINVAL;
-
-	WIPHY_PRIV(wiphy, prGlueInfo);
-
-	if (!prGlueInfo)
-		return -EFAULT;
-	prAdapter = prGlueInfo->prAdapter;
-	if (!prAdapter)
-		return -EFAULT;
-
-	query.cmd.u4Tag = STATS_LLS_TAG_GET_WFD_PRED_TX_BITRATE;
-	rStatus = kalIoctl(prGlueInfo,
-			wlanQueryLinkStats,
-			&query,
-			u4QueryBufLen,
-			&u4QueryInfoLen);
-	DBGLOG(REQ, TRACE, "kalIoctl=%x, %u bytes", rStatus, u4QueryInfoLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS ||
-		u4QueryInfoLen != sizeof(struct EVENT_STATS_LLS_TX_BIT_RATE)) {
-		DBGLOG(REQ, WARN, "kalIoctl=%x, %u bytes",
-				rStatus, u4QueryBufLen);
-		rStatus = -EFAULT;
-	}
-	DBGLOG(REQ, TRACE, "u4CurBitRate=%u u4PredBitRate=%u",
-		query.bitrate.au4CurrentBitrate[0],
-		query.bitrate.au4PredictBitrate[0]);
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-			sizeof(struct EVENT_STATS_LLS_TX_BIT_RATE));
-	if (!skb) {
-		DBGLOG(REQ, ERROR, "Allocate skb failed\n");
-		return -ENOMEM;
-	}
-	if (unlikely(nla_put_u32(skb, WIFI_ATTR_WFD_CUR_TX_BR,
-				query.bitrate.au4CurrentBitrate[0])))
-		goto nla_put_failure;
-	if (unlikely(nla_put_u32(skb, WIFI_ATTR_WFD_PRED_TX_BR,
-				query.bitrate.au4PredictBitrate[0])))
-		goto nla_put_failure;
-	return cfg80211_vendor_cmd_reply(skb);
-
-nla_put_failure:
-	kfree_skb(skb);
-	return -EFAULT;
-}
-#endif
-#endif
 
 int mtk_cfg80211_vendor_set_band(struct wiphy *wiphy,
 				 struct wireless_dev *wdev,
@@ -2008,16 +1483,24 @@ int mtk_cfg80211_vendor_set_band(struct wiphy *wiphy,
 	if ((data == NULL) || !data_len)
 		goto nla_put_failure;
 
-	DBGLOG(REQ, TRACE,
-	       "vendor command: data_len=%d, data=0x%x 0x%x\r\n",
-	       data_len, *((uint32_t *) data), *((uint32_t *) data + 1));
-
 	attr = (struct nlattr *)data;
-	setBand = nla_get_u32(attr);
+	if (attr->nla_type == QCA_WLAN_VENDOR_ATTR_SETBAND_VALUE)
+		setBand = nla_get_u32(attr);
+	else
+		return -EINVAL;
+
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ASSERT(prGlueInfo);
 
-	DBGLOG(REQ, INFO, "Vendor Set Band value=%d\r\n", setBand);
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
+	DBGLOG(REQ, INFO,
+	       "vendor command: data_len=%d, data=0x%x 0x%x, set band value=%d\r\n",
+	       data_len, *((uint32_t *) data), *((uint32_t *) data + 1),
+	       setBand);
 
 	if (setBand == QCA_SETBAND_5G)
 		band = BAND_5G;
@@ -2075,6 +1558,11 @@ int mtk_cfg80211_vendor_set_roaming_param(struct wiphy *wiphy,
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	if (!prGlueInfo)
 		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	if ((data == NULL) || (data_len == 0))
 		goto fail;
@@ -2141,7 +1629,7 @@ int mtk_cfg80211_vendor_set_roaming_param(struct wiphy *wiphy,
 		rStatus = kalIoctl(prGlueInfo, wlanoidBssDisallowedList,
 				   &request,
 				   sizeof(struct PARAM_BSS_DISALLOWED_LIST),
-				   &u4BufLen);
+				   FALSE, FALSE, TRUE, &u4BufLen);
 
 		if (rStatus != WLAN_STATUS_SUCCESS) {
 			DBGLOG(REQ, ERROR, "disallowed error:%x\n", rStatus);
@@ -2182,10 +1670,18 @@ int mtk_cfg80211_vendor_set_roaming_policy(
 		goto nla_put_failure;
 
 	attr = (struct nlattr *)data;
-	setRoaming = nla_get_u32(attr);
+	if (attr->nla_type == QCA_WLAN_VENDOR_ATTR_ROAMING_POLICY)
+		setRoaming = nla_get_u32(attr);
+	else
+		return -EINVAL;
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ucBssIndex = wlanGetBssIdx(wdev->netdev);
 	ASSERT(prGlueInfo);
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	DBGLOG(REQ, INFO,
 	       "vendor command: data_len=%d, data=0x%x 0x%x, roaming policy=%d\r\n",
@@ -2194,7 +1690,7 @@ int mtk_cfg80211_vendor_set_roaming_policy(
 
 	rStatus = kalIoctlByBssIdx(prGlueInfo,
 			   wlanoidSetDrvRoamingPolicy,
-			   &setRoaming, sizeof(uint32_t),
+			   &setRoaming, sizeof(uint32_t), FALSE, FALSE, TRUE,
 			   &u4BufLen,
 			   ucBssIndex);
 
@@ -2265,9 +1761,15 @@ int mtk_cfg80211_vendor_set_rssi_monitoring(
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ASSERT(prGlueInfo);
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidRssiMonitor,
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
+	rStatus = kalIoctl(prGlueInfo,
+			   wlanoidRssiMonitor,
 			   &rRSSIMonitor, sizeof(struct PARAM_RSSI_MONITOR_T),
-			   &u4BufLen);
+			   FALSE, FALSE, TRUE, &u4BufLen);
 	return rStatus;
 
 nla_put_failure:
@@ -2278,24 +1780,26 @@ int mtk_cfg80211_vendor_packet_keep_alive_start(
 	struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int data_len)
 {
+	uint32_t rStatus = WLAN_STATUS_SUCCESS;
+	unsigned short u2IpPktLen = 0;
+	uint32_t u4BufLen = 0;
 	struct GLUE_INFO *prGlueInfo = NULL;
+
+	int32_t i4Status = -EINVAL;
 	struct PARAM_PACKET_KEEPALIVE_T *prPkt = NULL;
 	struct nlattr *attr[MKEEP_ALIVE_ATTRIBUTE_MAX];
-	uint32_t rStatus = WLAN_STATUS_SUCCESS;
-	uint16_t u2IpPktLen = 0;
-	uint32_t u4BufLen = 0;
-	uint8_t ucBssIndex = 0, ucIdx = 0;
-	int32_t i4Status = -EINVAL;
+	uint32_t i = 0;
 
 	ASSERT(wiphy);
 	ASSERT(wdev);
 	if ((data == NULL) || !data_len)
 		goto nla_put_failure;
 
-	ucBssIndex = wlanGetBssIdx(wdev->netdev);
-	DBGLOG(REQ, TRACE, "vendor command: data_len=%d\r\n", data_len);
-	prPkt = (struct PARAM_PACKET_KEEPALIVE_T *) kalMemAlloc(
-		sizeof(struct PARAM_PACKET_KEEPALIVE_T), VIR_MEM_TYPE);
+	DBGLOG(REQ, TRACE, "vendor command: data_len=%d\r\n",
+	       data_len);
+	prPkt = (struct PARAM_PACKET_KEEPALIVE_T *)
+		kalMemAlloc(sizeof(struct PARAM_PACKET_KEEPALIVE_T),
+			    VIR_MEM_TYPE);
 	if (!prPkt) {
 		DBGLOG(REQ, ERROR,
 		       "Can not alloc memory for struct PARAM_PACKET_KEEPALIVE_T\n");
@@ -2305,7 +1809,6 @@ int mtk_cfg80211_vendor_packet_keep_alive_start(
 	kalMemZero(attr, sizeof(struct nlattr *) * (MKEEP_ALIVE_ATTRIBUTE_MAX));
 
 	prPkt->enable = TRUE; /*start packet keep alive*/
-	prPkt->reserved[0] = ucBssIndex;
 	if (NLA_PARSE_NESTED(attr,
 			     MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC,
 			     (struct nlattr *)(data - NLA_HDRLEN),
@@ -2315,67 +1818,74 @@ int mtk_cfg80211_vendor_packet_keep_alive_start(
 		goto nla_put_failure;
 	}
 
-	for (ucIdx = MKEEP_ALIVE_ATTRIBUTE_ID;
-	     ucIdx <= MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC; ucIdx++) {
-		if (attr[ucIdx]) {
-			switch (ucIdx) {
+	for (i = MKEEP_ALIVE_ATTRIBUTE_ID;
+	     i <= MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC; i++) {
+		if (attr[i]) {
+			switch (i) {
 			case MKEEP_ALIVE_ATTRIBUTE_ID:
-				prPkt->index = nla_get_u8(attr[ucIdx]);
+				prPkt->index = nla_get_u8(attr[i]);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_IP_PKT_LEN:
-				prPkt->u2IpPktLen = nla_get_u16(attr[ucIdx]);
+				prPkt->u2IpPktLen = nla_get_u16(attr[i]);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_IP_PKT:
 				u2IpPktLen = prPkt->u2IpPktLen <= 256
 					? prPkt->u2IpPktLen : 256;
-				kalMemCopy(prPkt->pIpPkt, nla_data(attr[ucIdx]),
+				kalMemCopy(prPkt->pIpPkt, nla_data(attr[i]),
 					u2IpPktLen);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_SRC_MAC_ADDR:
 				kalMemCopy(prPkt->ucSrcMacAddr,
-				   nla_data(attr[ucIdx]), sizeof(uint8_t) * 6);
+				   nla_data(attr[i]), sizeof(uint8_t) * 6);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_DST_MAC_ADDR:
 				kalMemCopy(prPkt->ucDstMacAddr,
-				   nla_data(attr[ucIdx]), sizeof(uint8_t) * 6);
+				   nla_data(attr[i]), sizeof(uint8_t) * 6);
 				break;
 			case MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC:
-				prPkt->u4PeriodMsec = nla_get_u32(attr[ucIdx]);
+				prPkt->u4PeriodMsec = nla_get_u32(attr[i]);
 				break;
 			}
 		}
 	}
 
 	DBGLOG(REQ, INFO,
-		"BssIdx=%d enable=%d, index=%d, u2IpPktLen=%d u4PeriodMsec=%d\n",
-		prPkt->reserved[0], prPkt->enable, prPkt->index,
-		prPkt->u2IpPktLen, prPkt->u4PeriodMsec);
+	       "enable=%d, index=%d, u2IpPktLen=%d u4PeriodMsec=%d\n",
+	       prPkt->enable, prPkt->index,
+	       prPkt->u2IpPktLen, prPkt->u4PeriodMsec);
 	DBGLOG(REQ, TRACE, "prPkt->pIpPkt=0x%02x%02x%02x%02x\n",
-		prPkt->pIpPkt[0], prPkt->pIpPkt[1],
-		prPkt->pIpPkt[2], prPkt->pIpPkt[3]);
+	       prPkt->pIpPkt[0], prPkt->pIpPkt[1],
+	       prPkt->pIpPkt[2], prPkt->pIpPkt[3]);
 	DBGLOG(REQ, TRACE, "%02x%02x%02x%02x, %02x%02x%02x%02x\n",
-		prPkt->pIpPkt[4], prPkt->pIpPkt[5],
-		prPkt->pIpPkt[6], prPkt->pIpPkt[7],
-		prPkt->pIpPkt[8], prPkt->pIpPkt[9],
-		prPkt->pIpPkt[10], prPkt->pIpPkt[11]);
+	       prPkt->pIpPkt[4], prPkt->pIpPkt[5],
+	       prPkt->pIpPkt[6], prPkt->pIpPkt[7],
+	       prPkt->pIpPkt[8], prPkt->pIpPkt[9],
+	       prPkt->pIpPkt[10], prPkt->pIpPkt[11]);
 	DBGLOG(REQ, TRACE, "%02x%02x%02x%02x\n",
-		prPkt->pIpPkt[12], prPkt->pIpPkt[13],
-		prPkt->pIpPkt[14], prPkt->pIpPkt[15]);
+	       prPkt->pIpPkt[12], prPkt->pIpPkt[13],
+	       prPkt->pIpPkt[14], prPkt->pIpPkt[15]);
 	DBGLOG(REQ, TRACE,
-		"prPkt->srcMAC=%02x:%02x:%02x:%02x:%02x:%02x\n",
-		prPkt->ucSrcMacAddr[0], prPkt->ucSrcMacAddr[1],
-		prPkt->ucSrcMacAddr[2], prPkt->ucSrcMacAddr[3],
-		prPkt->ucSrcMacAddr[4], prPkt->ucSrcMacAddr[5]);
+	       "prPkt->srcMAC=%02x:%02x:%02x:%02x:%02x:%02x\n",
+	       prPkt->ucSrcMacAddr[0], prPkt->ucSrcMacAddr[1],
+	       prPkt->ucSrcMacAddr[2], prPkt->ucSrcMacAddr[3],
+	       prPkt->ucSrcMacAddr[4], prPkt->ucSrcMacAddr[5]);
 	DBGLOG(REQ, TRACE, "dstMAC=%02x:%02x:%02x:%02x:%02x:%02x\n",
-		prPkt->ucDstMacAddr[0], prPkt->ucDstMacAddr[1],
-		prPkt->ucDstMacAddr[2], prPkt->ucDstMacAddr[3],
-		prPkt->ucDstMacAddr[4], prPkt->ucDstMacAddr[5]);
+	       prPkt->ucDstMacAddr[0], prPkt->ucDstMacAddr[1],
+	       prPkt->ucDstMacAddr[2], prPkt->ucDstMacAddr[3],
+	       prPkt->ucDstMacAddr[4], prPkt->ucDstMacAddr[5]);
+
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ASSERT(prGlueInfo);
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidPacketKeepAlive,
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
+	rStatus = kalIoctl(prGlueInfo,
+			   wlanoidPacketKeepAlive,
 			   prPkt, sizeof(struct PARAM_PACKET_KEEPALIVE_T),
-			   &u4BufLen);
+			   FALSE, FALSE, TRUE, &u4BufLen);
 	kalMemFree(prPkt, VIR_MEM_TYPE,
 		   sizeof(struct PARAM_PACKET_KEEPALIVE_T));
 	return rStatus;
@@ -2427,9 +1937,15 @@ int mtk_cfg80211_vendor_packet_keep_alive_stop(
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ASSERT(prGlueInfo);
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidPacketKeepAlive,
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
+	rStatus = kalIoctl(prGlueInfo,
+			   wlanoidPacketKeepAlive,
 			   prPkt, sizeof(struct PARAM_PACKET_KEEPALIVE_T),
-			   &u4BufLen);
+			   FALSE, FALSE, TRUE, &u4BufLen);
 	kalMemFree(prPkt, VIR_MEM_TYPE,
 		   sizeof(struct PARAM_PACKET_KEEPALIVE_T));
 	return rStatus;
@@ -2476,12 +1992,6 @@ int mtk_cfg80211_vendor_get_version(struct wiphy *wiphy,
 
 		WIPHY_PRIV(wiphy, prGlueInfo);
 		ASSERT(prGlueInfo);
-		if (!wlanIsDriverReady(prGlueInfo, WLAN_DRV_READY_CHECK_WLAN_ON
-			| WLAN_DRV_READY_CHECK_HIF_SUSPEND)) {
-			DBGLOG(REQ, WARN, "driver is not ready\n");
-			return -EFAULT;
-		}
-
 		prAdapter = prGlueInfo->prAdapter;
 		if (prAdapter) {
 			u2Len = kalStrLen(
@@ -2560,8 +2070,12 @@ int mtk_cfg80211_vendor_get_supported_feature_set(struct wiphy *wiphy,
 	ASSERT(wdev);
 
 	WIPHY_PRIV(wiphy, prGlueInfo);
-	if (!prGlueInfo)
+	ASSERT(prGlueInfo);
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
 		return -EFAULT;
+	}
 
 	u8FeatureSet = wlanGetSupportedFeatureSet(prGlueInfo);
 
@@ -2587,28 +2101,27 @@ nla_put_failure:
 }
 
 int mtk_cfg80211_vendor_event_rssi_beyond_range(
-	struct GLUE_INFO *prGlueInfo,
-	uint8_t ucBssIdx, int rssi)
+	struct wiphy *wiphy, struct wireless_dev *wdev, int rssi)
 {
-	struct wiphy *wiphy = wlanGetWiphy();
-	struct net_device *dev = wlanGetNetDev(prGlueInfo,
-			ucBssIdx);
 	struct sk_buff *skb;
 	struct PARAM_RSSI_MONITOR_EVENT rRSSIEvt;
 	struct BSS_INFO *prAisBssInfo;
+	struct GLUE_INFO *prGlueInfo = NULL;
+	struct ADAPTER *prAdapter;
+	uint8_t ucBssIndex = AIS_DEFAULT_INDEX;
 
 	ASSERT(wiphy);
-	ASSERT(dev->ieee80211_ptr);
+	ASSERT(wdev);
 
-	if (dev == NULL)
-		return -EINVAL;
+	WIPHY_PRIV(wiphy, prGlueInfo);
+	ASSERT(prGlueInfo);
 
 	DBGLOG(REQ, TRACE, "vendor command rssi=%d\r\n", rssi);
 	kalMemZero(&rRSSIEvt,
 		   sizeof(struct PARAM_RSSI_MONITOR_EVENT));
 
 #if KERNEL_VERSION(4, 4, 0) <= LINUX_VERSION_CODE
-	skb = cfg80211_vendor_event_alloc(wiphy, dev->ieee80211_ptr,
+	skb = cfg80211_vendor_event_alloc(wiphy, wdev,
 				  sizeof(struct PARAM_RSSI_MONITOR_EVENT),
 				  WIFI_EVENT_RSSI_MONITOR, GFP_KERNEL);
 #else
@@ -2622,8 +2135,8 @@ int mtk_cfg80211_vendor_event_rssi_beyond_range(
 		return -ENOMEM;
 	}
 
-	prAisBssInfo = aisGetDefaultLinkBssInfo(prGlueInfo->prAdapter);
-
+	prAdapter = prGlueInfo->prAdapter;
+	prAisBssInfo = aisGetAisBssInfo(prAdapter, ucBssIndex);
 	kalMemCopy(rRSSIEvt.BSSID, prAisBssInfo->aucBSSID,
 		   sizeof(uint8_t) * MAC_ADDR_LEN);
 
@@ -2679,6 +2192,11 @@ int mtk_cfg80211_vendor_set_tx_power_scenario(struct wiphy *wiphy,
 	if (!prGlueInfo)
 		return -EFAULT;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	attr = (struct nlattr *)data;
 	if (attr->nla_type == WIFI_ATTRIBUTE_TX_POWER_SCENARIO)
 		u4Scenario = nla_get_u32(attr);
@@ -2707,8 +2225,13 @@ int mtk_cfg80211_vendor_set_tx_power_scenario(struct wiphy *wiphy,
 	       UINT_MAX,
 	       wdev->iftype);
 
-	rStatus = kalIoctl(prGlueInfo, wlanoidTxPowerControl,
-		 (void *)&rPwrCtrlParam, sizeof(struct PARAM_TX_PWR_CTRL_IOCTL),
+	rStatus = kalIoctl(prGlueInfo,
+		 wlanoidTxPowerControl,
+		 (void *)&rPwrCtrlParam,
+		 sizeof(struct PARAM_TX_PWR_CTRL_IOCTL),
+		 FALSE,
+		 FALSE,
+		 TRUE,
 		 &u4SetInfoLen);
 
 	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy, sizeof(rStatus));
@@ -2730,7 +2253,7 @@ int mtk_cfg80211_vendor_set_tx_power_scenario(struct wiphy *wiphy,
 errHandleLabel:
 	kfree_skb(skb);
 #endif
-	return -EOPNOTSUPP;
+	return -EFAULT;
 }
 
 int mtk_cfg80211_vendor_set_multista_primary_connection(struct wiphy *wiphy,
@@ -2747,9 +2270,14 @@ int mtk_cfg80211_vendor_set_multista_primary_connection(struct wiphy *wiphy,
 	if ((data == NULL) || (data_len == 0))
 		return -EINVAL;
 
-	WIPHY_PRIV(wlanGetWiphy(), prGlueInfo);
+	WIPHY_PRIV(wiphy, prGlueInfo);
 	if (!prGlueInfo)
 		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	prAttr = (struct nlattr *)data;
 	if (prAttr->nla_type == MULTISTA_ATTRIBUTE_PRIMARY_IFACE)
@@ -2775,8 +2303,14 @@ int mtk_cfg80211_vendor_set_multista_primary_connection(struct wiphy *wiphy,
 	}
 
 #if 0
-	u4Status = kalIoctl(prGlueInfo, wlanoidSetMultiStaPrimaryInterface,
-			&u4AisIndex, sizeof(uint32_t), &u4BufLen);
+	u4Status = kalIoctl(prGlueInfo,
+			wlanoidSetMultiStaPrimaryInterface,
+			&u4AisIndex,
+			sizeof(uint32_t),
+			FALSE,
+			FALSE,
+			FALSE,
+			&u4BufLen);
 #endif
 
 	return u4Status;
@@ -2797,9 +2331,14 @@ int mtk_cfg80211_vendor_set_multista_use_case(
 	if ((data == NULL) || (data_len == 0))
 		return -EINVAL;
 
-	WIPHY_PRIV(wlanGetWiphy(), prGlueInfo);
+	WIPHY_PRIV(wiphy, prGlueInfo);
 	if (!prGlueInfo)
 		return -EFAULT;
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
 
 	prAttr = (struct nlattr *)data;
 	if (prAttr->nla_type == MULTISTA_ATTRIBUTE_USE_CASE)
@@ -2812,8 +2351,14 @@ int mtk_cfg80211_vendor_set_multista_use_case(
 	DBGLOG(REQ, INFO, "Multiple station use case=%d\n", u4UseCase);
 
 #if 0
-	u4Status = kalIoctl(prGlueInfo, wlanoidSetMultiStaUseCase,
-		&u4UseCase, sizeof(uint32_t), &u4BufLen);
+	u4Status = kalIoctl(prGlueInfo,
+		wlanoidSetMultiStaUseCase,
+		&u4UseCase,
+		sizeof(uint32_t),
+		FALSE,
+		FALSE,
+		FALSE,
+		&u4BufLen);
 #endif
 
 	return u4Status;
@@ -2843,12 +2388,21 @@ int mtk_cfg80211_vendor_get_preferred_freq_list(struct wiphy
 	if (!prGlueInfo)
 		return -EFAULT;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	if (NLA_PARSE(tb, WIFI_VENDOR_ATTR_PREFERRED_FREQ_LIST_MAX,
 			data, data_len, nla_get_preferred_freq_list_policy)) {
 		DBGLOG(REQ, ERROR, "Invalid ATTR.\n");
 		return -EINVAL;
 	}
 
+	if (!tb[WIFI_VENDOR_ATTR_PREFERRED_FREQ_LIST_IFACE_TYPE]) {
+		DBGLOG(REQ, ERROR, "Invalid type.\n");
+		return -EINVAL;
+	}
 	type = nla_get_u32(tb[WIFI_VENDOR_ATTR_PREFERRED_FREQ_LIST_IFACE_TYPE]);
 
 	DBGLOG(REQ, INFO, "type: %d\n", type);
@@ -2945,6 +2499,11 @@ int mtk_cfg80211_vendor_acs(struct wiphy *wiphy,
 		DBGLOG(REQ, ERROR, "get glue structure fail.\n");
 		rStatus = -EFAULT;
 		goto exit;
+	}
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
 	}
 
 	if (mtk_Netdev_To_RoleIdx(prGlueInfo, wdev->netdev, &role_idx) < 0) {
@@ -3192,7 +2751,17 @@ int mtk_cfg80211_vendor_get_apf_capabilities(struct wiphy *wiphy,
 
 	if (!prGlueInfo) {
 		DBGLOG(REQ, ERROR, "get glue structure fail.\n");
-		return -EFAULT;
+		goto nla_put_failure;
+	}
+
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		goto nla_put_failure;
+	}
+
+	if (!prGlueInfo->prAdapter) {
+		DBGLOG(REQ, ERROR, "prAdapter is NULL.\n");
+		goto nla_put_failure;
 	}
 
 	if (prGlueInfo->prAdapter->rWifiVar.ucApfEnable == 0)
@@ -3245,6 +2814,11 @@ int mtk_cfg80211_vendor_set_packet_filter(struct wiphy *wiphy,
 		return -EFAULT;
 	}
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	attr = (struct nlattr *)data;
 
 	if (nla_type(attr) != APF_ATTRIBUTE_PROGRAM) {
@@ -3285,8 +2859,10 @@ int mtk_cfg80211_vendor_set_packet_filter(struct wiphy *wiphy,
 				u4ProgLen, u4SentLen,
 				ucFragNum, ucFragSeq);
 
-		rStatus = kalIoctl(prGlueInfo, wlanoidSetOffloadInfo, &rInfo,
-				sizeof(struct PARAM_OFLD_INFO), &u4SetInfoLen);
+		rStatus = kalIoctl(prGlueInfo,
+				wlanoidSetOffloadInfo, &rInfo,
+				sizeof(struct PARAM_OFLD_INFO),
+				FALSE, FALSE, TRUE, &u4SetInfoLen);
 
 		if (rStatus != WLAN_STATUS_SUCCESS) {
 			DBGLOG(REQ, ERROR, "APF install fail:0x%x\n", rStatus);
@@ -3310,7 +2886,7 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 	uint32_t u4SetInfoLen = 0;
 	struct sk_buff *skb = NULL;
 
-	uint8_t *prProg = NULL;
+	uint8_t prProg[APF_MAX_PROGRAM_LEN];
 	uint32_t u4ProgLen = 0, u4RecvLen = 0, u4BufLen = 0;
 	uint8_t ucFragNum = 0, ucCurrSeq = 0;
 
@@ -3324,23 +2900,12 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 		return -EFAULT;
 	}
 
-	prProg = kalMemAlloc(APF_MAX_PROGRAM_LEN, VIR_MEM_TYPE);
-
-	if (prProg == NULL) {
-		DBGLOG(REQ, ERROR, "Can not allocate memory.\n");
-		 goto query_apf_failure;
-	}
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-		APF_MAX_PROGRAM_LEN);
-
-	if (skb == NULL) {
-		DBGLOG(REQ, ERROR, "Allocate skb failed\n");
-		goto query_apf_failure;
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
 	}
 
 	kalMemZero(&rInfo, sizeof(struct PARAM_OFLD_INFO));
-	kalMemZero(prProg, APF_MAX_PROGRAM_LEN);
 
 	/* Init OFLD description */
 	rInfo.ucType = PKT_OFLD_TYPE_APF;
@@ -3348,8 +2913,10 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 	rInfo.u4BufLen = PKT_OFLD_BUF_SIZE;
 
 	do {
-		rStatus = kalIoctl(prGlueInfo, wlanoidQueryOffloadInfo, &rInfo,
-				sizeof(struct PARAM_OFLD_INFO), &u4SetInfoLen);
+		rStatus = kalIoctl(prGlueInfo,
+				wlanoidQueryOffloadInfo, &rInfo,
+				sizeof(struct PARAM_OFLD_INFO),
+				TRUE, TRUE, TRUE, &u4SetInfoLen);
 
 		if (rStatus != WLAN_STATUS_SUCCESS) {
 			DBGLOG(REQ, ERROR, "APF query fail:0x%x\n", rStatus);
@@ -3362,7 +2929,13 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 			if (u4ProgLen == 0) {
 				DBGLOG(REQ, ERROR,
 					"Failed to query APF from firmware.\n");
-				 goto query_apf_failure;
+				return -EFAULT;
+			}
+			skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
+				u4ProgLen);
+			if (!skb) {
+				DBGLOG(REQ, ERROR, "Allocate skb failed\n");
+				return -ENOMEM;
 			}
 		} else if (rInfo.ucFragSeq <= ucCurrSeq) {
 			DBGLOG(REQ, ERROR, "Wrong frag seq (%d, %d)\n",
@@ -3380,7 +2953,7 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 					rInfo.u4BufLen);
 
 		u4RecvLen = u4BufLen;
-		DBGLOG(REQ, INFO, "Get APF size(%d, %d) frag(%d, %d).\n",
+		DBGLOG(REQ, TRACE, "Get APF size(%d, %d) frag(%d, %d).\n",
 					u4ProgLen, u4RecvLen,
 					ucFragNum, ucCurrSeq);
 		rInfo.ucFragSeq++;
@@ -3390,18 +2963,11 @@ int mtk_cfg80211_vendor_read_packet_filter(struct wiphy *wiphy,
 				u4ProgLen, prProg) < 0))
 		goto query_apf_failure;
 
-	if (prProg != NULL)
-		kalMemFree(prProg, VIR_MEM_TYPE, APF_MAX_PROGRAM_LEN);
-
 	return cfg80211_vendor_cmd_reply(skb);
 
 query_apf_failure:
 	if (skb != NULL)
 		kfree_skb(skb);
-
-	if (prProg != NULL)
-		kalMemFree(prProg, VIR_MEM_TYPE, APF_MAX_PROGRAM_LEN);
-
 	return -EFAULT;
 }
 #endif /* CFG_SUPPORT_APF */
@@ -3409,7 +2975,7 @@ query_apf_failure:
 int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 	struct wireless_dev *wdev, const void *data, int data_len)
 {
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 	struct LINK_QUALITY_INFO_OUTPUT_DATA {
 		uint16_t u2Tag01; /* cur tx rate */
 		uint16_t u2Len01;
@@ -3482,16 +3048,16 @@ int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 	struct NETDEV_PRIVATE_GLUE_INFO *prNetDevPrivate;
 	struct WIFI_LINK_QUALITY_INFO rLinkQualityInfo;
 	struct GLUE_INFO *prGlueInfo;
-	uint32_t u4BufLen;
 #endif
 	struct sk_buff *skb = NULL;
 	uint32_t *puBuffer = NULL;
 	int32_t i4Status = -EINVAL;
+	uint32_t u4BufLen;
 	uint16_t u2CopySize = 0;
 
 	ASSERT(wiphy);
 	ASSERT(wdev);
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 	prNetDevPrivate =
 		(struct NETDEV_PRIVATE_GLUE_INFO *) netdev_priv(wdev->netdev);
 	if (!prNetDevPrivate) {
@@ -3501,8 +3067,15 @@ int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 	rParam.ucBssIdx = 0; /* prNetDevPrivate->ucBssIdx; */
 	rParam.prLinkQualityInfo = &rLinkQualityInfo;
 	WIPHY_PRIV(wiphy, prGlueInfo);
-	i4Status = kalIoctl(prGlueInfo, wlanoidGetLinkQualityInfo, &rParam,
-			sizeof(struct PARAM_GET_LINK_QUALITY_INFO), &u4BufLen);
+
+	if (!prGlueInfo || prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
+	i4Status = kalIoctl(prGlueInfo, wlanoidGetLinkQualityInfo,
+		 &rParam, sizeof(struct PARAM_GET_LINK_QUALITY_INFO),
+		 TRUE, FALSE, FALSE, &u4BufLen);
 	if (i4Status != WLAN_STATUS_SUCCESS) {
 		DBGLOG(REQ, ERROR, "wlanoidGetLinkQualityInfo error\n");
 		goto err_handle_label;
@@ -3585,6 +3158,11 @@ int mtk_cfg80211_vendor_get_trx_stats(struct wiphy *wiphy,
 	if (!prGlueInfo)
 		return i4Status;
 
+	if (prGlueInfo->u4ReadyFlag == 0) {
+		DBGLOG(REQ, WARN, "driver is not ready\n");
+		return -EFAULT;
+	}
+
 	if (!prGlueInfo->prAdapter)
 		return -EFAULT;
 
@@ -3664,115 +3242,14 @@ int mtk_cfg80211_vendor_trigger_reset(
 	}
 	DBGLOG(REQ, INFO, "Framework trigger reset\n");
 
-	GL_DEFAULT_RESET_TRIGGER(prGlueInfo->prAdapter, RST_FWK_TRIGGER);
+	glSetRstReason(RST_FWK_TRIGGER);
+#if (CFG_SUPPORT_CONNINFRA == 0)
+	GL_RESET_TRIGGER(prGlueInfo->prAdapter, RST_FLAG_CHIP_RESET);
+#else
+	GL_RESET_TRIGGER(prGlueInfo->prAdapter, RST_FLAG_WF_RESET);
+#endif
 
 	return 0;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief This routine is to handle a reset CMD from FWK.
- *
- * \param[in] wiphy wiphy
- * \param[in] wdev wireless_dev
- * \param[in] data (not used here)
- * \param[in] data_len (not used here)
- *
- * \retval 0 Success.
- */
-/*----------------------------------------------------------------------------*/
-int mtk_cfg80211_vendor_comb_matrix(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len)
-{
-	struct GLUE_INFO *prGlueInfo = wlanGetGlueInfo();
-	struct sk_buff *skb = NULL;
-	struct ANDROID_T_COMB_MATRIX *pr_comb_matrix;
-
-	pr_comb_matrix = (struct ANDROID_T_COMB_MATRIX *)
-		kalMemAlloc(sizeof(struct ANDROID_T_COMB_MATRIX),
-		VIR_MEM_TYPE);
-
-	if (!pr_comb_matrix) {
-		DBGLOG(REQ, ERROR,
-			"Can not alloc memory for stats info\n");
-		return -ENOMEM;
-	}
-	kalMemZero(pr_comb_matrix,
-		   sizeof(struct ANDROID_T_COMB_MATRIX));
-	DBGLOG(REQ, WARN, "mtk_cfg80211_vendor_comb_matrix\n");
-
-	if (!prGlueInfo) {
-		DBGLOG(REQ, WARN, "Invalid glue info\n");
-		return -EFAULT;
-	}
-
-	pr_comb_matrix->comb_mtx[0].band_0 = 2;
-	pr_comb_matrix->comb_mtx[0].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[1].band_0 = 5;
-	pr_comb_matrix->comb_mtx[1].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-#if (CFG_SUPPORT_WIFI_6G == 1)
-	pr_comb_matrix->comb_mtx[2].band_0 = 6;
-	pr_comb_matrix->comb_mtx[2].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-#endif
-	pr_comb_matrix->comb_mtx[3].band_0 = 2;
-	pr_comb_matrix->comb_mtx[3].band_1 = 5;
-#if (CFG_SUPPORT_WIFI_6G == 1)
-	pr_comb_matrix->comb_mtx[4].band_0 = 2;
-	pr_comb_matrix->comb_mtx[4].band_1 = 6;
-	pr_comb_matrix->comb_mtx[5].band_0 = 5;
-	pr_comb_matrix->comb_mtx[5].band_1 = 6;
-#endif
-#if (CFG_SUPPORT_DBDC_DOWNGRADE_NSS == 1)
-	pr_comb_matrix->comb_mtx[3].ant_0 = 1;
-	pr_comb_matrix->comb_mtx[3].ant_1 = 1;
-	pr_comb_matrix->comb_mtx[4].ant_0 = 1;
-	pr_comb_matrix->comb_mtx[4].ant_1 = 1;
-	pr_comb_matrix->comb_mtx[5].ant_0 = 1;
-	pr_comb_matrix->comb_mtx[5].ant_1 = 1;
-#else
-	pr_comb_matrix->comb_mtx[3].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[3].ant_1 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[4].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[4].ant_1 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[5].ant_0 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-	pr_comb_matrix->comb_mtx[5].ant_1 =
-		prGlueInfo->prAdapter->rWifiVar.ucNSS;
-#endif
-
-	skb = cfg80211_vendor_cmd_alloc_reply_skb(wiphy,
-		sizeof(struct ANDROID_T_COMB_MATRIX));
-	if (!skb) {
-		DBGLOG(REQ, ERROR, "Allocate skb failed\n");
-		return -ENOMEM;
-	}
-	DBGLOG(REQ, ERROR, "sizeof(comb_matrix):%d\n,",
-		sizeof(struct ANDROID_T_COMB_MATRIX));
-
-
-	if (unlikely(nla_put(skb,
-		WIFI_ATTRIBUTE_RADIO_COMBINATIONS_MATRIX_MATRIX,
-		sizeof(struct ANDROID_T_COMB_MATRIX),
-		pr_comb_matrix) < 0)) {
-		kalMemFree(pr_comb_matrix,
-			sizeof(struct ANDROID_T_COMB_MATRIX),
-			VIR_MEM_TYPE);
-		goto nla_put_failure;
-	}
-
-	return cfg80211_vendor_cmd_reply(skb);
-
-nla_put_failure:
-	kfree_skb(skb);
-	return -EINVAL;
 }
 
 /*----------------------------------------------------------------------------*/
@@ -3822,233 +3299,3 @@ nla_put_failure:
 	kfree_skb(skb);
 	return -ENOMEM;
 }
-
-#if CFG_SUPPORT_CSI
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief This routine is to set CSI CMD from FWK.
- *
- * \param[in] wiphy wiphy
- * \param[in] wdev wireless_dev
- * \param[in] data
- * \param[in] data_len
- *
- * \retval 0 Success.
- */
-/*----------------------------------------------------------------------------*/
-int mtk_cfg80211_vendor_csi_control(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len)
-{
-	struct GLUE_INFO *prGlueInfo;
-	struct nlattr *tb[WIFI_ATTRIBUTE_CSI_MAX + 1] = {};
-	uint32_t rStatus;
-	uint32_t u4BufLen;
-	int32_t i4Status = 0;
-	struct CMD_CSI_CONTROL_T *prCSICtrl = NULL;
-	struct CSI_INFO_T *prCSIInfo = NULL;
-	struct BSS_INFO *prAisBssInfo;
-
-	if (!wiphy || !wdev || data == NULL || data_len == 0)
-		return -EINVAL;
-
-	prGlueInfo = wlanGetGlueInfo();
-	if (!prGlueInfo)
-		return -EFAULT;
-
-	DBGLOG(REQ, INFO,
-	       "[CSI] vendor command: data_len=%d, iftype=%d\n", data_len,
-	       wdev->iftype);
-
-	prCSIInfo = glCsiGetCSIInfo();
-	prCSICtrl = (struct CMD_CSI_CONTROL_T *) kalMemAlloc(
-			sizeof(struct CMD_CSI_CONTROL_T), VIR_MEM_TYPE);
-	if (!prCSICtrl) {
-		DBGLOG(REQ, LOUD,
-			"[CSI] allocate memory for prCSICtrl failed\n");
-		i4Status = -ENOMEM;
-		goto out;
-	}
-
-	kalMemZero(tb, sizeof(struct nlattr *) *
-			   (WIFI_ATTRIBUTE_CSI_MAX + 1));
-
-	if (NLA_PARSE(tb, WIFI_ATTRIBUTE_CSI_MAX, (struct nlattr *)data,
-			data_len, nla_get_csi_policy)) {
-		DBGLOG(REQ, ERROR, "[CSI] parse csi attr fail.\n");
-		i4Status = -EINVAL;
-		goto out;
-	}
-
-	if (!tb[WIFI_ATTRIBUTE_CSI_CONTROL_MODE]) {
-		DBGLOG(REQ, LOUD, "[CSI] parse csi mode error.\n");
-		i4Status = -EINVAL;
-		goto out;
-	}
-	prCSICtrl->ucMode = nla_get_u8(tb[WIFI_ATTRIBUTE_CSI_CONTROL_MODE]);
-	if (prCSICtrl->ucMode >= CSI_CONTROL_MODE_NUM) {
-		DBGLOG(REQ, ERROR, "[CSI] Invalid csi mode %d\n",
-			prCSICtrl->ucMode);
-		i4Status = -EINVAL;
-		goto out;
-	}
-	prCSIInfo->ucMode = prCSICtrl->ucMode;
-
-	prAisBssInfo = aisGetAisBssInfo(
-			prGlueInfo->prAdapter, wlanGetBssIdx(wdev->netdev));
-	if (prAisBssInfo->eBand == BAND_5G
-#if (CFG_SUPPORT_WIFI_6G == 1)
-			|| prAisBssInfo->eBand == BAND_6G
-#endif
-		)
-		prCSICtrl->ucBandIdx = ENUM_BAND_1;
-	else
-		prCSICtrl->ucBandIdx = ENUM_BAND_0;
-
-	if (prCSICtrl->ucMode == CSI_CONTROL_MODE_STOP ||
-		prCSICtrl->ucMode == CSI_CONTROL_MODE_START) {
-		prCSIInfo->bIncomplete = FALSE;
-		prCSIInfo->u4CopiedDataSize = 0;
-		prCSIInfo->u4RemainingDataSize = 0;
-		prCSIInfo->u4CSIBufferHead = 0;
-		prCSIInfo->u4CSIBufferTail = 0;
-		prCSIInfo->u4CSIBufferUsed = 0;
-		goto send_cmd;
-	}
-
-	if (!tb[WIFI_ATTRIBUTE_CSI_CONFIG_ITEM]) {
-		DBGLOG(REQ, LOUD, "[CSI] parse cfg item error.\n");
-		i4Status = -EINVAL;
-		goto out;
-	}
-	prCSICtrl->ucCfgItem = nla_get_u8(tb[WIFI_ATTRIBUTE_CSI_CONFIG_ITEM]);
-
-	if (prCSICtrl->ucCfgItem >= CSI_CONFIG_ITEM_NUM) {
-		DBGLOG(REQ, ERROR, "[CSI] Invalid csi cfg_item %u\n",
-			prCSICtrl->ucCfgItem);
-		i4Status = -EINVAL;
-		goto out;
-	}
-
-	if (!tb[WIFI_ATTRIBUTE_CSI_VALUE_1]) {
-		DBGLOG(REQ, LOUD, "[CSI] parse csi cfg value1 error.\n");
-		i4Status = -EINVAL;
-		goto out;
-	}
-	prCSICtrl->ucValue1 = nla_get_u8(tb[WIFI_ATTRIBUTE_CSI_VALUE_1]);
-	prCSIInfo->ucValue1[prCSICtrl->ucCfgItem] = prCSICtrl->ucValue1;
-
-	if (prCSICtrl->ucCfgItem == CSI_CONFIG_OUTPUT_METHOD) {
-		if (prCSICtrl->ucValue1 == CSI_PROC_FILE_COMMAND) {
-			prCSIInfo->eCSIOutput = CSI_OUTPUT_PROC_FILE;
-			DBGLOG(REQ, INFO,
-				"[CSI] Set CSI data output to proc file\n");
-		} else if (prCSICtrl->ucValue1 == CSI_VENDOR_EVENT_COMMAND) {
-			prCSIInfo->eCSIOutput = CSI_OUTPUT_VENDOR_EVENT;
-			DBGLOG(REQ, INFO,
-				"[CSI] Set CSI data output to vendor event\n");
-		} else
-			DBGLOG(REQ, ERROR,
-				"[CSI] Invalid csi output method %d\n",
-				prCSICtrl->ucValue1);
-	}
-
-	if (tb[WIFI_ATTRIBUTE_CSI_VALUE_2]) {
-		prCSICtrl->u4Value2 =
-			nla_get_u32(tb[WIFI_ATTRIBUTE_CSI_VALUE_2]);
-		prCSIInfo->u4Value2[prCSICtrl->ucCfgItem] = prCSICtrl->u4Value2;
-	}
-
-send_cmd:
-	DBGLOG(REQ, STATE,
-	   "[CSI] Set band idx %d, mode %d, csi cfg item %d, value1 %d, value2 %d",
-		prCSICtrl->ucBandIdx,
-		prCSICtrl->ucMode, prCSICtrl->ucCfgItem,
-		prCSICtrl->ucValue1, prCSICtrl->u4Value2);
-
-	rStatus = kalIoctl(prGlueInfo, wlanoidSetCSIControl, prCSICtrl,
-				sizeof(struct CMD_CSI_CONTROL_T), &u4BufLen);
-
-	if (rStatus != WLAN_STATUS_SUCCESS) {
-		DBGLOG(REQ, ERROR,
-			"[CSI] send CSI control cmd failed, rStatus %u\n",
-			rStatus);
-		i4Status = -EFAULT;
-	}
-
-out:
-	if (prCSICtrl)
-		kalMemFree(prCSICtrl, VIR_MEM_TYPE,
-				sizeof(struct CMD_CSI_CONTROL_T));
-	return i4Status;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief This routine is to send FWK a event of CSI raw data.
- *
- * \retval 0 Success.
- */
-/*----------------------------------------------------------------------------*/
-int mtk_cfg80211_vendor_event_csi_raw_data(
-	struct ADAPTER *prAdapter)
-{
-	struct wiphy *wiphy = gprWdev[0]->wiphy;
-	struct wireless_dev *wdev = gprWdev[0];
-	struct CSI_INFO_T *prCSIInfo = NULL;
-	struct CSI_DATA_T rTempCSIData;
-	struct sk_buff *skb = NULL;
-	uint8_t *temp;
-	int32_t i4Pos = 0;
-	u_int8_t bStatus;
-
-	if (!wiphy || !wdev || !wdev->netdev) {
-		DBGLOG(REQ, ERROR,
-			"[CSI] %s wrong input parameters\n", __func__);
-		return -EINVAL;
-	}
-
-	prCSIInfo = glCsiGetCSIInfo();
-	temp = glCsiGetCSIBuf();
-
-	bStatus = wlanPopCSIData(prAdapter, &rTempCSIData);
-	if (!bStatus)
-		return 0;
-	i4Pos = wlanCSIDataPrepare(temp,  prCSIInfo, &rTempCSIData);
-
-	skb = cfg80211_vendor_event_alloc(wiphy,
-#if KERNEL_VERSION(4, 4, 0) <= CFG80211_VERSION_CODE
-			wdev,
-#endif
-			i4Pos,
-			WIFI_EVENT_SUBCMD_CSI,
-			GFP_KERNEL);
-	if (!skb) {
-		DBGLOG(REQ, ERROR, "[CSI] %s allocate skb failed\n", __func__);
-		goto err_handle;
-	}
-
-	if (unlikely(nla_put(skb, MTK_WLAN_VENDOR_ATTR_CSI,
-				i4Pos, temp) < 0)) {
-		DBGLOG(REQ, ERROR, "[CSI] nla_put failure: len=%u, ptr=%p\n",
-		       i4Pos, temp);
-		goto err_handle;
-	}
-
-#if CFG_CSI_DEBUG
-	DBGLOG(REQ, INFO,
-		"[CSI] copy size = %d, [used|head idx|tail idx] = [%d|%d|%d]\n",
-		i4Pos, prCSIInfo->u4CSIBufferUsed,
-		prCSIInfo->u4CSIBufferHead, prCSIInfo->u4CSIBufferTail);
-#endif
-
-	cfg80211_vendor_event(skb, GFP_KERNEL);
-	return 0;
-
-err_handle:
-	if (skb)
-		kfree_skb(skb);
-
-	return -ENOMEM;
-}
-#endif

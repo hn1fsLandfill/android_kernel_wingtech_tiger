@@ -206,11 +206,6 @@ struct GL_P2P_INFO {
 	uint16_t u2VenderIELen;
 #endif
 
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	uint8_t aucMlIE[MAX_LEN_OF_MLIE];
-	uint16_t u2MlIELen;
-#endif
-
 	/*UINT_8 ucOperatingChnl;*//* TH3 multiple P2P */
 	/*UINT_8 ucInvitationType;*//* TH3 multiple P2P */
 
@@ -242,8 +237,6 @@ struct GL_P2P_INFO {
 
 	/* indicate caller thread for stop ap complete */
 	struct completion rStopApComp;
-	struct completion rWaitRocComp;
-	uint8_t fgDelIface;
 
 	enum ENUM_CHNL_SWITCH_POLICY eChnlSwitchPolicy;
 	u_int8_t fgChannelSwitchReq;
@@ -252,7 +245,6 @@ struct GL_P2P_INFO {
 struct GL_P2P_DEV_INFO {
 #if CFG_ENABLE_WIFI_DIRECT_CFG_80211
 	struct cfg80211_scan_request *prScanRequest;
-	uint8_t fgScanSpecificSSID;
 #if 0
 	struct cfg80211_scan_request rBackupScanRequest;
 #endif
@@ -365,9 +357,7 @@ u_int8_t p2pLaunch(struct GLUE_INFO *prGlueInfo);
 
 u_int8_t p2pRemove(struct GLUE_INFO *prGlueInfo);
 
-void p2pSetMode(uint8_t ucAPMode);
-
-uint8_t p2pGetMode(void);
+void p2pSetMode(IN uint8_t ucAPMode);
 
 u_int8_t glRegisterP2P(struct GLUE_INFO *prGlueInfo,
 		const char *prDevName,
@@ -378,8 +368,7 @@ int glSetupP2P(struct GLUE_INFO *prGlueInfo,
 		struct wireless_dev *prP2pWdev,
 		struct net_device *prP2pDev,
 		uint8_t u4Idx,
-		u_int8_t fgIsApMode,
-		u_int8_t fgSkipRole);
+		u_int8_t fgIsApMode);
 
 u_int8_t glUnregisterP2P(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx);
 
@@ -390,7 +379,7 @@ u_int8_t p2pNetUnregister(struct GLUE_INFO *prGlueInfo,
 		u_int8_t fgIsRtnlLockAcquired);
 
 
-u_int8_t p2PAllocInfo(struct GLUE_INFO *prGlueInfo, uint8_t ucIdex);
+u_int8_t p2PAllocInfo(IN struct GLUE_INFO *prGlueInfo, IN uint8_t ucIdex);
 u_int8_t p2PFreeInfo(struct GLUE_INFO *prGlueInfo, uint8_t ucIdx);
 void p2pFreeMemSafe(struct GLUE_INFO *prGlueInfo,
 		void **pprMemInfo, uint32_t size);

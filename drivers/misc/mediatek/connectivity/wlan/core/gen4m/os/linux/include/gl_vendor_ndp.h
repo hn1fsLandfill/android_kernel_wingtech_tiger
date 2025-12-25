@@ -89,6 +89,7 @@ struct NdiIfaceDelete {
 
 extern struct NanDataPathInitiatorNDPE g_ndpReqNDPE;
 extern uint8_t g_aucNanServiceName[NAN_MAX_SERVICE_NAME_LEN];
+extern uint8_t g_aucNanServiceId[6];
 
 enum mtk_wlan_ndp_sub_cmd {
 	MTK_WLAN_VENDOR_ATTR_NDP_INVALID = 0,
@@ -221,6 +222,7 @@ enum mtk_wlan_vendor_attr_ndp_cfg_security {
 extern const struct nla_policy
 	mtk_wlan_vendor_ndp_policy[MTK_WLAN_VENDOR_ATTR_NDP_PARAMS_MAX + 1];
 
+
 /*******************************************************************************
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
@@ -255,14 +257,14 @@ uint32_t nanNdpResponderReqHandler(struct GLUE_INFO *prGlueInfo,
 
 uint32_t nanNdpEndReqHandler(struct GLUE_INFO *prGlueInfo, struct nlattr **tb);
 
-uint32_t nanNdpDataIndEvent(struct ADAPTER *prAdapter,
+uint32_t nanNdpDataIndEvent(IN struct ADAPTER *prAdapter,
 			    struct _NAN_NDP_INSTANCE_T *prNDP,
 			    struct _NAN_NDL_INSTANCE_T *prNDL);
 
-uint32_t nanNdpDataConfirmEvent(struct ADAPTER *prAdapter,
+uint32_t nanNdpDataConfirmEvent(IN struct ADAPTER *prAdapter,
 				struct _NAN_NDP_INSTANCE_T *prNDP);
 
-uint32_t nanNdpDataTerminationEvent(struct ADAPTER *prAdapter,
+uint32_t nanNdpDataTerminationEvent(IN struct ADAPTER *prAdapter,
 				    struct _NAN_NDP_INSTANCE_T *prNDP);
 
 int mtk_cfg80211_vendor_ndp(struct wiphy *wiphy, struct wireless_dev *wdev,

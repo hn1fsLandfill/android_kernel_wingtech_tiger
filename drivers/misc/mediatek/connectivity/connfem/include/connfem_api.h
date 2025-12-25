@@ -71,19 +71,9 @@ struct connfem_epaelna_laa_pin_info {
 	struct connfem_epaelna_laa_pin pin[CONNFEM_EPAELNA_LAA_PIN_COUNT];
 };
 
-struct connfem_epaelna_flags_common {
-	unsigned char rxmode;
-	unsigned char fe_ant_cnt;
-	unsigned char fe_main_bt_share_lp2g;
-	unsigned char fe_conn_spdt;
-	unsigned char fe_reserved;
-};
-
 struct connfem_epaelna_flags_wifi {
 	bool open_loop;
 	bool laa;
-	unsigned char epa_option;
-	bool only_2g;
 };
 
 struct connfem_epaelna_flags_bt {
@@ -95,18 +85,12 @@ struct connfem_epaelna_flags_bt {
 
 struct connfem_epaelna_flag_tbl_entry {
 	const char *name;
-	unsigned char *addr;
-};
-
-struct connfem_epaelna_flag_pair {
-	char name[CONNFEM_FLAG_NAME_SIZE]; /* zero-terminated */
-	unsigned char value;
+	bool *addr;
 };
 
 struct connfem_epaelna_subsys_cb {
 	void*(*flags_get)(void);
 	struct connfem_epaelna_flag_tbl_entry*(*flags_tbl_get)(void);
-	unsigned int (*flags_cnt)(void);
 };
 
 /*******************************************************************************
@@ -122,9 +106,6 @@ extern bool connfem_is_available(enum connfem_type fem_type);
 extern int connfem_epaelna_get_fem_info(
 			struct connfem_epaelna_fem_info *fem_info);
 
-extern int connfem_epaelna_get_bt_fem_info(
-			struct connfem_epaelna_fem_info *fem_info);
-
 extern int connfem_epaelna_get_pin_info(
 			struct connfem_epaelna_pin_info *pin_info);
 
@@ -132,5 +113,8 @@ extern int connfem_epaelna_laa_get_pin_info(
 			struct connfem_epaelna_laa_pin_info *laa_pin_info);
 
 extern int connfem_epaelna_get_flags(enum connfem_subsys subsys, void *flags);
+
+extern int connfem_epaelna_get_flags_names(enum connfem_subsys subsys,
+			unsigned int *num_flags, char ***names);
 
 #endif /* __CONNFEM_API_H__ */

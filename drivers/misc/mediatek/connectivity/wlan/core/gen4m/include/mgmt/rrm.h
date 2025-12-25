@@ -150,8 +150,8 @@ void rrmTxNeighborReportRequest(struct ADAPTER *prAdapter,
 				struct STA_RECORD *prStaRec,
 				struct SUB_ELEMENT_LIST *prSubIEs);
 
-void rrmGenerateRRMEnabledCapIE(struct ADAPTER *prAdapter,
-				struct MSDU_INFO *prMsduInfo);
+void rrmGenerateRRMEnabledCapIE(IN struct ADAPTER *prAdapter,
+				IN struct MSDU_INFO *prMsduInfo);
 
 void rrmProcessRadioMeasurementRequest(struct ADAPTER *prAdapter,
 				       struct SW_RFB *prSwRfb);
@@ -168,7 +168,7 @@ void rrmStartNextMeasurement(struct ADAPTER *prAdapter, u_int8_t fgNewStarted,
 u_int8_t rrmFillScanMsg(struct ADAPTER *prAdapter,
 			struct MSG_SCN_SCAN_REQ_V2 *prMsg);
 
-void rrmDoBeaconMeasurement(struct ADAPTER *prAdapter, uintptr_t ulParam);
+void rrmDoBeaconMeasurement(struct ADAPTER *prAdapter, unsigned long ulParam);
 
 void rrmTxNeighborReportRequest(struct ADAPTER *prAdapter,
 				struct STA_RECORD *prStaRec,
@@ -194,8 +194,8 @@ void rrmUpdateBssTimeTsf(struct ADAPTER *prAdapter, struct BSS_DESC *prBssDesc);
 uint8_t rrmCheckIs6GOpClass(uint8_t ucOpClass);
 #endif
 
-void rrmCollectBeaconReport(struct ADAPTER *prAdapter,
-	struct BSS_DESC *prBssDesc, uint8_t ucBssIndex);
+void rrmCollectBeaconReport(IN struct ADAPTER *prAdapter,
+	IN struct BSS_DESC *prBssDesc, IN uint8_t ucBssIndex);
 
 /*******************************************************************************
  *                              F U N C T I O N S

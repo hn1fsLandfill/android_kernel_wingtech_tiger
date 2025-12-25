@@ -100,7 +100,7 @@
 ********************************************************************************
 */
 
-struct DMASHDL_CFG rMT7961DmashdlCfg = {
+struct MT7961_DMASHDL_CFG rMT7961DmashdlCfg = {
 	.fgSlotArbiterEn = MT7961_DMASHDL_SLOT_ARBITER_EN,
 
 	.u2PktPleMaxPage = MT7961_DMASHDL_PKT_PLE_MAX_PAGE,
@@ -217,262 +217,195 @@ struct DMASHDL_CFG rMT7961DmashdlCfg = {
 		MT7961_DMASHDL_PRIORITY14_GROUP,
 		MT7961_DMASHDL_PRIORITY15_GROUP,
 	},
-
-	.u4GroupNum = ENUM_MT7961_DMASHDL_GROUP_NUM,
-
-	.ucQueueNum = MT7961_DMASHDL_QUEUE_NUM,
-
-	.ucPriorityNum = MT7961_DMASHDL_PRIORITY_NUM,
-
-	.rPlePacketMaxSize = {
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR,
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PLE_PACKET_MAX_SIZE_MASK,
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PLE_PACKET_MAX_SIZE_SHFT
-	},
-
-	.rPsePacketMaxSize = {
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR,
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PSE_PACKET_MAX_SIZE_MASK,
-		WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PSE_PACKET_MAX_SIZE_SHFT
-	},
-
-	.rGroup0RefillDisable = {
-		WF_HIF_DMASHDL_TOP_REFILL_CONTROL_ADDR,
-		WF_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP0_REFILL_DISABLE_MASK,
-		0
-	},
-
-	.rGroup0ControlMaxQuota = {
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_ADDR,
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MAX_QUOTA_MASK,
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MAX_QUOTA_SHFT
-	},
-
-	.rGroup0ControlMinQuota = {
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_ADDR,
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MIN_QUOTA_MASK,
-		WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MIN_QUOTA_SHFT
-	},
-
-	.rQueueMapping0Queue0 = {
-		WF_HIF_DMASHDL_TOP_QUEUE_MAPPING0_ADDR,
-		WF_HIF_DMASHDL_TOP_QUEUE_MAPPING0_QUEUE0_MAPPING_MASK,
-		WF_HIF_DMASHDL_TOP_QUEUE_MAPPING0_QUEUE0_MAPPING_SHFT
-	},
-
-	.rPageSettingGroupSeqOrderType = {
-		WF_HIF_DMASHDL_TOP_PAGE_SETTING_ADDR,
-		WF_HIF_DMASHDL_TOP_PAGE_SETTING_GROUP_SEQUENCE_ORDER_TYPE_MASK,
-		WF_HIF_DMASHDL_TOP_PAGE_SETTING_GROUP_SEQUENCE_ORDER_TYPE_SHFT,
-	},
-
-	.rSchdulerSetting0Priority0Group = {
-		WF_HIF_DMASHDL_TOP_HIF_SCHEDULER_SETTING0_ADDR,
-		WF_HIF_DMASHDL_TOP_HIF_SCHEDULER_SETTING0_PRIORITY0_GROUP_MASK,
-		WF_HIF_DMASHDL_TOP_HIF_SCHEDULER_SETTING0_PRIORITY0_GROUP_SHFT
-	},
-
-	.rStatusRdGp0RsvCnt = {
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_ADDR,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_G0_RSV_CNT_MASK,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_G0_RSV_CNT_SHFT
-	},
-
-	.rStatusRdGp0SrcCnt = {
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_ADDR,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_G0_SRC_CNT_MASK,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_GP0_G0_SRC_CNT_SHFT
-	},
-
-	.rRdGroupPktCnt0 = {
-		WF_HIF_DMASHDL_TOP_RD_GROUP_PKT_CNT0_ADDR,
-		0,
-		0
-	},
-
-	.rOptionalControlCrHifAckCntTh = {
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_ADDR,
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_CR_HIF_ACK_CNT_TH_MASK,
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_CR_HIF_ACK_CNT_TH_SHFT
-	},
-
-	.rOptionalControlCrHifGupActMap = {
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_ADDR,
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_CR_HIF_GUP_ACT_MAP_MASK,
-		WF_HIF_DMASHDL_TOP_OPTIONAL_CONTROL_CR_HIF_GUP_ACT_MAP_SHFT,
-	},
-
-	.rErrorFlagCtrl = {
-		WF_HIF_DMASHDL_TOP_ERROR_FLAG_CTRL_ADDR,
-		0,
-		0
-	},
-
-	.rStatusRdFfaCnt = {
-		WF_HIF_DMASHDL_TOP_STATUS_RD_ADDR,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_FFA_CNT_MASK,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_FFA_CNT_SHFT
-	},
-
-	.rStatusRdFreePageCnt = {
-		WF_HIF_DMASHDL_TOP_STATUS_RD_ADDR,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_FREE_PAGE_CNT_MASK,
-		WF_HIF_DMASHDL_TOP_STATUS_RD_FREE_PAGE_CNT_SHFT
-	},
 };
 
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief Do DMASDHL init when WIFISYS is initialized at probe, L0.5 reset, etc.
- *
- * \param prAdapter      Pointer of Adapter Data Structure
- *
- * \return (none)
- */
-/*----------------------------------------------------------------------------*/
+void mt7961HalDmashdlSetPlePktMaxPage(struct ADAPTER *prAdapter,
+				      uint16_t u2MaxPage)
+{
+	uint32_t u4Val;
+
+	HAL_MCR_RD(prAdapter, WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR, &u4Val);
+
+	u4Val &= ~WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PLE_PACKET_MAX_SIZE_MASK;
+	u4Val |= (u2MaxPage <<
+		  WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PLE_PACKET_MAX_SIZE_SHFT) &
+		 WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PLE_PACKET_MAX_SIZE_MASK;
+
+	HAL_MCR_WR(prAdapter, WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR, u4Val);
+}
+
+void mt7961HalDmashdlSetPsePktMaxPage(struct ADAPTER *prAdapter,
+				      uint16_t u2MaxPage)
+{
+	uint32_t u4Val;
+
+	HAL_MCR_RD(prAdapter, WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR, &u4Val);
+
+	u4Val &= ~WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PSE_PACKET_MAX_SIZE_MASK;
+	u4Val |= (u2MaxPage <<
+		  WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PSE_PACKET_MAX_SIZE_SHFT) &
+		 WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_PSE_PACKET_MAX_SIZE_MASK;
+
+	HAL_MCR_WR(prAdapter, WF_HIF_DMASHDL_TOP_PACKET_MAX_SIZE_ADDR, u4Val);
+}
+
+void mt7961HalDmashdlSetRefill(struct ADAPTER *prAdapter, uint8_t ucGroup,
+			       u_int8_t fgEnable)
+{
+	uint32_t u4Val, u4Mask;
+
+	if (ucGroup >= ENUM_MT7961_DMASHDL_GROUP_NUM)
+		ASSERT(0);
+
+	u4Mask = WF_HIF_DMASHDL_TOP_REFILL_CONTROL_GROUP0_REFILL_DISABLE_MASK
+		<< ucGroup;
+
+	HAL_MCR_RD(prAdapter, WF_HIF_DMASHDL_TOP_REFILL_CONTROL_ADDR, &u4Val);
+
+	if (fgEnable)
+		u4Val &= ~u4Mask;
+	else
+		u4Val |= u4Mask;
+
+	HAL_MCR_WR(prAdapter, WF_HIF_DMASHDL_TOP_REFILL_CONTROL_ADDR, u4Val);
+}
+
+void mt7961HalDmashdlSetMaxQuota(struct ADAPTER *prAdapter, uint8_t ucGroup,
+				 uint16_t u2MaxQuota)
+{
+	uint32_t u4Addr, u4Val;
+
+	if (ucGroup >= ENUM_MT7961_DMASHDL_GROUP_NUM)
+		ASSERT(0);
+
+	u4Addr = WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_ADDR + (ucGroup << 2);
+
+	HAL_MCR_RD(prAdapter, u4Addr, &u4Val);
+
+	u4Val &= ~WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MAX_QUOTA_MASK;
+	u4Val |= (u2MaxQuota <<
+		  WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MAX_QUOTA_SHFT) &
+		 WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MAX_QUOTA_MASK;
+
+	HAL_MCR_WR(prAdapter, u4Addr, u4Val);
+}
+
+void mt7961HalDmashdlSetMinQuota(struct ADAPTER *prAdapter, uint8_t ucGroup,
+				 uint16_t u2MinQuota)
+{
+	uint32_t u4Addr, u4Val;
+
+	if (ucGroup >= ENUM_MT7961_DMASHDL_GROUP_NUM)
+		ASSERT(0);
+
+	u4Addr = WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_ADDR + (ucGroup << 2);
+
+	HAL_MCR_RD(prAdapter, u4Addr, &u4Val);
+
+	u4Val &= ~WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MIN_QUOTA_MASK;
+	u4Val |= (u2MinQuota <<
+		  WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MIN_QUOTA_SHFT) &
+		 WF_HIF_DMASHDL_TOP_GROUP0_CONTROL_GROUP0_MIN_QUOTA_MASK;
+
+	HAL_MCR_WR(prAdapter, u4Addr, u4Val);
+}
+
+void mt7961HalDmashdlSetQueueMapping(struct ADAPTER *prAdapter, uint8_t ucQueue,
+				     uint8_t ucGroup)
+{
+	uint32_t u4Addr, u4Val, u4Mask, u4Shft;
+
+	if (ucQueue >= 32)
+		ASSERT(0);
+
+	if (ucGroup >= ENUM_MT7961_DMASHDL_GROUP_NUM)
+		ASSERT(0);
+
+	u4Addr = WF_HIF_DMASHDL_TOP_QUEUE_MAPPING0_ADDR +
+		 ((ucQueue >> 3) << 2);
+	u4Mask = WF_HIF_DMASHDL_TOP_QUEUE_MAPPING0_QUEUE0_MAPPING_MASK <<
+		 ((ucQueue % 8) << 2);
+	u4Shft = (ucQueue % 8) << 2;
+
+	HAL_MCR_RD(prAdapter, u4Addr, &u4Val);
+
+	u4Val &= ~u4Mask;
+	u4Val |= (ucGroup << u4Shft) & u4Mask;
+
+	HAL_MCR_WR(prAdapter, u4Addr, u4Val);
+}
+
+void mt7961HalDmashdlSetSlotArbiter(struct ADAPTER *prAdapter,
+				    u_int8_t fgEnable)
+{
+	uint32_t u4Val;
+
+	HAL_MCR_RD(prAdapter, WF_HIF_DMASHDL_TOP_PAGE_SETTING_ADDR, &u4Val);
+
+	if (fgEnable)
+		u4Val |=
+		 WF_HIF_DMASHDL_TOP_PAGE_SETTING_GROUP_SEQUENCE_ORDER_TYPE_MASK;
+	else
+		u4Val &=
+		~WF_HIF_DMASHDL_TOP_PAGE_SETTING_GROUP_SEQUENCE_ORDER_TYPE_MASK;
+
+	HAL_MCR_WR(prAdapter, WF_HIF_DMASHDL_TOP_PAGE_SETTING_ADDR, u4Val);
+}
+
+void mt7961HalDmashdlSetUserDefinedPriority(struct ADAPTER *prAdapter,
+					    uint8_t ucPriority, uint8_t ucGroup)
+{
+	uint32_t u4Addr, u4Val, u4Mask, u4Shft;
+
+	ASSERT(ucPriority < 16);
+	ASSERT(ucGroup < ENUM_MT7961_DMASHDL_GROUP_NUM);
+
+	u4Addr = WF_HIF_DMASHDL_TOP_HIF_SCHEDULER_SETTING0_ADDR +
+		((ucPriority >> 3) << 2);
+	u4Mask = WF_HIF_DMASHDL_TOP_HIF_SCHEDULER_SETTING0_PRIORITY0_GROUP_MASK
+		 << ((ucPriority % 8) << 2);
+	u4Shft = (ucPriority % 8) << 2;
+
+	HAL_MCR_RD(prAdapter, u4Addr, &u4Val);
+
+	u4Val &= ~u4Mask;
+	u4Val |= (ucGroup << u4Shft) & u4Mask;
+
+	HAL_MCR_WR(prAdapter, u4Addr, u4Val);
+}
+
 void mt7961DmashdlInit(struct ADAPTER *prAdapter)
 {
-	asicConnac2xDmashdlSetPktMaxPage(prAdapter,
-				      rMT7961DmashdlCfg.u2PktPleMaxPage,
-				      rMT7961DmashdlCfg.u2PktPseMaxPage);
-
-	asicConnac2xDmashdlSetAllRefill(prAdapter,
-					rMT7961DmashdlCfg.afgRefillEn);
-
-	asicConnac2xDmashdlSetAllQuota(prAdapter, rMT7961DmashdlCfg.au2MaxQuota,
-				    rMT7961DmashdlCfg.au2MinQuota);
-
-	asicConnac2xDmashdlSetAllQueueMapping(prAdapter,
-					   rMT7961DmashdlCfg.aucQueue2Group);
-
-	asicConnac2xDmashdlSetAllUserDefinedPriority(prAdapter,
-					   rMT7961DmashdlCfg.aucPriority2Group);
-
-	asicConnac2xDmashdlSetSlotArbiter(prAdapter,
-				       rMT7961DmashdlCfg.fgSlotArbiterEn);
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief Although DMASHDL was init, we need to reinit it again due to falcon
- *        L1 reset, etc. The difference between mt7961DmashdlInit and
- *        mt7961DmashdlReInit is that we don't init CRs such as refill,
- *        min_quota, max_quota in mt7961DmashdlReInit, which are backup and
- *        restored in fw. The reason why some DMASHDL CRs are reinit by driver
- *        and some by fw is
- *        1. Some DMASHDL CRs shall be inited before fw releases UMAC reset
- *           in L1 procedure. Then, these CRs are backup and restored by fw.
- *        2. However, the backup and restore of each DMASHDL CR in fw needs
- *           wm DLM space. So, we save DLM space by reinit the remaining
- *           DMASHDL CRs in driver.
- *
- * \param prAdapter      Pointer of Adapter Data Structure
- *
- * \return (none)
- */
-/*----------------------------------------------------------------------------*/
-void mt7961DmashdlReInit(struct ADAPTER *prAdapter)
-{
-	asicConnac2xDmashdlSetPktMaxPage(prAdapter,
-				      rMT7961DmashdlCfg.u2PktPleMaxPage,
-				      rMT7961DmashdlCfg.u2PktPseMaxPage);
-
-	asicConnac2xDmashdlSetAllQueueMapping(prAdapter,
-					   rMT7961DmashdlCfg.aucQueue2Group);
-
-	asicConnac2xDmashdlSetAllUserDefinedPriority(prAdapter,
-					   rMT7961DmashdlCfg.aucPriority2Group);
-
-	asicConnac2xDmashdlSetSlotArbiter(prAdapter,
-				       rMT7961DmashdlCfg.fgSlotArbiterEn);
-}
-
-uint32_t mt7961UpdateDmashdlQuota(struct ADAPTER *prAdapter,
-			uint8_t ucWmmIndex, uint32_t u4MaxQuota)
-{
-	uint8_t ucGroupIdx, ucAcIdx;
 	uint32_t idx;
-	uint16_t u2MaxQuotaFinal;
-	bool fgIsMaxQuotaInvalid = FALSE;
 
-	ASSERT(prAdapter);
-	if (u4MaxQuota > (DMASHDL_MAX_QUOTA_MASK >> DMASHDL_MAX_QUOTA_OFFSET))
-		fgIsMaxQuotaInvalid = TRUE;
+	mt7961HalDmashdlSetPlePktMaxPage(prAdapter,
+					 rMT7961DmashdlCfg.u2PktPleMaxPage);
 
-	for (idx = 0; idx < WMM_AC_INDEX_NUM; idx++) {
-		ucAcIdx = idx + (ucWmmIndex * WMM_AC_INDEX_NUM);
-		ucGroupIdx = rMT7961DmashdlCfg.aucQueue2Group[ucAcIdx];
-		u2MaxQuotaFinal = u4MaxQuota;
-		if (fgIsMaxQuotaInvalid) {
-			/* Set quota to default */
-			u2MaxQuotaFinal =
-				rMT7961DmashdlCfg.au2MaxQuota[ucGroupIdx];
-		}
+	mt7961HalDmashdlSetPsePktMaxPage(prAdapter,
+					 rMT7961DmashdlCfg.u2PktPseMaxPage);
 
-		if (u2MaxQuotaFinal) {
-			DBGLOG(HAL, INFO,
-				"ucWmmIndex,%u,ucGroupIdx,%u,u2MaxQuotaFinal,0x%x\n",
-				ucWmmIndex, ucGroupIdx, u2MaxQuotaFinal);
-			asicConnac2xDmashdlSetMaxQuota(prAdapter,
-				ucGroupIdx,
-				u2MaxQuotaFinal);
-		}
+	for (idx = 0; idx < ENUM_MT7961_DMASHDL_GROUP_NUM; idx++) {
+		mt7961HalDmashdlSetRefill(prAdapter, idx,
+					  rMT7961DmashdlCfg.afgRefillEn[idx]);
+
+		mt7961HalDmashdlSetMaxQuota(prAdapter, idx,
+					    rMT7961DmashdlCfg.au2MaxQuota[idx]);
+
+		mt7961HalDmashdlSetMinQuota(prAdapter, idx,
+					    rMT7961DmashdlCfg.au2MinQuota[idx]);
 	}
-	return WLAN_STATUS_SUCCESS;
+
+	for (idx = 0; idx < 32; idx++)
+		mt7961HalDmashdlSetQueueMapping(prAdapter, idx,
+					 rMT7961DmashdlCfg.aucQueue2Group[idx]);
+
+	for (idx = 0; idx < 16; idx++)
+		mt7961HalDmashdlSetUserDefinedPriority(prAdapter, idx,
+				      rMT7961DmashdlCfg.aucPriority2Group[idx]);
+
+	mt7961HalDmashdlSetSlotArbiter(prAdapter,
+				       rMT7961DmashdlCfg.fgSlotArbiterEn);
 }
-
-uint32_t mt7961dmashdlQuotaDecision(struct ADAPTER *prAdapter,
-			uint8_t ucWmmIndex)
-{
-	struct BSS_INFO *prBssInfo;
-	uint8_t ucBssIndex;
-	uint16_t u2MaxQuota = 0;
-#if (CFG_SUPPORT_WIFI_6G == 1)
-	u_int8_t fgIs5g = FALSE, fgIs6g = FALSE;
-#endif
-	enum ENUM_BAND eTargetBand = BAND_NULL;
-
-	for (ucBssIndex = 0;
-		ucBssIndex < prAdapter->ucHwBssIdNum; ucBssIndex++) {
-
-		prBssInfo = prAdapter->aprBssInfo[ucBssIndex];
-
-		if (IS_BSS_NOT_ALIVE(prAdapter, prBssInfo))
-			continue;
-
-		if (prBssInfo->eBand != BAND_2G4
-			&& prBssInfo->eBand != BAND_5G
-#if (CFG_SUPPORT_WIFI_6G == 1)
-			&& prBssInfo->eBand != BAND_6G
-#endif
-			)
-			continue;
-
-#if (CFG_SUPPORT_WIFI_6G == 1)
-		if (prBssInfo->eBand == BAND_6G)
-			fgIs6g = TRUE;
-		else if (prBssInfo->eBand == BAND_5G)
-			fgIs5g = TRUE;
-#endif
-		if (prBssInfo->ucWmmQueSet == ucWmmIndex)
-			eTargetBand = prBssInfo->eBand;
-
-	}
-
-	if (eTargetBand != BAND_NULL) {
-		if (eTargetBand == BAND_2G4) /* for 2G in case 2+6 or 2+5 */
-			u2MaxQuota = MT7961_DMASHDL_DBDC_2G_MAX_QUOTA;
-		else /* for 5G and 6G in case 2+6 or 2+5 */
-			u2MaxQuota = MT7961_DMASHDL_DBDC_5G_MAX_QUOTA;
-#if (CFG_SUPPORT_WIFI_6G == 1)
-		if (fgIs6g && fgIs5g) /* for 5+6 case */
-			u2MaxQuota = MT7961_DMASHDL_DBDC_5G_6G_MAX_QUOTA;
-#endif
-	}
-
-	return u2MaxQuota;
-}
-
 
 #endif /* defined(_HIF_PCIE) || defined(_HIF_AXI) || defined(_HIF_USB) */
 #endif /* MT7961 */

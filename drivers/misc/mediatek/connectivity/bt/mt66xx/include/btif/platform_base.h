@@ -14,7 +14,7 @@
 
 static uint8_t g_dump_cr_buffer[BT_CR_DUMP_BUF_SIZE];
 #if (CUSTOMER_FW_UPDATE == 1)
-extern uint8_t g_fwp_names[PATCH_FILE_NUM][2][FW_NAME_LEN];
+extern uint8_t g_fwp_names[PATCH_FILE_NUM][2[FW_NAME_LEN];
 #else
 extern uint8_t g_fwp_names[PATCH_FILE_NUM][1][FW_NAME_LEN];
 #endif

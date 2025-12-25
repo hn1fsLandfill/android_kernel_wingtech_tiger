@@ -224,10 +224,8 @@ struct MSDU_INFO *cnmPktAllocX(struct ADAPTER *prAdapter, uint32_t u4Length,
 struct MSDU_INFO *cnmPktAlloc(struct ADAPTER *prAdapter, uint32_t u4Length)
 #endif
 {
-	struct MSDU_INFO *prMsduInfo = NULL;
+	struct MSDU_INFO *prMsduInfo;
 	struct QUE *prQueList;
-	uint32_t u4TxHeadRoomSize = 0;
-	uint8_t *prHead;
 
 	KAL_SPIN_LOCK_DECLARATION();
 
@@ -239,43 +237,31 @@ struct MSDU_INFO *cnmPktAlloc(struct ADAPTER *prAdapter, uint32_t u4Length)
 	QUEUE_REMOVE_HEAD(prQueList, prMsduInfo, struct MSDU_INFO *);
 	KAL_RELEASE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_MSDU_INFO_LIST);
 
-	if (!prMsduInfo)
-		return NULL;
-
-	kalMemZero(prMsduInfo, sizeof(struct MSDU_INFO));
-
-	if (u4Length) {
-		u4TxHeadRoomSize = NIC_TX_DESC_AND_PADDING_LENGTH +
-			prAdapter->chip_info->txd_append_size;
+	if (prMsduInfo) {
+		if (u4Length) {
 #if CFG_DBG_MGT_BUF
-		prHead = cnmMemAllocX(prAdapter,
-			RAM_TYPE_BUF, u4Length + u4TxHeadRoomSize,
-			fileAndLine);
+			prMsduInfo->prPacket = cnmMemAllocX(prAdapter,
+				RAM_TYPE_BUF, u4Length, fileAndLine);
 #else
-		prHead = cnmMemAlloc(prAdapter,
-			RAM_TYPE_BUF, u4Length + u4TxHeadRoomSize);
+			prMsduInfo->prPacket = cnmMemAlloc(prAdapter,
+				RAM_TYPE_BUF, u4Length);
 #endif
-		if (prHead == NULL) {
-			KAL_ACQUIRE_SPIN_LOCK(prAdapter,
-				SPIN_LOCK_TX_MSDU_INFO_LIST);
-			QUEUE_INSERT_TAIL(prQueList, &prMsduInfo->rQueEntry);
-			KAL_RELEASE_SPIN_LOCK(prAdapter,
-				SPIN_LOCK_TX_MSDU_INFO_LIST);
-			return NULL;
+			prMsduInfo->eSrc = TX_PACKET_MGMT;
+			prMsduInfo->ucControlFlag = 0;
+
+			if (prMsduInfo->prPacket == NULL) {
+				KAL_ACQUIRE_SPIN_LOCK(prAdapter,
+					SPIN_LOCK_TX_MSDU_INFO_LIST);
+				QUEUE_INSERT_TAIL(prQueList,
+					&prMsduInfo->rQueEntry);
+				KAL_RELEASE_SPIN_LOCK(prAdapter,
+					SPIN_LOCK_TX_MSDU_INFO_LIST);
+				prMsduInfo = NULL;
+			}
+		} else {
+			prMsduInfo->prPacket = NULL;
 		}
-		prMsduInfo->prHead = prHead;
-		prMsduInfo->prPacket = (uint8_t *)
-			((uintptr_t)prMsduInfo->prHead +
-			u4TxHeadRoomSize);
-		prMsduInfo->aucTxDescBuffer = prMsduInfo->prHead;
-		prMsduInfo->eSrc = TX_PACKET_MGMT;
-		prMsduInfo->u4Option = 0;
-		prMsduInfo->ucControlFlag = 0;
-		prMsduInfo->fgMgmtUseDataQ = FALSE;
-		prMsduInfo->fgIsPacketSkb = FALSE;
 	}
-
-
 #if DBG
 	if (prMsduInfo == NULL) {
 		log_dbg(MEM, WARN, "\n");
@@ -317,12 +303,10 @@ void cnmPktFree(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo)
 
 	prQueList = &prAdapter->rTxCtrl.rFreeMsduInfoList;
 
-	if (prMsduInfo->prHead) {
-		cnmMemFree(prAdapter, prMsduInfo->prHead);
-		prMsduInfo->prHead = NULL;
+	/* ASSERT(prMsduInfo->prPacket); */
+	if (prMsduInfo->prPacket) {
+		cnmMemFree(prAdapter, prMsduInfo->prPacket);
 		prMsduInfo->prPacket = NULL;
-		prMsduInfo->prTxP = NULL;
-		prMsduInfo->aucTxDescBuffer = NULL;
 	}
 
 	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_TX_MSDU_INFO_LIST);
@@ -378,11 +362,11 @@ void cnmMemInit(struct ADAPTER *prAdapter)
  */
 /*----------------------------------------------------------------------------*/
 #if CFG_DBG_MGT_BUF
-void *cnmMemAllocX(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
-	uint32_t u4Length, uint8_t *fileAndLine)
+void *cnmMemAllocX(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
+	IN uint32_t u4Length, uint8_t *fileAndLine)
 #else
-void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
-	uint32_t u4Length)
+void *cnmMemAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
+	IN uint32_t u4Length)
 #endif
 {
 	struct BUF_INFO *prBufInfo;
@@ -391,7 +375,6 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 	uint32_t i, u4BlkSzInPower;
 	void *pvMemory;
 	enum ENUM_SPIN_LOCK_CATEGORY_E eLockBufCat;
-	enum ENUM_KAL_MEM_ALLOCATION_TYPE_E eMemAllocType;
 
 	KAL_SPIN_LOCK_DECLARATION();
 
@@ -403,12 +386,6 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 			__func__);
 		return NULL;
 	}
-
-	if (eRamType == RAM_TYPE_ATOMIC_MSG)
-		eMemAllocType = ATOMIC_MEM_TYPE;
-	else
-		eMemAllocType = PHY_MEM_TYPE;
-
 
 	if (eRamType == RAM_TYPE_MSG && u4Length <= 256) {
 		prBufInfo = &prAdapter->rMsgBufInfo;
@@ -467,9 +444,8 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 				/* Return the start address of
 				 * allocated memory
 				 */
-				pvMemory = (void *) (prBufInfo->pucBuf
+				return (void *) (prBufInfo->pucBuf
 					+ (i << u4BlkSzInPower));
-				goto exit;
 			}
 
 			rRequiredBitmap <<= 1;
@@ -486,7 +462,7 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 #ifdef LINUX
 #if CFG_DBG_MGT_BUF
 	pvMemory = (void *) kalMemAlloc(u4Length + sizeof(struct MEM_TRACK),
-		eMemAllocType);
+		PHY_MEM_TYPE);
 	if (pvMemory) {
 		struct MEM_TRACK *prMemTrack = (struct MEM_TRACK *)pvMemory;
 
@@ -497,9 +473,10 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 		prMemTrack->pucFileAndLine = fileAndLine;
 		prMemTrack->u2CmdIdAndWhere = 0x0000;
 		pvMemory = (void *)(prMemTrack + 1);
+		kalMemZero(pvMemory, u4Length);
 	}
 #else
-	pvMemory = (void *) kalMemAlloc(u4Length, eMemAllocType);
+	pvMemory = (void *) kalMemAlloc(u4Length, PHY_MEM_TYPE);
 	if (!pvMemory)
 		DBGLOG(MEM, WARN, "kmalloc fail: %u\n", u4Length);
 #endif
@@ -512,9 +489,6 @@ void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
 		GLUE_INC_REF_CNT(prAdapter->u4MemAllocDynamicCount);
 #endif
 
-exit:
-	if (pvMemory)
-		kalMemZero(pvMemory, u4Length);
 	return pvMemory;
 
 }	/* end of cnmMemAlloc() */
@@ -528,7 +502,7 @@ exit:
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmMemFree(struct ADAPTER *prAdapter, void *pvMemory)
+void cnmMemFree(IN struct ADAPTER *prAdapter, IN void *pvMemory)
 {
 	struct BUF_INFO *prBufInfo;
 	uint32_t u4BlockIndex;
@@ -544,25 +518,25 @@ void cnmMemFree(struct ADAPTER *prAdapter, void *pvMemory)
 		return;
 
 	/* Judge it belongs to which RAM type */
-	if (((uintptr_t) pvMemory
-		>= (uintptr_t)&prAdapter->aucMsgBuf[0])
-		&& ((uintptr_t) pvMemory
-		<= (uintptr_t)&prAdapter->aucMsgBuf[MSG_BUFFER_SIZE - 1])) {
+	if (((unsigned long) pvMemory
+		>= (unsigned long)&prAdapter->aucMsgBuf[0])
+		&& ((unsigned long) pvMemory
+		<= (unsigned long)&prAdapter->aucMsgBuf[MSG_BUFFER_SIZE - 1])) {
 
 		prBufInfo = &prAdapter->rMsgBufInfo;
-		u4BlockIndex = ((uintptr_t) pvMemory
-			- (uintptr_t) prBufInfo->pucBuf)
+		u4BlockIndex = ((unsigned long) pvMemory
+			- (unsigned long) prBufInfo->pucBuf)
 			>> MSG_BUF_BLOCK_SIZE_IN_POWER_OF_2;
 		ASSERT(u4BlockIndex < MAX_NUM_OF_BUF_BLOCKS);
 		eRamType = RAM_TYPE_MSG;
-	} else if (((uintptr_t) pvMemory
-		>= (uintptr_t) prAdapter->pucMgtBufCached)
-		&& ((uintptr_t) pvMemory
-		<= ((uintptr_t) prAdapter->pucMgtBufCached
+	} else if (((unsigned long) pvMemory
+		>= (unsigned long) prAdapter->pucMgtBufCached)
+		&& ((unsigned long) pvMemory
+		<= ((unsigned long) prAdapter->pucMgtBufCached
 		 + MGT_BUFFER_SIZE - 1))) {
 		prBufInfo = &prAdapter->rMgtBufInfo;
-		u4BlockIndex = ((uintptr_t) pvMemory
-			- (uintptr_t) prBufInfo->pucBuf)
+		u4BlockIndex = ((unsigned long) pvMemory
+			- (unsigned long) prBufInfo->pucBuf)
 			>> MGT_BUF_BLOCK_SIZE_IN_POWER_OF_2;
 		ASSERT(u4BlockIndex < MAX_NUM_OF_BUF_BLOCKS);
 		eRamType = RAM_TYPE_BUF;
@@ -658,9 +632,7 @@ void cnmStaRecInit(struct ADAPTER *prAdapter)
 struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 	enum ENUM_STA_TYPE eStaType, uint8_t ucBssIndex, uint8_t *pucMacAddr)
 {
-	struct STA_RECORD *prStaRec = NULL;
-	struct BSS_INFO *prBssInfo =
-		GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+	struct STA_RECORD *prStaRec;
 	uint16_t i, k;
 
 	ASSERT(prAdapter);
@@ -675,8 +647,7 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 			prStaRec->fgIsInUse = TRUE;
 
 			prStaRec->eStaType = eStaType;
-			if (prBssInfo)
-				prStaRec->eHwBandIdx = prBssInfo->eHwBandIdx;
+			prStaRec->ucBssIndex = ucBssIndex;
 
 			/* Initialize the SN caches for duplicate detection */
 			for (k = 0; k < TID_NUM + 1; k++) {
@@ -694,20 +665,13 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 
 			LINK_INITIALIZE(&prStaRec->rMscsMonitorList);
 			LINK_INITIALIZE(&prStaRec->rMscsTcpMonitorList);
-			DBGLOG(MEM, WARN,
-				"LINK_INITIALIZE list=%p, BssIdx=%d, StaRecIdx=%d\n",
-				&prStaRec->rMscsMonitorList, ucBssIndex, i);
+			DBGLOG(MEM, WARN, "LINK_INITIALIZE list: %p\n",
+						&prStaRec->rMscsMonitorList);
 #if CFG_ENABLE_PER_STA_STATISTICS && CFG_ENABLE_PKT_LIFETIME_PROFILE
 			prStaRec->u4TotalTxPktsNumber = 0;
 			prStaRec->u4TotalTxPktsTime = 0;
 			prStaRec->u4TotalRxPktsNumber = 0;
 			prStaRec->u4MaxTxPktsTime = 0;
-#endif
-#if CFG_AP_80211KVR_INTERFACE
-			prStaRec->u8TotalTxBytes = 0;
-			prStaRec->u8TotalRxBytes = 0;
-			prStaRec->u8TotalRxPkts = 0;
-			prStaRec->u8GetDataRateTime = 0;
 #endif
 
 			for (k = 0; k < NUM_OF_PER_STA_TX_QUEUES; k++) {
@@ -715,9 +679,6 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 					&prStaRec->arTxQueue[k]);
 				QUEUE_INITIALIZE(
 					&prStaRec->arPendingTxQueue[k]);
-				/* Default should be no-TX.
-				 * Switch when allow to TX.
-				 */
 				prStaRec->aprTargetQueue[k]
 					= &prStaRec->arPendingTxQueue[k];
 			}
@@ -729,10 +690,6 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 
 #if DSCP_SUPPORT
 			qosMapSetInit(prStaRec);
-#endif
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-			prStaRec->ucMldStaIndex = MLD_GROUP_NONE;
-			prStaRec->ucTidBitmap = 0xFF;
 #endif
 			break;
 		}
@@ -772,22 +729,26 @@ struct STA_RECORD *cnmStaRecAlloc(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 void cnmStaRecFree(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec)
 {
+	uint8_t ucStaRecIndex, ucBssIndex;
+
 	ASSERT(prAdapter);
 
 	if (!prStaRec)
 		return;
 
-	log_dbg(CNM, INFO, "BssIdx=%d, StaRecIdx=%d, InUse=%d\n",
-		prStaRec->ucBssIndex, prStaRec->ucIndex, prStaRec->fgIsInUse);
+	log_dbg(CNM, INFO, "cnmStaRecFree %d\n", prStaRec->ucIndex);
+
+	ucStaRecIndex = prStaRec->ucIndex;
+	ucBssIndex = prStaRec->ucBssIndex;
 
 	if (prStaRec->fgIsInUse) {
 		nicFreePendingTxMsduInfo(prAdapter, prStaRec->ucWlanIndex,
 				MSDU_REMOVE_BY_WLAN_INDEX);
 
-		cnmStaSendRemoveCmd(prAdapter, STA_REC_CMD_ACTION_STA,
-			prStaRec->ucIndex, prStaRec->ucBssIndex);
-
 		cnmStaRoutinesForAbort(prAdapter, prStaRec);
+
+		cnmStaSendRemoveCmd(prAdapter, STA_REC_CMD_ACTION_STA,
+			ucStaRecIndex, ucBssIndex);
 	} else {
 		log_dbg(CNM, ERROR, "prStaRec is not in use\n");
 	}
@@ -810,16 +771,9 @@ static void cnmStaRoutinesForAbort(struct ADAPTER *prAdapter,
 	if (!prStaRec)
 		return;
 
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	mldStarecUnregister(prAdapter, prStaRec);
-#endif
-
 	/* To do: free related resources, e.g. timers, buffers, etc */
 	cnmTimerStopTimer(prAdapter, &prStaRec->rTxReqDoneOrRxRespTimer);
 	cnmTimerStopTimer(prAdapter, &prStaRec->rDeauthTxDoneTimer);
-#if CFG_AP_80211V_SUPPORT
-	cnmTimerStopTimer(prAdapter, &prStaRec->rBTMReqDisassocTimer);
-#endif /* CFG_AP_80211V_SUPPORT */
 	prStaRec->fgTransmitKeyExist = FALSE;
 
 	prStaRec->fgSetPwrMgtBit = FALSE;
@@ -861,6 +815,14 @@ void cnmStaFreeAllStaByNetwork(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 	if (ucBssIndex > prAdapter->ucHwBssIdNum)
 		return;
 
+	for (i = 0; i < CFG_STA_REC_NUM; i++) {
+		prStaRec = (struct STA_RECORD *) &prAdapter->arStaRec[i];
+
+		if (prStaRec->fgIsInUse && prStaRec->ucBssIndex == ucBssIndex
+			&& i != ucStaRecIndexExcluded)
+			cnmStaRoutinesForAbort(prAdapter, prStaRec);
+	}	/* end of for loop */
+
 	if (ucStaRecIndexExcluded < CFG_STA_REC_NUM)
 		eAction = STA_REC_CMD_ACTION_BSS_EXCLUDE_STA;
 	else
@@ -870,23 +832,14 @@ void cnmStaFreeAllStaByNetwork(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 		eAction,
 		ucStaRecIndexExcluded, ucBssIndex);
 
-	for (i = 0; i < CFG_STA_REC_NUM; i++) {
-		prStaRec = (struct STA_RECORD *) &prAdapter->arStaRec[i];
-
-		if (prStaRec->fgIsInUse && prStaRec->ucBssIndex == ucBssIndex
-			&& i != ucStaRecIndexExcluded)
-			cnmStaRoutinesForAbort(prAdapter, prStaRec);
-	}	/* end of for loop */
-
 #if CFG_ENABLE_WIFI_DIRECT
 	/* To do: Confirm if it is invoked here or other location, but it should
 	 *        be invoked after state sync of STA_REC
 	 * Update system operation parameters for AP mode
 	 */
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (prAdapter->fgIsP2PRegistered &&
-	    prBssInfo &&
-	    prBssInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT) {
+	if (prAdapter->fgIsP2PRegistered
+		&& prBssInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT) {
 		rlmUpdateParamsForAP(prAdapter, prBssInfo, FALSE);
 	}
 #endif
@@ -942,7 +895,7 @@ struct STA_RECORD *cnmGetStaRecByIndex(struct ADAPTER *prAdapter,
 struct STA_RECORD *cnmGetStaRecByAddress(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex, uint8_t *pucPeerMacAddr)
 {
-	struct STA_RECORD *prStaRec = NULL;
+	struct STA_RECORD *prStaRec;
 	uint16_t i;
 
 	ASSERT(prAdapter);
@@ -1027,15 +980,13 @@ void cnmStaRecChangeState(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec
 	 *        be invoked after state sync of STA_REC
 	 * Update system operation parameters for AP mode
 	 */
-	if (IS_BSS_INDEX_VALID(prStaRec->ucBssIndex) &&
-		prAdapter->fgIsP2PRegistered && (IS_STA_IN_P2P(prStaRec))) {
+	if (prAdapter->fgIsP2PRegistered && (IS_STA_IN_P2P(prStaRec))) {
 		struct BSS_INFO *prBssInfo;
 
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 			prStaRec->ucBssIndex);
 
-		if (prBssInfo &&
-		    prBssInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT)
+		if (prBssInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT)
 			rlmUpdateParamsForAP(prAdapter, prBssInfo, FALSE);
 	}
 #endif
@@ -1301,32 +1252,6 @@ void cnmStaSendUpdateCmd(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
 	cnmStaRecCmdEhtContentFill(prStaRec, prCmdContent);
 #endif
 
-#if CFG_SUPPORT_MLR
-	if (MLR_IS_BOTH_SUPPORT(prAdapter, prStaRec)
-		&& MLR_CHECK_IF_RCPI_IS_LOW(prAdapter, prStaRec->ucRCPI)
-		&& (prStaRec->ucStaState == STA_STATE_3)) {
-		prCmdContent->ucMlrMode = (prStaRec->ucMlrSupportBitmap &
-			prAdapter->u4MlrSupportBitmap);
-		prCmdContent->ucMlrState = MLR_STATE_START;
-	} else {
-		prCmdContent->ucMlrMode = (prStaRec->ucMlrSupportBitmap &
-			prAdapter->u4MlrSupportBitmap);
-		prCmdContent->ucMlrState = MLR_STATE_IDLE;
-	}
-
-	MLR_DBGLOG(prAdapter, REQ, INFO,
-		"MLR updatestarec StaRec[%u] WIDX[%u] ucStaState[%u] MLR[%d,0x%04x,%d,0x%02x] ucMlrMode[0x%02x] ucMlrState[%u] RCPI=%d(RSSI=%d)\n",
-		prCmdContent->ucStaIndex,
-		prCmdContent->ucWlanIndex,
-		prCmdContent->ucStaState,
-		prAdapter->ucMlrIsSupport, prAdapter->u4MlrSupportBitmap,
-		prStaRec->fgIsMlrSupported, prStaRec->ucMlrSupportBitmap,
-		prCmdContent->ucMlrMode,
-		prCmdContent->ucMlrState,
-		prStaRec->ucRCPI,
-		RCPI_TO_dBm(prStaRec->ucRCPI));
-#endif
-
 	log_dbg(REQ, TRACE, "Update StaRec[%u] WIDX[%u] State[%u] Type[%u] BssIdx[%u] AID[%u]\n",
 		prCmdContent->ucStaIndex,
 		prCmdContent->ucWlanIndex,
@@ -1444,225 +1369,6 @@ uint8_t *cnmStaRecGetRoleString(enum ENUM_STA_TYPE eStaType)
 	return pucRoleString;
 }
 
-int cnmShowBssInfo(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
-	char *pcCommand, int i4TotalLen)
-{
-	int32_t i4BytesWritten = 0;
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tBSS[%d][RF_BAND=%d][OMAC="MACSTR"][LINK_ID=%u]:\n",
-		prBssInfo->ucBssIndex, prBssInfo->eBand,
-		MAC2STR(prBssInfo->aucOwnMacAddr),
-		prBssInfo->ucLinkIndex);
-#else
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tBSS[%d][RF_BAND=%d][OMAC="MACSTR"]:\n",
-		prBssInfo->ucBssIndex, prBssInfo->eBand,
-		MAC2STR(prBssInfo->aucOwnMacAddr));
-#endif
-
-	if (!prBssInfo->fgIsInUse) {
-		i4BytesWritten += kalSnprintf(
-			pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-			"\t[ERROR] NOT IN USE!!\n", prBssInfo->ucBssIndex);
-		return i4BytesWritten;
-	}
-
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		 "\tACTIVE/HW_BAND/OMAC_IDX: %u/%u/%u/\n",
-		prBssInfo->fgIsNetActive,
-		prBssInfo->eHwBandIdx,
-		prBssInfo->ucOwnMacIndex);
-
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		 "\tBMC/OP_MODE/WMM/CONN_STATE/BSSID: %u/%u/%u/%u/"MACSTR"\n",
-		prBssInfo->ucBMCWlanIndex,
-		prBssInfo->eCurrentOPMode,
-		prBssInfo->ucWmmQueSet,
-		prBssInfo->eConnectionState,
-		MAC2STR(prBssInfo->aucBSSID));
-
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		 "\tSSID/QBSS/PHY/PWR_STATE: %d %s/%u/0x%x/%d\n",
-		prBssInfo->ucSSIDLen,
-		prBssInfo->aucSSID,
-		prBssInfo->fgIsQBSS,
-		prBssInfo->ucPhyTypeSet,
-		prAdapter->rWifiVar.aePwrState[prBssInfo->ucBssIndex]);
-#if 0
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		 "AID/BCN_INT/RATE/PROT:%d/%d/0x%x/%u\n",
-		prBssInfo->u2AssocId,
-		prBssInfo->u2BeaconInterval,
-		prBssInfo->u2BSSBasicRateSet,
-		secIsProtectedBss(prAdapter, prBssInfo));
-#endif
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tCHANNEL/WIDTH/S1/S2: %u/%u/%u/%u/\n",
-		prBssInfo->ucPrimaryChannel,
-		prBssInfo->ucVhtChannelWidth,
-		prBssInfo->ucVhtChannelFrequencyS1,
-		prBssInfo->ucVhtChannelFrequencyS2);
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tGRP_MLD_ID/OWN_MLD_ID: %u/%u\n",
-		prBssInfo->ucGroupMldId,
-		prBssInfo->ucOwnMldId);
-#endif
-
-	return i4BytesWritten;
-}
-
-int cnmShowStaRec(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
-	char *pcCommand, int i4TotalLen)
-{
-	int32_t i4BytesWritten = 0;
-
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tSTA[%d][WIDX=%d][BSS_IDX=%d]:\n",
-		prStaRec->ucIndex,
-		prStaRec->ucWlanIndex,
-		prStaRec->ucBssIndex);
-
-	if (!prStaRec->fgIsInUse) {
-		i4BytesWritten += kalSnprintf(
-			pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-			"\t[ERROR] NOT IN USE!!\n", prStaRec->ucBssIndex);
-		return i4BytesWritten;
-	}
-
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tSTATE/RCPI/MAC: %u/%u/"MACSTR"\n",
-		prStaRec->ucStaState,
-		prStaRec->ucRCPI,
-		MAC2STR(prStaRec->aucMacAddr));
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tPHY/DESIRE_PHY/BASIC_PHY/WMM/UAPSD: 0x%x/0x%x/0x%x/%u/%u\n",
-		prStaRec->ucPhyTypeSet,
-		prStaRec->ucDesiredPhyTypeSet,
-		prStaRec->ucNonHTBasicPhyType,
-		prStaRec->fgIsWmmSupported,
-		prStaRec->fgIsUapsdSupported);
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tAID/OP_RATE/DESIRE_RATE/DEFAULT_RATE: %d/0x%x/0x%x/0x%x\n",
-		prStaRec->u2AssocId,
-		prStaRec->u2OperationalRateSet,
-		prStaRec->u2DesiredNonHTRateSet,
-		prStaRec->u2HwDefaultFixedRateCode);
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tPS/TX_ALLOWED/KEY_READY/TX_AMPDU/RX_AMPDU: %u/%u/%u/%u/%u\n",
-		prStaRec->fgIsInPS,
-		prStaRec->fgIsTxAllowed,
-		prStaRec->fgIsTxKeyReady,
-		prStaRec->fgTxAmpduEn,
-		prStaRec->fgRxAmpduEn);
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tHT_CAP/HT_EXT_CAP/TX_BF_CAP/VHT_CAP: 0x%x/0x%x/0x%x/0x%x\n",
-		prStaRec->u2HtCapInfo,
-		prStaRec->u2HtExtendedCap,
-		prStaRec->u4TxBeamformingCap,
-		prStaRec->u4VhtCapInfo);
-#if (CFG_SUPPORT_802_11AX == 1)
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tHE_MAC_CAP/HE_PHY_CAP: 0x%04x%08x/0x%02x%04x%016llx\n",
-		*(uint16_t *)(prStaRec->ucHeMacCapInfo + 4),
-		*(uint32_t *)(prStaRec->ucHeMacCapInfo),
-		*(uint8_t *)(prStaRec->ucHePhyCapInfo + 10),
-		*(uint16_t *)(prStaRec->ucHePhyCapInfo + 8),
-		*(uint64_t *)(prStaRec->ucHePhyCapInfo));
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tEHT_MAC_CAP/EHT_PHY_CAP: 0x%04x/0x%016llx\n",
-		(*(uint16_t *)(prStaRec->ucEhtMacCapInfo)),
-		(*(uint64_t *)(prStaRec->ucEhtPhyCapInfo)));
-#endif
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	i4BytesWritten += kalSnprintf(
-		pcCommand + i4BytesWritten, i4TotalLen - i4BytesWritten,
-		"\tMLD_STA/LINK_ID/TID_BMAP/MLD_ADDR: %u/%u/0x%x/" MACSTR "\n",
-		prStaRec->ucMldStaIndex,
-		prStaRec->ucLinkIndex,
-		prStaRec->ucTidBitmap,
-		MAC2STR(prStaRec->aucMldAddr));
-#endif
-
-	return i4BytesWritten;
-}
-
-void cnmDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIdx)
-{
-	struct BSS_INFO *prBssInfo;
-
-	prBssInfo = prAdapter->aprBssInfo[ucBssIdx];
-
-	if (!prBssInfo->fgIsInUse)
-		return;
-
-	log_dbg(MEM, INFO, "============= DUMP BSS[%u] ===========\n",
-		ucBssIdx);
-
-	/*
-	 * [1] BASIC [BSS_IDX, ACTIVE, TYPE, PRIVATE_DATA, OMAC_IDX, OMAC_ADDR, BMC_IDX, MODE]
-	 * [2] CONNECTION [STATE, BSSID, SSID, AID, BCN_INT, PHY_TYPE]
-	 * [3] RLM [BAND, CHANNEL, WIDTH, S1, S2]
-	 * [4] MLO [GROUP_IDX, OWN_MLD_ID]
-	 * [5] TRX [ABSENT, QBSS]
-	 */
-	log_dbg(MEM, INFO, "\tBASIC [%u %d %u %u %u %u " MACSTR " %u %u]\n",
-		prBssInfo->ucBssIndex,
-		prBssInfo->fgIsNetActive,
-		prBssInfo->eNetworkType,
-		prBssInfo->u4PrivateData,
-		prBssInfo->eHwBandIdx,
-		prBssInfo->ucOwnMacIndex,
-		MAC2STR(prBssInfo->aucOwnMacAddr),
-		prBssInfo->ucBMCWlanIndex,
-		prBssInfo->eCurrentOPMode);
-	log_dbg(MEM, INFO, "\tCONNECTION [%u " MACSTR " %u %s 0x%x %u 0x%x]\n",
-		prBssInfo->eConnectionState,
-		MAC2STR(prBssInfo->aucBSSID),
-		prBssInfo->ucSSIDLen,
-		prBssInfo->aucSSID,
-		prBssInfo->u2AssocId,
-		prBssInfo->u2BeaconInterval,
-		prBssInfo->ucPhyTypeSet);
-	log_dbg(MEM, INFO, "\tRLM [%u %u %u %u %u]\n",
-		prBssInfo->eBand,
-		prBssInfo->ucPrimaryChannel,
-		prBssInfo->ucVhtChannelWidth,
-		prBssInfo->ucVhtChannelFrequencyS1,
-		prBssInfo->ucVhtChannelFrequencyS2);
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	log_dbg(MEM, INFO, "\tMLO [%u %u]\n",
-		prBssInfo->ucGroupMldId,
-		prBssInfo->ucOwnMldId);
-#endif
-	log_dbg(MEM, INFO, "\tTRX [%u %u]\n",
-		prBssInfo->fgIsNetAbsent,
-		prBssInfo->fgIsQBSS);
-
-	log_dbg(MEM, INFO, "============= DUMP END ===========\n");
-}
-
 /*----------------------------------------------------------------------------*/
 /*!
  * @brief
@@ -1672,7 +1378,7 @@ void cnmDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIdx)
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmDumpStaRec(struct ADAPTER *prAdapter, uint8_t ucStaRecIdx)
+void cnmDumpStaRec(IN struct ADAPTER *prAdapter, IN uint8_t ucStaRecIdx)
 {
 	uint8_t ucWTEntry;
 	uint32_t i;
@@ -1775,28 +1481,6 @@ void cnmDumpStaRec(struct ADAPTER *prAdapter, uint8_t ucStaRecIdx)
 		prStaRec->aucRxMcsBitmask[0],
 		prStaRec->aucRxMcsBitmask[1]);
 
-#if (CFG_SUPPORT_802_11AX == 1)
-	log_dbg(SW4, INFO, "[HeMacCap][0x%04x%08x],[HePhyCap][0x%02x%04x%016llx]\n",
-		*(uint16_t *)(prStaRec->ucHeMacCapInfo + 4),
-		*(uint32_t *)(prStaRec->ucHeMacCapInfo),
-		*(uint8_t *)(prStaRec->ucHePhyCapInfo + 10),
-		*(uint16_t *)(prStaRec->ucHePhyCapInfo + 8),
-		*(uint64_t *)(prStaRec->ucHePhyCapInfo));
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-	log_dbg(SW4, INFO, "[EhtMacCap][0x%04x],[EhtPhyCap][0x%016llx],[EhtPhyCapExt][0x%016llx]\n",
-		(*(uint16_t *)(prStaRec->ucEhtMacCapInfo)),
-		(*(uint64_t *)(prStaRec->ucEhtPhyCapInfo)),
-		(*(uint64_t *)(prStaRec->ucEhtPhyCapInfoExt)));
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	log_dbg(SW4, INFO, "[MldStaIndex][%u], [LinkIndex][%u], [TidBitmap][%u], [MldAddr][" MACSTR "]\n",
-		prStaRec->ucMldStaIndex,
-		prStaRec->ucLinkIndex,
-		prStaRec->ucTidBitmap,
-		MAC2STR(prStaRec->aucMldAddr));
-#endif
-#endif
-
 	for (i = 0; i < CFG_RX_MAX_BA_TID_NUM; i++) {
 		if (prStaRec->aprRxReorderParamRefTbl[i]) {
 			log_dbg(SW4, INFO, "TID[%u],Valid[%u],WinStart/End[%u/%u],WinSize[%u],ReOrderQueLen[%u],Bubble Exist[%u],SN[%u]\n",
@@ -1821,8 +1505,8 @@ void cnmDumpStaRec(struct ADAPTER *prAdapter, uint8_t ucStaRecIdx)
 	log_dbg(SW4, INFO, "============= DUMP END ===========\n");
 }
 
-uint32_t cnmDumpMemoryStatus(struct ADAPTER *prAdapter, uint8_t *pucBuf,
-	uint32_t u4Max)
+uint32_t cnmDumpMemoryStatus(IN struct ADAPTER *prAdapter, IN uint8_t *pucBuf,
+	IN uint32_t u4Max)
 {
 	uint32_t u4Len = 0;
 #if CFG_DBG_MGT_BUF
@@ -1994,11 +1678,6 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	uint8_t ucRate;
 	uint16_t i, j;
 
-#if CFG_SUPPORT_802_11AC
-	uint8_t ucRxNss = 1;
-	struct WIFI_VAR *prWifiVar;
-#endif /* CFG_SUPPORT_802_11AC */
-
 	/* sanity check */
 	if ((!prAdapter) || (!pvSetBuffer) || (!pu4SetInfoLen))
 		return TDLS_STATUS_FAIL;
@@ -2098,7 +1777,7 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 				}
 			}
 		} else {
-			if (prCmd->fgIsSupVht)
+			if (prCmd->rVHtCap.u2CapInfo)
 				prStaRec->ucPhyTypeSet |= PHY_TYPE_BIT_VHT;
 
 			if (prCmd->fgIsSupHt)
@@ -2166,7 +1845,9 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 	}
 
 	/* ++HT capability */
+
 	if (prCmd->fgIsSupHt) {
+		prAdapter->rWifiVar.eRateSetting = FIXED_RATE_NONE;
 		prStaRec->ucDesiredPhyTypeSet |= PHY_TYPE_BIT_HT;
 		prStaRec->ucPhyTypeSet |= PHY_TYPE_BIT_HT;
 		prStaRec->u2HtCapInfo = prCmd->rHtCap.u2CapInfo;
@@ -2185,83 +1866,7 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 			prCmd->rHtCap.rMCS.arRxMask,
 			sizeof(prStaRec->aucRxMcsBitmask));
 	}
-
-#if CFG_SUPPORT_802_11AC
-	prWifiVar = &prAdapter->rWifiVar;
-	/* ++VHT capability */
-	if (prCmd->fgIsSupVht) {
-		prStaRec->u4VhtCapInfo = prCmd->rVHtCap.u4CapInfo;
-
-		/* Set Tx LDPC capability */
-		if (IS_FEATURE_FORCE_ENABLED(prWifiVar->ucTxLdpc))
-			prStaRec->u4VhtCapInfo |= VHT_CAP_INFO_RX_LDPC;
-		else if (IS_FEATURE_DISABLED(prWifiVar->ucTxLdpc))
-			prStaRec->u4VhtCapInfo &= ~VHT_CAP_INFO_RX_LDPC;
-
-		/* Set Tx STBC capability */
-		if (IS_FEATURE_FORCE_ENABLED(prWifiVar->ucTxStbc))
-			prStaRec->u4VhtCapInfo |=
-				VHT_CAP_INFO_RX_STBC_MASK;
-		else if (IS_FEATURE_DISABLED(prWifiVar->ucTxStbc))
-			prStaRec->u4VhtCapInfo &=
-				~VHT_CAP_INFO_RX_STBC_MASK;
-
-		/* Set Tx TXOP PS capability */
-		if (IS_FEATURE_FORCE_ENABLED(prWifiVar->ucTxopPsTx))
-			prStaRec->u4VhtCapInfo |=
-				VHT_CAP_INFO_VHT_TXOP_PS;
-		else if (IS_FEATURE_DISABLED(prWifiVar->ucTxopPsTx))
-			prStaRec->u4VhtCapInfo &=
-				~VHT_CAP_INFO_VHT_TXOP_PS;
-
-		/* Set Tx Short GI capability */
-		if (IS_FEATURE_FORCE_ENABLED(prWifiVar->ucTxShortGI)) {
-			prStaRec->u4VhtCapInfo |=
-				VHT_CAP_INFO_SHORT_GI_80;
-			prStaRec->u4VhtCapInfo |=
-				VHT_CAP_INFO_SHORT_GI_160_80P80;
-		} else if (IS_FEATURE_DISABLED(
-					prWifiVar->ucTxShortGI)) {
-			prStaRec->u4VhtCapInfo &=
-				~VHT_CAP_INFO_SHORT_GI_80;
-			prStaRec->u4VhtCapInfo &=
-				~VHT_CAP_INFO_SHORT_GI_160_80P80;
-		}
-
-		prStaRec->u2VhtRxMcsMap = prCmd->rVHtCap.rVMCS.u2RxMcsMap;
-		prStaRec->u2VhtRxHighestSupportedDataRate =
-					prCmd->rVHtCap.rVMCS.u2RxHighest;
-
-		prStaRec->u2VhtTxMcsMap = prCmd->rVHtCap.rVMCS.u2TxMcsMap;
-		prStaRec->u2VhtTxHighestSupportedDataRate =
-					prCmd->rVHtCap.rVMCS.u2TxHighest;
-
-		prStaRec->ucVhtOpMode =
-			VHT_OP_MODE_CHANNEL_WIDTH_20 |
-			VHT_OP_MODE_CHANNEL_WIDTH_80;
-		/* no op mode IE, use HT/VHT cap to check BW */
-		if (prCmd->fgIsSupHt &&
-			prBssInfo->fg40mBwAllowed &&
-			(prCmd->rHtCap.u2CapInfo & HT_CAP_INFO_SUP_CHNL_WIDTH))
-			prStaRec->ucVhtOpMode |= VHT_OP_MODE_CHANNEL_WIDTH_40;
-		if ((prCmd->rVHtCap.u4CapInfo &
-			VHT_CAP_INFO_MAX_SUP_CHANNEL_WIDTH_SET_160) ||
-		    (prCmd->rVHtCap.u4CapInfo &
-			VHT_CAP_INFO_MAX_SUP_CHANNEL_WIDTH_SET_160_80P80))
-			prStaRec->ucVhtOpMode |=
-				VHT_OP_MODE_CHANNEL_WIDTH_160_80P80;
-
-		/* no op mode IE, use MCS set to check NSS */
-		if (((prCmd->rVHtCap.rVMCS.u2RxMcsMap &
-			VHT_CAP_INFO_MCS_2SS_MASK) >>
-			VHT_CAP_INFO_MCS_2SS_OFFSET)
-			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-			ucRxNss = 2;
-		prStaRec->ucVhtOpMode |=
-			((ucRxNss - 1)	<< VHT_OP_MODE_RX_NSS_OFFSET) &
-			VHT_OP_MODE_RX_NSS;
-	}
-#endif /* CFG_SUPPORT_802_11AC */
+	/* TODO ++VHT */
 
 	cnmStaRecChangeState(prAdapter, prStaRec, STA_STATE_3);
 
@@ -2280,7 +1885,7 @@ cnmPeerUpdate(struct ADAPTER *prAdapter, void *pvSetBuffer,
 struct STA_RECORD *cnmGetTdlsPeerByAddress(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex, uint8_t aucPeerMACAddress[])
 {
-	struct STA_RECORD *prStaRec = NULL;
+	struct STA_RECORD *prStaRec;
 	uint16_t i;
 
 	ASSERT(prAdapter);
@@ -2339,16 +1944,6 @@ static void cnmStaRecCmdEhtContentFill(
 		EHT_MAC_CAP_BYTE_NUM);
 	memcpy(prCmdContent->ucEhtPhyCapInfo, prStaRec->ucEhtPhyCapInfo,
 		EHT_PHY_CAP_BYTE_NUM);
-	memcpy(prCmdContent->ucEhtPhyCapInfoExt, prStaRec->ucEhtPhyCapInfoExt,
-		EHT_PHY_CAP_BYTE_NUM);
-	memcpy(prCmdContent->aucMcsMap20MHzSta, prStaRec->aucMcsMap20MHzSta,
-		sizeof(prCmdContent->aucMcsMap20MHzSta));
-	memcpy(prCmdContent->aucMcsMap80MHz, prStaRec->aucMcsMap80MHz,
-		sizeof(prCmdContent->aucMcsMap80MHz));
-	memcpy(prCmdContent->aucMcsMap160MHz, prStaRec->aucMcsMap160MHz,
-		sizeof(prCmdContent->aucMcsMap160MHz));
-	memcpy(prCmdContent->aucMcsMap320MHz, prStaRec->aucMcsMap320MHz,
-		sizeof(prCmdContent->aucMcsMap320MHz));
 }
 #endif
 

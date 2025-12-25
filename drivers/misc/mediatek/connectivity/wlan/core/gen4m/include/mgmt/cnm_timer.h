@@ -95,11 +95,6 @@
 
 #define MSEC_PER_MIN			(60 * MSEC_PER_SEC)
 
-#define SEC_PER_HOUR			(3600)
-#define HOUR_MAX			(24)
-#define SEC_PER_MINUTE			(60)
-#define MINUTE_MAX			(60)
-
 #define MGMT_MAX_TIMEOUT_INTERVAL	((uint32_t)0x7fffffff)
 
 #define WAKE_LOCK_MAX_TIME		5	/* Unit: sec */
@@ -122,14 +117,14 @@ enum ENUM_TIMER_WAKELOCK_TYPE_T {
  *                             D A T A   T Y P E S
  *******************************************************************************
  */
-typedef void(*PFN_MGMT_TIMEOUT_FUNC) (struct ADAPTER *, uintptr_t);
+typedef void(*PFN_MGMT_TIMEOUT_FUNC) (struct ADAPTER *, unsigned long);
 
 struct TIMER {
 	struct LINK_ENTRY rLinkEntry;
 	OS_SYSTIME rExpiredSysTime;
 	uint16_t u2Minutes;
 	uint16_t u2Reserved;
-	uintptr_t ulDataPtr;
+	unsigned long ulDataPtr;
 	PFN_MGMT_TIMEOUT_FUNC pfMgmtTimeOutFunc;
 	enum ENUM_TIMER_WAKELOCK_TYPE_T eType;
 };
@@ -165,13 +160,6 @@ struct TIMER {
 
 #define SYSTIME_TO_SEC(_systime)	((_systime) / KAL_HZ)
 #define SEC_TO_SYSTIME(_sec)		((_sec) * KAL_HZ)
-
-/* The macros to convert second & hours/minutes */
-#define SEC_TO_TIME_HOUR(_sec) \
-	(((uint32_t)(_sec) / SEC_PER_HOUR) % HOUR_MAX)
-#define SEC_TO_TIME_MINUTE(_sec) \
-	(((uint32_t)(_sec) / SEC_PER_MINUTE) % MINUTE_MAX)
-#define SEC_TO_TIME_SECOND(_sec)	((uint32_t)(_sec) % SEC_PER_MINUTE)
 
 /* The macros to convert second & millisecond */
 #define MSEC_TO_SEC(_msec)		((_msec) / MSEC_PER_SEC)
@@ -243,45 +231,42 @@ struct TIMER {
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-void cnmTimerInitialize(struct ADAPTER *prAdapter);
+void cnmTimerInitialize(IN struct ADAPTER *prAdapter);
 
-void cnmTimerDestroy(struct ADAPTER *prAdapter);
+void cnmTimerDestroy(IN struct ADAPTER *prAdapter);
 
-void cnmTimerInitTimerOption(struct ADAPTER *prAdapter,
-			     struct TIMER *prTimer,
-			     PFN_MGMT_TIMEOUT_FUNC pfFunc,
-			     uintptr_t ulDataPtr,
-			     enum ENUM_TIMER_WAKELOCK_TYPE_T eType);
+void cnmTimerInitTimerOption(IN struct ADAPTER *prAdapter,
+			     IN struct TIMER *prTimer,
+			     IN PFN_MGMT_TIMEOUT_FUNC pfFunc,
+			     IN unsigned long ulDataPtr,
+			     IN enum ENUM_TIMER_WAKELOCK_TYPE_T eType);
 
-void cnmTimerStopTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer);
+void cnmTimerStopTimer(IN struct ADAPTER *prAdapter, IN struct TIMER *prTimer);
 
-void cnmTimerStartTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer,
-			uint32_t u4TimeoutMs);
+void cnmTimerStartTimer(IN struct ADAPTER *prAdapter, IN struct TIMER *prTimer,
+			IN uint32_t u4TimeoutMs);
 
-void cnmTimerDoTimeOutCheck(struct ADAPTER *prAdapter);
+void cnmTimerDoTimeOutCheck(IN struct ADAPTER *prAdapter);
 
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************
  */
-static __KAL_INLINE__ int32_t timerPendingTimer(struct TIMER *prTimer)
+static __KAL_INLINE__ int32_t timerPendingTimer(IN struct TIMER *prTimer)
 {
 	ASSERT(prTimer);
 
 	return prTimer->rLinkEntry.prNext != NULL;
 }
 
-static __KAL_INLINE__ void cnmTimerInitTimer(struct ADAPTER *prAdapter,
-					     struct TIMER *prTimer,
-					     PFN_MGMT_TIMEOUT_FUNC pfFunc,
-					     uintptr_t ulDataPtr)
+static __KAL_INLINE__ void cnmTimerInitTimer(IN struct ADAPTER *prAdapter,
+					     IN struct TIMER *prTimer,
+					     IN PFN_MGMT_TIMEOUT_FUNC pfFunc,
+					     IN unsigned long ulDataPtr)
 {
 	cnmTimerInitTimerOption(prAdapter, prTimer, pfFunc, ulDataPtr,
 		TIMER_WAKELOCK_AUTO);
 }
 
-#if CFG_WOW_SUPPORT
-void cnmStopPendingJoinTimerForSuspend(struct ADAPTER *prAdapter);
-#endif
 
 #endif /* _CNM_TIMER_H */

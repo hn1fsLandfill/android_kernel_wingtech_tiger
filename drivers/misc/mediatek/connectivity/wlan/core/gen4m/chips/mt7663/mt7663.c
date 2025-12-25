@@ -175,11 +175,6 @@ struct BUS_INFO mt7663_bus_info = {
 	.tx_ring_cmd_idx = 15,
 	.tx_ring0_data_idx = 0,
 	.tx_ring1_data_idx = 0,
-	.rx_data_ring_num = 1,
-	.rx_evt_ring_num = 1,
-	.rx_data_ring_size = 256,
-	.rx_evt_ring_size = 16,
-	.rx_data_ring_prealloc_size = 256,
 	.fw_own_clear_addr = WPDMA_INT_STA,
 	.fw_own_clear_bit = WPDMA_FW_CLR_OWN_INT,
 	.max_static_map_addr = 0x00040000,
@@ -187,8 +182,6 @@ struct BUS_INFO mt7663_bus_info = {
 	.u4DmaMask = 36,
 
 	.pdmaSetup = asicPdmaConfig,
-	.pdmaStop = NULL,
-	.pdmaPollingIdle = NULL,
 	.updateTxRingMaxQuota = NULL,
 	.enableInterrupt = asicEnableInterrupt,
 	.disableInterrupt = asicDisableInterrupt,
@@ -205,7 +198,6 @@ struct BUS_INFO mt7663_bus_info = {
 	.hifRst = NULL,
 	.initPcieInt = mt7663InitPcieInt,
 	.DmaShdlInit = asicPcieDmaShdlInit,
-	.DmaShdlReInit = NULL,
 #endif /* _HIF_PCIE */
 #if defined(_HIF_USB)
 	.u4UdmaWlCfg_0_Addr = CONNAC_UDMA_WLCFG_0,
@@ -223,11 +215,6 @@ struct BUS_INFO mt7663_bus_info = {
 	.asicUsbEventEpDetected = asicUsbEventEpDetected,
 	.asicUsbRxByteCount = NULL,
 	.DmaShdlInit = asicUsbDmaShdlInit,
-	.DmaShdlReInit = NULL,
-	.asicUdmaRxFlush = NULL,
-#if CFG_CHIP_RESET_SUPPORT
-	.asicUsbEpctlRstOpt = NULL,
-#endif
 #endif /* _HIF_USB */
 #if defined(_HIF_SDIO)
 	.halTxGetFreeResource = halTxGetFreeResource_v1,
@@ -282,7 +269,6 @@ struct CHIP_DBG_OPS mt7663_debug_ops = {
 	.showWtblInfo = NULL,
 	.showHifInfo = NULL,
 	.printHifDbgInfo = halPrintHifDbgInfo,
-	.show_mcu_debug_info = NULL,
 };
 
 /* Litien code refine to support multi chip */

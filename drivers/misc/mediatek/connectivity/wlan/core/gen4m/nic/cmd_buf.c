@@ -124,7 +124,7 @@ u_int8_t fgCmdDumpIsDone = FALSE;
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cmdBufInitialize(struct ADAPTER *prAdapter)
+void cmdBufInitialize(IN struct ADAPTER *prAdapter)
 {
 	struct CMD_INFO *prCmdInfo;
 	uint32_t i;
@@ -152,7 +152,8 @@ void cmdBufInitialize(struct ADAPTER *prAdapter)
 void cmdBufDumpCmdQueue(struct QUE *prQueue,
 			int8_t *queName)
 {
-	struct CMD_INFO *prCmdInfo = QUEUE_GET_HEAD(prQueue);
+	struct CMD_INFO *prCmdInfo = (struct CMD_INFO *)
+			QUEUE_GET_HEAD(prQueue);
 	uint8_t i = 1, pos = 0;
 	char buf[500] = {0};
 
@@ -174,7 +175,8 @@ void cmdBufDumpCmdQueue(struct QUE *prQueue,
 			kalMemZero(buf, sizeof(buf));
 			pos = 0;
 		}
-		prCmdInfo = QUEUE_GET_NEXT_ENTRY(prCmdInfo);
+		prCmdInfo = (struct CMD_INFO *) QUEUE_GET_NEXT_ENTRY((
+					struct QUE_ENTRY *) prCmdInfo);
 		i++;
 	}
 }
@@ -191,15 +193,15 @@ void cmdBufDumpCmdQueue(struct QUE *prQueue,
  */
 /*----------------------------------------------------------------------------*/
 #if CFG_DBG_MGT_BUF
-struct CMD_INFO *cmdBufAllocateCmdInfoX(struct ADAPTER
-					   *prAdapter, uint32_t u4Length,
+struct CMD_INFO *cmdBufAllocateCmdInfoX(IN struct ADAPTER
+					   *prAdapter, IN uint32_t u4Length,
 					   uint8_t *fileAndLine)
 #else
-struct CMD_INFO *cmdBufAllocateCmdInfo(struct ADAPTER
-				       *prAdapter, uint32_t u4Length)
+struct CMD_INFO *cmdBufAllocateCmdInfo(IN struct ADAPTER
+				       *prAdapter, IN uint32_t u4Length)
 #endif
 {
-	struct CMD_INFO *prCmdInfo = NULL;
+	struct CMD_INFO *prCmdInfo;
 
 	KAL_SPIN_LOCK_DECLARATION();
 
@@ -274,7 +276,6 @@ struct CMD_INFO *cmdBufAllocateCmdInfo(struct ADAPTER
 		       "CMD[0x%p] allocated! LEN[%04u], Rest[%u]\n",
 		       prCmdInfo, u4Length, prAdapter->rFreeCmdList.u4NumElem);
 
-		prAdapter->fgIsCmdAllocFail = FALSE;
 	} else {
 		/* dump debug log */
 		prAdapter->u4HifDbgFlag |= DEG_HIF_DEFAULT_DUMP;
@@ -283,15 +284,6 @@ struct CMD_INFO *cmdBufAllocateCmdInfo(struct ADAPTER
 		DBGLOG(MEM, ERROR,
 		       "CMD allocation failed! LEN[%04u], Rest[%u]\n",
 		       u4Length, prAdapter->rFreeCmdList.u4NumElem);
-
-		if (!prAdapter->fgIsCmdAllocFail) {
-			prAdapter->fgIsCmdAllocFail = TRUE;
-			prAdapter->u4CmdAllocStartFailTime = kalGetTimeTick();
-		} else if (CHECK_FOR_TIMEOUT(kalGetTimeTick(),
-					    prAdapter->u4CmdAllocStartFailTime,
-					    CFG_CMD_ALLOC_FAIL_TIMEOUT_MS))
-			GL_DEFAULT_RESET_TRIGGER(prAdapter,
-					     RST_CMD_EVT_FAIL);
 	}
 
 	return prCmdInfo;
@@ -308,8 +300,8 @@ struct CMD_INFO *cmdBufAllocateCmdInfo(struct ADAPTER
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cmdBufFreeCmdInfo(struct ADAPTER *prAdapter,
-		       struct CMD_INFO *prCmdInfo)
+void cmdBufFreeCmdInfo(IN struct ADAPTER *prAdapter,
+		       IN struct CMD_INFO *prCmdInfo)
 {
 	KAL_SPIN_LOCK_DECLARATION();
 
@@ -333,35 +325,9 @@ void cmdBufFreeCmdInfo(struct ADAPTER *prAdapter,
 	}
 
 	if (prCmdInfo)
-		DBGLOG(MEM, LOUD, "CMD[0x%d] SEQ[%d] freed! Rest[%u]\n",
-			prCmdInfo->ucCID, prCmdInfo->ucCmdSeqNum,
-			prAdapter->rFreeCmdList.u4NumElem);
+		DBGLOG(MEM, LOUD, "CMD[0x%p] freed! Rest[%u]\n", prCmdInfo,
+		       prAdapter->rFreeCmdList.u4NumElem);
 
 	return;
 
 }				/* end of cmdBufFreeCmdPacket() */
-
-uint32_t
-wlanSendSetQueryCmd(struct ADAPTER *prAdapter,
-		    uint8_t ucCID,
-		    u_int8_t fgSetQuery,
-		    u_int8_t fgNeedResp,
-		    u_int8_t fgIsOid,
-		    PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-		    PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler,
-		    uint32_t u4SetQueryInfoLen,
-		    uint8_t *pucInfoBuffer, void *pvSetQueryBuffer,
-		    uint32_t u4SetQueryBufferLen)
-{
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-	return wlanSendSetQueryCmdHelper(
-#else
-	return wlanSendSetQueryCmdAdv(
-#endif
-		prAdapter, ucCID, 0, fgSetQuery,
-		fgNeedResp, fgIsOid, pfCmdDoneHandler,
-		pfCmdTimeoutHandler, u4SetQueryInfoLen,
-		pucInfoBuffer, pvSetQueryBuffer, u4SetQueryBufferLen,
-		CMD_SEND_METHOD_ENQUEUE);
-}
-

@@ -27,9 +27,9 @@ static void wmmSyncAcParamWithFw(struct ADAPTER *prAdapter, uint8_t ucAc,
 	uint16_t u2MediumTime, uint32_t u4PhyRate, uint8_t ucBssIndex);
 
 static void wmmGetTsmRptTimeout(struct ADAPTER *prAdapter,
-				uintptr_t ulParam);
+				unsigned long ulParam);
 
-static void wmmQueryTsmResult(struct ADAPTER *prAdapter, uintptr_t ulParam);
+static void wmmQueryTsmResult(struct ADAPTER *prAdapter, unsigned long ulParam);
 static void wmmRemoveTSM(struct ADAPTER *prAdapter,
 			 struct ACTIVE_RM_TSM_REQ *prActiveTsm,
 			 u_int8_t fgNeedStop,
@@ -57,8 +57,8 @@ static uint16_t wmmAcmTxTimeCal(uint16_t u2SecExtra, uint16_t u2EthBodyLen,
 static uint16_t wmmAcmTxTimeHtCal(uint16_t u2SecExtra, uint16_t u2EthBodyLen,
 				  uint8_t ucMcsId, uint8_t ucFlags);
 
-static void wmmAcmDequeueTimeOut(struct ADAPTER *prAdapter,
-				 uintptr_t ulParamPtr);
+static void wmmAcmDequeueTimeOut(IN struct ADAPTER *prAdapter,
+				 unsigned long ulParamPtr);
 
 #define FLAG_S_PREAMBLE BIT(0)
 #define FLAG_CTS_SELF BIT(1)
@@ -82,66 +82,71 @@ static void wmmAcmDequeueTimeOut(struct ADAPTER *prAdapter,
 #define FRM_LENGTH_AGG_AMSDU_HDR 17
 #define FRM_LENGTH_AGG_RAILNK_HDR 14
 
-static inline uint8_t LMR_PREAMBL_TIME(uint8_t __fgIsGmode,
-	uint8_t __fgIsSpreamble)
-{
-	uint8_t ucTime = 0;
-
-	if (__fgIsGmode)
-		ucTime = 20;
-	else
-		ucTime = __fgIsSpreamble ? TIME_SHORT_PREAMBLE
-		: TIME_LONG_PREAMBLE;
-
-	return ucTime;
-}
+#define LMR_PREAMBL_TIME(__fgIsGmode, __fgIsSpreamble)                         \
+	({                                                                     \
+		uint8_t ucTime;                                                \
+		if (__fgIsGmode)                                               \
+			ucTime = 20;                                           \
+		else                                                           \
+			ucTime = __fgIsSpreamble ? TIME_SHORT_PREAMBLE         \
+						 : TIME_LONG_PREAMBLE;         \
+		ucTime;                                                        \
+	})
 #endif
 
 uint8_t const aucUp2ACIMap[8] = {ACI_BE, ACI_BK, ACI_BK, ACI_BE,
 				 ACI_VI, ACI_VI, ACI_VO, ACI_VO};
 
-void wmmInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
+void wmmInit(IN struct ADAPTER *prAdapter)
 {
-	struct WMM_INFO *prWmmInfo = aisGetWMMInfo(prAdapter, ucBssIndex);
-	struct TSPEC_INFO *prTspecInfo = &prWmmInfo->arTsInfo[0];
-	uint8_t ucTid = 0;
+	uint8_t i;
 
-	for (ucTid = 0; ucTid < WMM_TSPEC_ID_NUM;
-		ucTid++, prTspecInfo++) {
-		prTspecInfo->ucTid = ucTid;
-		cnmTimerInitTimer(prAdapter,
-		&prTspecInfo->rAddTsTimer,
-		(PFN_MGMT_TIMEOUT_FUNC)
-		wmmSetupTspecTimeOut,
-		(uintptr_t)prTspecInfo);
-	}
+	for (i = 0; i < KAL_AIS_NUM; i++) {
+		struct WMM_INFO *prWmmInfo =
+			aisGetWMMInfo(prAdapter, i);
+		struct TSPEC_INFO *prTspecInfo = &prWmmInfo->arTsInfo[0];
+		uint8_t ucTid = 0;
+
+		for (ucTid = 0; ucTid < WMM_TSPEC_ID_NUM;
+			ucTid++, prTspecInfo++) {
+			prTspecInfo->ucTid = ucTid;
+			cnmTimerInitTimer(prAdapter,
+			&prTspecInfo->rAddTsTimer,
+			(PFN_MGMT_TIMEOUT_FUNC)
+			wmmSetupTspecTimeOut,
+			(unsigned long)prTspecInfo);
+		}
 #if CFG_SUPPORT_SOFT_ACM
-	cnmTimerInitTimer(prAdapter, &prWmmInfo->rAcmDeqTimer,
-			wmmAcmDequeueTimeOut, ucBssIndex);
-	kalMemZero(&prWmmInfo->arAcmCtrl[0],
-			sizeof(prWmmInfo->arAcmCtrl));
+		cnmTimerInitTimer(prAdapter, &prWmmInfo->rAcmDeqTimer,
+				wmmAcmDequeueTimeOut, i);
+		kalMemZero(&prWmmInfo->arAcmCtrl[0],
+				sizeof(prWmmInfo->arAcmCtrl));
 #endif
-	LINK_INITIALIZE(&prWmmInfo->rActiveTsmReq);
-	prWmmInfo->rTriggeredTsmRptTime = 0;
-
+		LINK_INITIALIZE(&prWmmInfo->rActiveTsmReq);
+		prWmmInfo->rTriggeredTsmRptTime = 0;
+	}
 	DBGLOG(WMM, TRACE, "wmm init done\n");
 }
 
-void wmmUnInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
+void wmmUnInit(IN struct ADAPTER *prAdapter)
 {
-	struct WMM_INFO *prWmmInfo = aisGetWMMInfo(prAdapter, ucBssIndex);
-	struct TSPEC_INFO *prTspecInfo = &prWmmInfo->arTsInfo[0];
-	uint8_t ucTid = 0;
+	uint8_t i;
 
-	for (ucTid = 0; ucTid < WMM_TSPEC_ID_NUM;
-		ucTid++, prTspecInfo++)
-		cnmTimerStopTimer(prAdapter,
-			&prTspecInfo->rAddTsTimer);
+	for (i = 0; i < KAL_AIS_NUM; i++) {
+		struct WMM_INFO *prWmmInfo =
+			aisGetWMMInfo(prAdapter, i);
+		struct TSPEC_INFO *prTspecInfo = &prWmmInfo->arTsInfo[0];
+		uint8_t ucTid = 0;
+
+		for (ucTid = 0; ucTid < WMM_TSPEC_ID_NUM;
+			ucTid++, prTspecInfo++)
+			cnmTimerStopTimer(prAdapter,
+				&prTspecInfo->rAddTsTimer);
 #if CFG_SUPPORT_SOFT_ACM
-	cnmTimerStopTimer(prAdapter, &prWmmInfo->rAcmDeqTimer);
+		cnmTimerStopTimer(prAdapter, &prWmmInfo->rAcmDeqTimer);
 #endif
-	wmmRemoveAllTsmMeasurement(prAdapter, FALSE, ucBssIndex);
-
+		wmmRemoveAllTsmMeasurement(prAdapter, FALSE, i);
+	}
 	DBGLOG(WMM, TRACE, "wmm uninit done\n");
 }
 
@@ -167,8 +172,8 @@ void wmmFillTsinfo(struct PARAM_QOS_TSINFO *prTsInfo, uint8_t *pucTsInfo)
 	pucTsInfo[2] = (u4TsInfoValue >> 16) & 0xff;
 }
 
-void wmmComposeTspecIE(struct ADAPTER *prAdapter,
-		       struct MSDU_INFO *prMsduInfo,
+void wmmComposeTspecIE(IN struct ADAPTER *prAdapter,
+		       IN struct MSDU_INFO *prMsduInfo,
 		       struct PARAM_QOS_TSPEC *prParamQosTspec)
 {
 	struct IE_WMM_TSPEC *prIeWmmTspec = NULL;
@@ -310,7 +315,7 @@ static void wmmTxTspecFrame(struct ADAPTER *prAdapter, uint8_t ucTid,
 #endif
 }
 
-void wmmSetupTspecTimeOut(struct ADAPTER *prAdapter, uintptr_t ulParam)
+void wmmSetupTspecTimeOut(struct ADAPTER *prAdapter, unsigned long ulParam)
 {
 	struct TSPEC_INFO *prTsInfo = (struct TSPEC_INFO *)ulParam;
 
@@ -481,8 +486,8 @@ uint8_t wmmHasActiveTspec(struct WMM_INFO *prWmmInfo)
 	return ucACList;
 }
 
-void wmmRunEventTSOperate(struct ADAPTER *prAdapter,
-			  struct MSG_HDR *prMsgHdr)
+void wmmRunEventTSOperate(IN struct ADAPTER *prAdapter,
+			  IN struct MSG_HDR *prMsgHdr)
 {
 	struct MSG_TS_OPERATE *prMsgTsOperate =
 		(struct MSG_TS_OPERATE *)prMsgHdr;
@@ -582,14 +587,14 @@ void wmmTspecSteps(struct ADAPTER *prAdapter, uint8_t ucTid,
 				TRUE, FALSE, ucBssIndex);
 			if (prActiveTsmReq)
 				wmmStartTsmMeasurement(
-					prAdapter, (uintptr_t)prActiveTsmReq
+					prAdapter, (unsigned long)prActiveTsmReq
 							   ->prTsmReq,
 				ucBssIndex);
 			prActiveTsmReq = wmmGetActiveTsmReq(prAdapter, ucTid,
 				FALSE, FALSE, ucBssIndex);
 			if (prActiveTsmReq)
 				wmmStartTsmMeasurement(
-					prAdapter, (uintptr_t)prActiveTsmReq
+					prAdapter, (unsigned long)prActiveTsmReq
 							   ->prTsmReq,
 				ucBssIndex);
 
@@ -625,8 +630,8 @@ void wmmTspecSteps(struct ADAPTER *prAdapter, uint8_t ucTid,
 #if CFG_SUPPORT_SOFT_ACM
 			/* Need to change tx queue, due to we do soft ACM */
 			qmHandleDelTspec(prAdapter,
-				aisGetTargetStaRec(prAdapter, ucBssIndex),
-				prCurTs->eAC);
+					 prAisFsmInfo->prTargetStaRec,
+					 prCurTs->eAC);
 #endif
 			wmmSyncAcParamWithFw(prAdapter, prCurTs->eAC, 0, 0,
 				ucBssIndex);
@@ -743,7 +748,7 @@ void DumpData(uint8_t *prAddr, uint8_t uLen, char *tag)
 
 /* TSM related */
 static void wmmQueryTsmResult(struct ADAPTER *prAdapter,
-	uintptr_t ulParam)
+	unsigned long ulParam)
 {
 	uint8_t ucBssIndex =
 		((struct ACTIVE_RM_TSM_REQ *)ulParam)->ucBssIdx;
@@ -850,7 +855,7 @@ static void wmmRemoveTSM(struct ADAPTER *prAdapter,
 	cnmMemFree(prAdapter, prActiveTsm);
 }
 
-void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, uintptr_t ulParam,
+void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, unsigned long ulParam,
 	uint8_t ucBssIndex)
 {
 	struct WMM_INFO *prWMMInfo =
@@ -957,7 +962,7 @@ void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, uintptr_t ulParam,
 			prActiveTsmReq->ucBssIdx = ucBssIndex;
 			cnmTimerInitTimer(prAdapter, &prWMMInfo->rTsmTimer,
 				wmmQueryTsmResult,
-				(uintptr_t)prActiveTsmReq);
+				(unsigned long)prActiveTsmReq);
 			cnmTimerStartTimer(prAdapter, &prWMMInfo->rTsmTimer,
 					   TU_TO_MSEC(prTsmReq->u2Duration));
 		}
@@ -1032,8 +1037,8 @@ void wmmRemoveAllTsmMeasurement(struct ADAPTER *prAdapter,
 	prWmmInfo->rTriggeredTsmRptTime = 0;
 }
 
-u_int8_t wmmParseQosAction(struct ADAPTER *prAdapter,
-			   struct SW_RFB *prSwRfb)
+u_int8_t wmmParseQosAction(IN struct ADAPTER *prAdapter,
+			   IN struct SW_RFB *prSwRfb)
 {
 	struct WLAN_ACTION_FRAME *prWlanActionFrame = NULL;
 	uint8_t *pucIE = NULL;
@@ -1047,8 +1052,6 @@ u_int8_t wmmParseQosAction(struct ADAPTER *prAdapter,
 		prSwRfb);
 
 	prWlanActionFrame = (struct WLAN_ACTION_FRAME *)prSwRfb->pvHeader;
-	kalMemZero(&rTspec, sizeof(rTspec));
-
 	DBGLOG(WMM, INFO, "[%d] Action=%d\n",
 		ucBssIndex,
 		prWlanActionFrame->ucAction);
@@ -1245,7 +1248,7 @@ u_int8_t wmmParseTspecIE(struct ADAPTER *prAdapter, uint8_t *pucIE,
 }
 
 static void wmmGetTsmRptTimeout(struct ADAPTER *prAdapter,
-	uintptr_t ulParam)
+	unsigned long ulParam)
 {
 	uint8_t ucBssIndex =
 		((struct ACTIVE_RM_TSM_REQ *)ulParam)->ucBssIdx;
@@ -1606,7 +1609,11 @@ u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
 	struct WMM_INFO *prWmmInfo =
 		aisGetWMMInfo(prAdapter, ucBssIndex);
 	uint32_t u4CurTime = 0;
-
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+	struct timespec64 ts;
+#else
+	struct timespec ts;
+#endif
 	if (!prWmmInfo) {
 		DBGLOG(WMM, INFO, "prWmmInfo is null %d\n", ucBssIndex);
 		return FALSE;
@@ -1615,9 +1622,12 @@ u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
 	prAcmCtrl = &prWmmInfo->arAcmCtrl[ucAc];
 	if (!prAcmCtrl->u4AdmittedTime)
 		return FALSE;
-
-	u4CurTime = (uint32_t)(kalGetBootTime() / USEC_PER_SEC);
-
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+	ktime_get_boottime_ts64(&ts);
+#else
+	get_monotonic_boottime(&ts);
+#endif
+	u4CurTime = ts.tv_sec;
 	if (!TIME_BEFORE(u4CurTime, prAcmCtrl->u4IntervalEndSec)) {
 		u4CurTime++;
 		DBGLOG(WMM, INFO,
@@ -1666,9 +1676,13 @@ u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
 	 */
 	if (!timerPendingTimer(&prWmmInfo->rAcmDeqTimer)) {
 		uint32_t u4EndMsec = prAcmCtrl->u4IntervalEndSec * 1000;
-
-		u4CurTime = (uint32_t)(kalGetBootTime() / USEC_PER_MSEC);
-
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+		ktime_get_boottime_ts64(&ts);
+#else
+		get_monotonic_boottime(&ts);
+#endif
+		u4CurTime = ts.tv_sec * MSEC_PER_SEC;
+		u4CurTime += ts.tv_nsec / NSEC_PER_MSEC;
 		/* It is impossible that u4EndMsec is less than u4CurTime */
 		u4EndMsec = u4EndMsec - u4CurTime +
 			    20; /* the timeout duration at least 2 jiffies */
@@ -1680,45 +1694,6 @@ u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
 	}
 	return FALSE;
 }
-
-
-/*----------------------------------------------------------------------------*/
-/*!
- * \brief For TX direct, check whether can TX now, or pending until timeout
- *
- * \param[in] prAdapter
- * \param[in] prBssInfo
- * \param[in] prStaRec
- * \param[in] ucAc: AC category
- * \param[in] u2PktLen: packet length
- *
- * \return TRUE for TX, FALSE for pending
- */
-/*----------------------------------------------------------------------------*/
-u_int8_t wmmAcmCanTx(struct ADAPTER *prAdapter,
-		struct BSS_INFO *prBssInfo, struct STA_RECORD *prStaRec,
-		uint8_t ucAc, uint16_t u2PktLen)
-{
-	if (!prAdapter || !prBssInfo || !prStaRec)
-		return TRUE;
-
-	if (unlikely(prStaRec->afgAcmRequired[ucAc])) {
-		uint32_t u4PktTxTime = 0;
-
-		DBGLOG(WMM, TRACE, "AC %d Pending Pkts %u\n",
-				ucAc, u2PktLen);
-
-		u4PktTxTime = wmmCalculatePktUsedTime(
-				prBssInfo, prStaRec,
-				u2PktLen - ETH_HLEN);
-		return wmmAcmCanDequeue(prAdapter, ucAc,
-					u4PktTxTime,
-					prBssInfo->ucBssIndex);
-	} else {
-		return TRUE;
-	}
-}
-
 
 static uint16_t wmmAcmTxTimePLCPCal(uint16_t u2Length, uint16_t u2Rate,
 				    uint8_t FlgIsGmode)
@@ -1937,14 +1912,10 @@ static uint16_t wmmAcmTxTimeHtCal(uint16_t u2SecExtra, uint16_t u2EthBodyLen,
 	return u2TxTime;
 } /* End of ACM_TX_TimeCalHT */
 
-static void wmmAcmDequeueTimeOut(struct ADAPTER *prAdapter,
-				 uintptr_t ulParamPtr)
+static void wmmAcmDequeueTimeOut(IN struct ADAPTER *prAdapter,
+				 unsigned long ulParamPtr)
 {
 	DBGLOG(WMM, INFO, "Timeout, trigger to do ACM dequeue\n");
 	kalSetEvent(prAdapter->prGlueInfo);
-
-	/* for TX direct, continue TX */
-	if (HAL_IS_TX_DIRECT(prAdapter))
-		nicTxDirectStartCheckQTimer(prAdapter);
 }
 #endif

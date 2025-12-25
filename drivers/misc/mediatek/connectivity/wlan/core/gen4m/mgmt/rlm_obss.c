@@ -100,7 +100,7 @@
  *******************************************************************************
  */
 static void rlmObssScanTimeout(struct ADAPTER *prAdapter,
-			       uintptr_t ulParamPtr);
+			       unsigned long ulParamPtr);
 
 /*******************************************************************************
  *                              F U N C T I O N S
@@ -128,7 +128,7 @@ void rlmObssInit(struct ADAPTER *prAdapter)
 
 		cnmTimerInitTimer(prAdapter, &prBssInfo->rObssScanTimer,
 				  (PFN_MGMT_TIMEOUT_FUNC) rlmObssScanTimeout,
-				  (uintptr_t) prBssInfo);
+				  (unsigned long) prBssInfo);
 	}
 }
 
@@ -211,7 +211,7 @@ void rlmObssScanDone(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
 
 		if (prMsduInfo) {
 			prTxFrame = (struct ACTION_20_40_COEXIST_FRAME *)
-			    ((uintptr_t) (prMsduInfo->prPacket) +
+			    ((unsigned long) (prMsduInfo->prPacket) +
 			     MAC_TX_RESERVED_FIELD);
 
 			prTxFrame->u2FrameCtrl = MAC_FRAME_ACTION;
@@ -297,7 +297,7 @@ void rlmObssScanDone(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
  */
 /*----------------------------------------------------------------------------*/
 static void rlmObssScanTimeout(struct ADAPTER *prAdapter,
-			       uintptr_t ulParamPtr)
+			       unsigned long ulParamPtr)
 {
 	struct BSS_INFO *prBssInfo;
 

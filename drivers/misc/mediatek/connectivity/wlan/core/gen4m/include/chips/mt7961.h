@@ -77,7 +77,7 @@
 
 #define CONNAC2X_TOP_HCR 0x70010200
 #define CONNAC2X_TOP_HVR 0x70010204
-#define CONNAC2X_TOP_FVR 0x88000004
+#define CONNAC2X_TOP_FVR 0x70010208
 #define CONNAC2x_CONN_CFG_ON_BASE	0x7C060000
 #define CONNAC2x_CONN_CFG_ON_CONN_ON_MISC_ADDR \
 	(CONNAC2x_CONN_CFG_ON_BASE + 0xF0)
@@ -93,24 +93,6 @@
 #define MT7961_RX_DESC_LENGTH   24
 #define MT7961_ARB_AC_MODE_ADDR (0x820E315C)
 
-#define MT7961_A_DIE_VER_ADDR 0x70010020
-#define MT7961_A_DIE_VER_BIT  BIT(7)
-#define MT7961_A_DIE_7921     0
-#define MT7961_A_DIE_7920     BIT(7)
-#define MT7961_A_DIE_7921_FLAVOR 0x1
-#define MT7961_A_DIE_7920_FLAVOR 0x1a
-
-#define MT7961_BT_FW_VER_ADDR 0x7C812004
-#define MT7961_BT_FW_VER_MASK 0xFF
-
-/*------------------------------------------------------------------------------
- * MACRO for debug MCU
- *------------------------------------------------------------------------------
- */
-#define CURRENT_PC 0x3F
-#define PC_LOG_IDX 0x20
-#define PC_LOG_NUM 32
-
 /*------------------------------------------------------------------------------
  * MACRO for WTBL INFO GET
  *------------------------------------------------------------------------------
@@ -118,16 +100,6 @@
 
 #define MT7961_WIFI_LWTBL_BASE 0x820d4200
 #define MT7961_WIFI_UWTBL_BASE 0x820c4094
-
-#if CFG_SUPPORT_HOST_RX_WM_EVENT_FROM_PSE
-#define MT7961_HOST_RX_WM_EVENT_FROM_PSE_RX_RING4_SIZE	32
-#endif
-
-/*------------------------------------------------------------------------------
- * MACRO for WFDMA INFO GET
- *------------------------------------------------------------------------------
- */
-#define MT7961_WFDMA_COUNT 1
 
 /*******************************************************************************
 *                         D A T A   T Y P E S
@@ -156,65 +128,8 @@
 void mt7961_show_ple_info(
 	struct ADAPTER *prAdapter,
 	u_int8_t fgDumpTxd);
-
 void mt7961_show_pse_info(
 	struct ADAPTER *prAdapter);
-
-void mt7961_show_wfdma_info(
-	struct ADAPTER *prAdapter);
-
-#if defined(_HIF_SDIO)
-u_int8_t sdio_show_mcu_debug_info(
-	struct ADAPTER *prAdapter,
-	uint8_t *pucBuf, uint32_t u4Max,
-	uint8_t ucFlag, uint32_t *pu4Length);
-#elif defined(_HIF_USB)
-u_int8_t usb_show_mcu_debug_info(
-	struct ADAPTER *prAdapter,
-	uint8_t *pucBuf, uint32_t u4Max,
-	uint8_t ucFlag, uint32_t *pu4Length);
-#elif defined(_HIF_PCIE)
-u_int8_t pcie_show_mcu_debug_info(
-	struct ADAPTER *prAdapter,
-	uint8_t *pucBuf, uint32_t u4Max,
-	uint8_t ucFlag, uint32_t *pu4Length);
-#endif
-
-#if (CFG_SUPPORT_DEBUG_SOP == 1)
-#if defined(_HIF_USB)
-void usb_mt7961_dump_subsys_debug_cr(struct ADAPTER *prAdapter);
-void usb_mt7961_dump_conninfra_debug_cr(struct ADAPTER *prAdapter);
-#elif defined(_HIF_PCIE)
-void pcie_mt7961_dump_subsys_debug_cr(struct ADAPTER *prAdapter);
-void pcie_mt7961_dump_conninfra_debug_cr(struct ADAPTER *prAdapter);
-#endif
-u_int8_t mt7961_show_debug_sop_info(struct ADAPTER *prAdapter,
-	uint8_t ucCase);
-#endif
-
-
-#if defined(_HIF_PCIE) || defined(_HIF_AXI)
-
-void mt7961WfdmaTxRingExtCtrl(
-	struct GLUE_INFO *prGlueInfo,
-	struct RTMP_TX_RING *tx_ring,
-	uint32_t index);
-
-void mt7961WfdmaRxRingExtCtrl(
-	struct GLUE_INFO *prGlueInfo,
-	struct RTMP_RX_RING *rx_ring,
-	uint32_t index);
-
-#if (CFG_COALESCING_INTERRUPT == 1)
-uint32_t mt7961setWfdmaCoalescingInt(
-	struct ADAPTER *prAdapter,
-	u_int8_t fgEnable);
-#endif
-
-#endif /* _HIF_PCIE || _HIF_AXI */
-
-void mt7961SerInit(struct ADAPTER *prAdapter,
-		   const u_int8_t fgAtResetFlow);
 
 /*******************************************************************************
 *                              F U N C T I O N S

@@ -57,21 +57,10 @@ struct param_mtk_wifi_test_struct {
 	u_int32 func_data;
 };
 
-#if (CFG_SUPPORT_CONNAC3X == 0)
 struct param_custom_access_rx_stat {
 	u_int32 seq_num;
 	u_int32 total_num;
 };
-
-#else
-struct param_custom_access_rx_stat {
-	u_int16 seq_num;
-	u_int8  band_idx;
-	/* bit[0] in event structure will tell new / old firmware format */
-	u_int8  data;
-	u_int32 total_num;
-};
-#endif
 
 struct param_custom_mcr_rw_struct {
 	u_int32 mcr_offset;
@@ -157,10 +146,7 @@ s_int32 mt_op_set_clean_persta_txq(
 	boolean sta_pause_enable, u_char omac_idx, u_char band_idx);
 s_int32 mt_op_set_cfg_on_off(
 	struct test_wlan_info *winfos,
-	u_int32 type,
-	u_int32 enable,
-	u_int32 band_idx,
-	u_int32 ch_band);
+	u_int8 type, u_int8 enable, u_char band_idx);
 s_int32 mt_op_log_on_off(
 	struct test_wlan_info *winfos,
 	u_char band_idx,
@@ -182,9 +168,6 @@ s_int32 mt_op_set_rx_filter_pkt_len(
 	u_int8 enable, u_char band_idx, u_int32 rx_pkt_len);
 s_int32 mt_op_get_antswap_capability(
 	struct test_wlan_info *winfos,
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	u_char band_idx,
-#endif /* (CFG_SUPPORT_CONNAC3X == 1) */
 	u_int32 *antswap_support);
 s_int32 mt_op_set_antswap(
 	struct test_wlan_info *winfos,
@@ -398,20 +381,10 @@ s_int32 mt_op_get_freq_offset(
 	struct test_wlan_info *winfos,
 	u_char band_idx,
 	u_int32 *freq_offset);
-#if (CFG_SUPPORT_CONNAC3X == 1)
-s_int32 mt_op_set_freq_offset_C2(
-	struct test_wlan_info *winfos,
-	u_int32 freq_offset, u_char band_idx);
-s_int32 mt_op_get_freq_offset_C2(
-	struct test_wlan_info *winfos,
-	u_char band_idx,
-	u_int32 *freq_offset);
-#endif
 s_int32 mt_op_get_cfg_on_off(
 	struct test_wlan_info *winfos,
+	u_char band_idx,
 	u_int32 type,
-	u_int32 band_idx,
-	u_int32 ch_band,
 	u_int32 *result);
 s_int32 mt_op_get_tx_tone_pwr(
 	struct test_wlan_info *winfos,
@@ -441,13 +414,6 @@ s_int32 mt_op_set_dpd(
 	struct test_wlan_info *winfos,
 	u_int32 on_off,
 	u_int32 wf_sel);
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-s_int32 mt_op_set_max_pac_ext(
-	struct test_wlan_info *winfos,
-	u_int32 max_pac_ext);
-#endif
-
 s_int32 mt_op_set_tssi(
 	struct test_wlan_info *winfos,
 	u_int32 on_off,
@@ -526,33 +492,5 @@ s_int32 mt_op_listmode_cmd(
 	u_int16 para_len,
 	uint32_t *rsp_len,
 	void *rsp_data);
-s_int32 mt_op_set_efem_mode(
-	struct test_wlan_info *winfos,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 mode,
-	u_int32 level);
-s_int32 mt_op_set_tx_gain(
-	struct test_wlan_info *winfos,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_type,
-	u_int32 value);
-s_int32 mt_op_set_etssi_gain(
-	struct test_wlan_info *winfos,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_value);
-s_int32 mt_op_get_tssi_meas_dbv(
-	struct test_wlan_info *winfos,
-	u_int32 band_idx,
-	u_int32 wf_path,
-	u_int32 *dbv_value);
 
 #endif /* __OPERATION_H__ */

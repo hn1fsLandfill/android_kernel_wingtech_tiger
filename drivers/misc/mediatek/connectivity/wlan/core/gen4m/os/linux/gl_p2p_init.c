@@ -79,12 +79,7 @@
  */
 
 #define P2P_INF_NAME "p2p%d"
-
-#if CFG_TC10_FEATURE
-#define AP_INF_NAME  "swlan%d"
-#else
 #define AP_INF_NAME  "ap%d"
-#endif
 
 /******************************************************************************
  *                             D A T A   T Y P E S
@@ -150,12 +145,6 @@ void p2pSetSuspendMode(struct GLUE_INFO *prGlueInfo, u_int8_t fgEnable)
 		prDev = prP2PInfo->aprRoleHandler;
 	} else {
 		prDev = prP2PInfo->prDevHandler;
-		/* Skip p2p dev for dev mode */
-		if (p2pGetMode() == RUNNING_P2P_DEV_MODE &&
-			!prP2PInfo->aprRoleHandler) {
-			DBGLOG(INIT, LOUD, "P2P dev SKIP!\n");
-			return;
-		}
 	}
 
 	if (!prDev) {
@@ -212,14 +201,13 @@ void p2pResumeStatisticsTimer(struct GLUE_INFO *prGlueInfo,
 			"StatisticsTimer resume failed. prP2pRoleFsmInfo is NULL\n");
 		return;
 	}
-#if CFG_SUPPORT_WFD
+
 	if (prGlueInfo->prAdapter->rWifiVar.rWfdConfigureSettings.ucWfdEnable &&
 		!prGlueInfo->fgIsInSuspendMode) {
 		cnmTimerStartTimer(prGlueInfo->prAdapter,
 			&(prP2pRoleFsmInfo->rP2pRoleFsmGetStatisticsTimer),
 			P2P_ROLE_GET_STATISTICS_TIME);
 	}
-#endif
 }
 #endif
 
@@ -270,12 +258,7 @@ u_int8_t p2pLaunch(struct GLUE_INFO *prGlueInfo)
 	return TRUE;
 }
 
-uint8_t p2pGetMode()
-{
-	return mode;
-}
-
-void p2pSetMode(uint8_t ucAPMode)
+void p2pSetMode(IN uint8_t ucAPMode)
 {
 	uint8_t *prAPInfName = AP_INF_NAME;
 	uint8_t *prP2PInfName = P2P_INF_NAME;
@@ -316,14 +299,6 @@ void p2pSetMode(uint8_t ucAPMode)
 		break;
 	case 4:
 		mode = RUNNING_DUAL_P2P_MODE;
-		ifname = prP2PInfName;
-		break;
-	case 5:
-		mode = RUNNING_P2P_DEV_MODE;
-		ifname = prP2PInfName;
-		break;
-	case 6:
-		mode = RUNNING_P2P_NO_GROUP_MODE;
 		ifname = prP2PInfName;
 		break;
 	}

@@ -257,40 +257,33 @@ static bool mt7915WfdmaAllocRxRing(
 	struct GLUE_INFO *prGlueInfo,
 	bool fgAllocMem)
 {
-	struct GL_HIF_INFO *prHifInfo = &prGlueInfo->rHifInfo;
-
-	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_DATA1,
-				 prHifInfo->u4RxDataRingSize,
-				 RXD_SIZE, RX_BUFFER_AGGRESIZE,
-				 fgAllocMem)) {
+	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_DATA1_IDX_2,
+			RX_RING_SIZE, RXD_SIZE, RX_BUFFER_AGGRESIZE,
+			fgAllocMem)) {
 		DBGLOG(HAL, ERROR, "AllocWfdmaRxRing fail\n");
 		return false;
 	}
-	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_TXDONE0,
-				 prHifInfo->u4RxEvtRingSize,
-				 RXD_SIZE, RX_BUFFER_AGGRESIZE,
-				 fgAllocMem)) {
+	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_TXDONE0_IDX_3,
+			RX_RING1_SIZE, RXD_SIZE, RX_BUFFER_AGGRESIZE,
+			fgAllocMem)) {
 		DBGLOG(HAL, ERROR, "AllocWfdmaRxRing fail\n");
 		return false;
 	}
-	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_TXDONE1,
-				 prHifInfo->u4RxEvtRingSize, RXD_SIZE,
-				 RX_BUFFER_AGGRESIZE,
-				 fgAllocMem)) {
+	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_TXDONE1_IDX_4,
+			RX_RING1_SIZE, RXD_SIZE, RX_BUFFER_AGGRESIZE,
+			fgAllocMem)) {
 		DBGLOG(HAL, ERROR, "AllocWfdmaRxRing fail\n");
 		return false;
 	}
-	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_WAEVT0,
-				 prHifInfo->u4RxDataRingSize, RXD_SIZE,
-				 RX_BUFFER_AGGRESIZE,
-				 fgAllocMem)) {
+	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_WAEVT0_IDX_5,
+			RX_RING_SIZE, RXD_SIZE, RX_BUFFER_AGGRESIZE,
+			fgAllocMem)) {
 		DBGLOG(HAL, ERROR, "AllocWfdmaRxRing fail\n");
 		return false;
 	}
-	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_WAEVT1,
-				 prHifInfo->u4RxDataRingSize, RXD_SIZE,
-				 RX_BUFFER_AGGRESIZE,
-				 fgAllocMem)) {
+	if (!halWpdmaAllocRxRing(prGlueInfo, RX_RING_WAEVT1_IDX_6,
+			RX_RING_SIZE, RXD_SIZE, RX_BUFFER_AGGRESIZE,
+			fgAllocMem)) {
 		DBGLOG(HAL, ERROR, "AllocWfdmaRxRing fail\n");
 		return false;
 	}
@@ -461,11 +454,6 @@ struct BUS_INFO mt7915_bus_info = {
 	.tx_ring_wa_cmd_idx = CONNAC2X_CMD_TX_WA_RING_IDX,
 	.tx_ring0_data_idx = CONNAC2X_DATA0_TXD_IDX,
 	.tx_ring1_data_idx = CONNAC2X_DATA1_TXD_IDX,
-	.rx_data_ring_num = 2,
-	.rx_evt_ring_num = 5,
-	.rx_data_ring_size = 256,
-	.rx_evt_ring_size = 16,
-	.rx_data_ring_prealloc_size = 256,
 	.fw_own_clear_addr = CONNAC2X_BN0_IRQ_STAT_ADDR,
 	.fw_own_clear_bit = PCIE_LPCR_FW_CLR_OWN,
 
@@ -473,8 +461,6 @@ struct BUS_INFO mt7915_bus_info = {
 	.u4DmaMask = 32,
 
 	.pdmaSetup = asicConnac2xWpdmaConfig,
-	.pdmaStop = asicConnac2xWfdmaStop,
-	.pdmaPollingIdle = asicConnac2xWfdmaPollingAllIdle,
 	.enableInterrupt = asicConnac2xEnableExtInterrupt,
 	.disableInterrupt = asicConnac2xDisableExtInterrupt,
 	.processTxInterrupt = asicConnac2xProcessTxInterrupt,
@@ -493,7 +479,6 @@ struct BUS_INFO mt7915_bus_info = {
 	.initPcieInt = wlanHarrierInitPcieInt,
 	.devReadIntStatus = asicConnac2xReadExtIntStatus,
 	.DmaShdlInit = NULL,
-	.DmaShdlReInit = NULL,
 	.wfdmaAllocRxRing = mt7915WfdmaAllocRxRing,
 #endif				/* _HIF_PCIE */
 #if defined(_HIF_USB)
@@ -515,11 +500,6 @@ struct BUS_INFO mt7915_bus_info = {
 	.asicUsbEventEpDetected = asicConnac2xUsbEventEpDetected,
 	.asicUsbRxByteCount = wlanHarrierUsbRxByteCount,
 	.DmaShdlInit = NULL,
-	.DmaShdlReInit = NULL,
-	.asicUdmaRxFlush = asicConnac2xUdmaRxFlush,
-#if CFG_CHIP_RESET_SUPPORT
-	.asicUsbEpctlRstOpt = NULL,
-#endif
 #endif				/* _HIF_USB */
 #if defined(_HIF_SDIO)
 	.halTxGetFreeResource = halTxGetFreeResource_v1,
@@ -557,7 +537,7 @@ struct CHIP_DBG_OPS mt7915_debug_ops = {
 	.showPleInfo = mt7915_show_ple_info,
 	.showTxdInfo = connac2x_show_txd_Info,
 	.showWtblInfo = connac2x_show_wtbl_info,
-	.showUmacWtblInfo = connac2x_show_umac_wtbl_info,
+	.showUmacFwtblInfo = connac2x_show_umac_wtbl_info,
 	.showCsrInfo = NULL,
 	.showDmaschInfo = NULL,
 	.dumpMacInfo = NULL,
@@ -567,10 +547,9 @@ struct CHIP_DBG_OPS mt7915_debug_ops = {
 	.show_rx_rate_info = connac2x_show_rx_rate_info,
 	.show_rx_rssi_info = connac2x_show_rx_rssi_info,
 	.show_stat_info = connac2x_show_stat_info,
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
-	.get_rx_rate_info = connac2x_get_rx_rate_info,
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+	.get_rx_rate_info = connac2x_get_rx_rate_info
 #endif
-	.show_mcu_debug_info = NULL,
 };
 
 /* Litien code refine to support multi chip */
@@ -597,7 +576,6 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7915 = {
 	.init_event_size = CONNAC2X_RX_INIT_EVENT_LENGTH,
 	.eco_info = mt7915_eco_table,
 	.isNicCapV1 = FALSE,
-	.is_support_efuse = TRUE,
 	.top_hcr = CONNAC2X_TOP_HCR,
 	.top_hvr = CONNAC2X_TOP_HVR,
 	.top_fvr = CONNAC2X_TOP_FVR,
@@ -606,7 +584,7 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7915 = {
 #if defined(_HIF_USB)
 	.asicUsbInit = asicConnac2xWfdmaInitForUSB,
 	.asicUsbInit_ic_specific = mt7915Connac2xWfdmaInitForUSB,
-	.u4SerUsbMcuEventAddr = WF_SW_DEF_CR_USB_MCU_EVENT_ADDR,
+	.u4SerUsbMcuEventAddr = WF_SW_DEF_CR_USB_MCU_EVENT_ADD,
 	.u4SerUsbHostAckAddr = WF_SW_DEF_CR_USB_HOST_ACK_ADDR,
 #endif
 	.asicDumpSerDummyCR = mt7915DumpSerDummyCR,
@@ -616,8 +594,6 @@ struct mt66xx_chip_info mt66xx_chip_info_mt7915 = {
 	.asicGetChipID = NULL,
 	.downloadBufferBin = wlanConnacDownloadBufferBin,
 	.is_support_hw_amsdu = TRUE,
-	.prTxPwrLimitFile = "TxPwrLimit_MT79x5.dat",
-	.ucTxPwrLimitBatchSize = 8,
 	.is_support_asic_lp = TRUE,
 	.is_support_wfdma1 = TRUE,
 	.asicWfdmaReInit = asicConnac2xWfdmaReInit,

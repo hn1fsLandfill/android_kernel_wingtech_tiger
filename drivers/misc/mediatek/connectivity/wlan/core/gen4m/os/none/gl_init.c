@@ -81,11 +81,6 @@
  */
 
 struct wireless_dev *gprWdev[KAL_AIS_NUM];
-struct wireless_dev *gprP2pRoleWdev[KAL_P2P_NUM];
-
-enum ENUM_NVRAM_STATE g_NvramFsm = NVRAM_STATE_INIT;
-uint8_t g_aucNvram[MAX_CFG_FILE_WIFI_REC_SIZE];
-uint8_t g_aucNvram_OnlyPreCal[MAX_CFG_FILE_WIFI_RECAL_SIZE];
 
 /*****************************************************************************
  *                             D A T A   T Y P E S
@@ -127,25 +122,4 @@ uint32_t wlanDownloadBufferBin(struct ADAPTER *prAdapter)
 uint32_t wlanConnacDownloadBufferBin(struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void *wlanGetAisNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucAisIndex)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-	return NULL;
-}
-
-void *wlanGetP2pNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucP2pIndex)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-	return NULL;
-}
-
-void *wlanGetNetDev(struct GLUE_INFO *prGlueInfo,
-	uint8_t ucBssIndex)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-	return NULL;
 }

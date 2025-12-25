@@ -228,13 +228,11 @@ const uint8_t aucHwRate2PhyRate[] = {
 
 char *HW_TX_MODE_STR[] = {
 	"CCK", "OFDM", "MM", "GF", "VHT", "PLR",
-	"N/A", "N/A", "HE_SU", "HE_ER", "HE_TRIG", "HE_MU",
-	"N/A", "EHT_ER", "EHT_TRIG", "EHT_MU"};
+	"N/A", "N/A", "HE_SU", "HE_ER", "HE_TRIG", "HE_MU"};
 char *HW_TX_RATE_CCK_STR[] = {"1M", "2M", "5.5M", "11M", "N/A"};
 char *HW_TX_RATE_OFDM_STR[] = {"6M", "9M", "12M", "18M", "24M", "36M",
 				      "48M", "54M", "N/A"};
-char *HW_TX_RATE_BW[] = {"BW20", "BW40", "BW80", "BW160/BW8080",
-					  "BW320", "N/A"};
+char *HW_TX_RATE_BW[] = {"BW20", "BW40", "BW80", "BW160/BW8080", "N/A"};
 
 /*******************************************************************************
  *                           P R I V A T E   D A T A
@@ -257,11 +255,24 @@ char *HW_TX_RATE_BW[] = {"BW20", "BW40", "BW80", "BW160/BW8080",
  *                              F U N C T I O N S
  *******************************************************************************
  */
+/**
+ * nicGetPhyRateByMcsRate() - Get PHY rate from MCS rate
+ * @ucIdx: MCS index.
+ * @ucBw: Bandwodth.
+ * @ucGI: GI value.
+ *
+ * This function called by TX or RX to get the PHY rate from MCS index.
+ * In the case of 11n(RX_VT_MIXED_MODE) 2x2, the MCS index shall be adjusted
+ * before query, and the result shall multiply by 2.
+ *
+ * Return: Mapped PHY rate.
+ */
+
 uint32_t
 nicGetPhyRateByMcsRate(
-	uint8_t ucIdx,
-	uint8_t ucBw,
-	uint8_t ucGI)
+	IN uint8_t ucIdx,
+	IN uint8_t ucBw,
+	IN uint8_t ucGI)
 {
 	if (ARRAY_SIZE(arMcsRate2PhyRate) <= ucIdx ||
 			ucBw > RX_VT_FR_MODE_160 ||
@@ -271,21 +282,21 @@ nicGetPhyRateByMcsRate(
 		return 0;
 	}
 
-	return	arMcsRate2PhyRate[ucIdx].u4PhyRate[ucBw][ucGI];
+	return arMcsRate2PhyRate[ucIdx].u4PhyRate[ucBw][ucGI];
 }
 
 uint32_t
 nicGetHwRateByPhyRate(
-	uint8_t ucIdx)
+	IN uint8_t ucIdx)
 {
 	return	aucHwRate2PhyRate[ucIdx]; /* uint : 500 kbps */
 }
 
 uint32_t
 nicSwIndex2RateIndex(
-	uint8_t ucRateSwIndex,
-	uint8_t *pucRateIndex,
-	uint8_t *pucPreambleOption
+	IN uint8_t ucRateSwIndex,
+	OUT uint8_t *pucRateIndex,
+	OUT uint8_t *pucPreambleOption
 )
 {
 	ASSERT(pucRateIndex);
@@ -301,8 +312,8 @@ nicSwIndex2RateIndex(
 	return WLAN_STATUS_SUCCESS;
 }
 
-uint32_t nicRateIndex2RateCode(uint8_t ucPreambleOption,
-	uint8_t ucRateIndex, uint16_t *pu2RateCode)
+uint32_t nicRateIndex2RateCode(IN uint8_t ucPreambleOption,
+	IN uint8_t ucRateIndex, OUT uint16_t *pu2RateCode)
 {
 	switch (ucPreambleOption) {
 	case PREAMBLE_DEFAULT_LONG_NONE:
@@ -350,10 +361,10 @@ uint32_t nicRateIndex2RateCode(uint8_t ucPreambleOption,
 
 uint32_t
 nicRateCode2PhyRate(
-	uint16_t  u2RateCode,
-	uint8_t   ucBandwidth,
-	uint8_t   ucGI,
-	uint8_t   ucRateNss)
+	IN uint16_t  u2RateCode,
+	IN uint8_t   ucBandwidth,
+	IN uint8_t   ucGI,
+	IN uint8_t   ucRateNss)
 {
 	uint8_t ucPhyRate;
 	uint16_t u2TxMode;
@@ -363,24 +374,21 @@ nicRateCode2PhyRate(
 	u2TxMode = u2RateCode & RATE_TX_MODE_MASK;
 	ucRateNss = ucRateNss + AR_SS_1; /* change to be base=1 */
 
-	if ((u2TxMode == TX_MODE_HT_GF)
-	    || (u2TxMode == TX_MODE_HT_MM)) {
+	if (u2TxMode == TX_MODE_HT_GF || u2TxMode == TX_MODE_HT_MM) {
 
 		if (ucPhyRate > PHY_RATE_MCS7)
-			u2RateCode = u2RateCode - HT_RATE_MCS7_INDEX;
+			u2RateCode %= 8;
 		else
 			ucRateNss = AR_SS_1;
 
-	} else if ((u2TxMode == TX_MODE_OFDM)
-		   || (u2TxMode == TX_MODE_CCK)) {
+	} else if (u2TxMode == TX_MODE_OFDM || u2TxMode == TX_MODE_CCK) {
 		ucRateNss = AR_SS_1;
 	}
 	DBGLOG(NIC, LOUD,
 	       "Coex:nicRateCode2PhyRate,RC:%x,B:%d,I:%d\n",
 	       u2RateCode, ucBandwidth, ucGI);
 
-	u4PhyRateBy1SS = nicRateCode2DataRate(u2RateCode,
-					      ucBandwidth, ucGI);
+	u4PhyRateBy1SS = nicRateCode2DataRate(u2RateCode, ucBandwidth, ucGI);
 	u4PhyRateIn100Kbps = u4PhyRateBy1SS * ucRateNss;
 
 	DBGLOG(NIC, LOUD,
@@ -392,9 +400,9 @@ nicRateCode2PhyRate(
 
 uint32_t
 nicRateCode2DataRate(
-	uint16_t  u2RateCode,
-	uint8_t   ucBandwidth,
-	uint8_t   ucGI)
+	IN uint16_t  u2RateCode,
+	IN uint8_t   ucBandwidth,
+	IN uint8_t   ucGI)
 {
 	uint8_t ucPhyRate, ucIdx, ucBw = 0;
 	uint32_t u4PhyRateIn100Kbps = 0;
@@ -440,10 +448,10 @@ nicRateCode2DataRate(
 
 u_int8_t
 nicGetRateIndexFromRateSetWithLimit(
-	uint16_t u2RateSet,
-	uint32_t u4PhyRateLimit,
-	u_int8_t fgGetLowest,
-	uint8_t *pucRateSwIndex)
+	IN uint16_t u2RateSet,
+	IN uint32_t u4PhyRateLimit,
+	IN u_int8_t fgGetLowest,
+	OUT uint8_t *pucRateSwIndex)
 {
 	uint32_t i;
 	uint32_t u4CurPhyRate, u4TarPhyRate, u4HighestPhyRate,
@@ -728,12 +736,12 @@ uint32_t nicSetFixedRateData(
 			RA_FIXEDRATE_FIELD_HE_LTF_OFFSET)
 			& RA_FIXEDRATE_FIELD_HE_LTF_MASK);
 
-		if (pFixedRate->u4HeErDCM)
-			u4Data |= BIT(RA_FIXEDRATE_FIELD_HE_ER_DCM);
-
-		if (pFixedRate->u4Mode == TX_RATE_MODE_HE_ER)
+		if (pFixedRate->u4Mode == TX_RATE_MODE_HE_ER) {
+			if (pFixedRate->u4HeErDCM)
+				u4Data |= RA_FIXEDRATE_FIELD_HE_ER_DCM;
 			if (pFixedRate->u4HeEr106t)
-				u4Data |= BIT(RA_FIXEDRATE_FIELD_HE_ER_106);
+				u4Data |= RA_FIXEDRATE_FIELD_HE_ER_106;
+		}
 	}
 
 	*pu4Data = u4Data;
@@ -796,8 +804,8 @@ uint32_t nicRateHeLtfCheckGi(
 }
 
 uint8_t nicGetTxSgiInfo(
-	struct PARAM_PEER_CAP *prWtblPeerCap,
-	uint8_t u1TxMode)
+	IN struct PARAM_PEER_CAP *prWtblPeerCap,
+	IN uint8_t u1TxMode)
 {
 	if (!prWtblPeerCap)
 		return FALSE;
@@ -817,33 +825,21 @@ uint8_t nicGetTxSgiInfo(
 }
 
 uint8_t nicGetTxLdpcInfo(
-	uint8_t ucTxMode,
-	struct PARAM_TX_CONFIG *prWtblTxConfig)
+	IN struct PARAM_TX_CONFIG *prWtblTxConfig)
 {
 	if (!prWtblTxConfig)
-		return 0;
+		return FALSE;
 
-	switch (ucTxMode) {
-	case ENUM_TX_MODE_MM:
-	case ENUM_TX_MODE_GF:
-		return prWtblTxConfig->fgLDPC;
-	case ENUM_TX_MODE_VHT:
-		return prWtblTxConfig->fgVhtLDPC;
-#if (CFG_SUPPORT_802_11AX == 1)
-	case ENUM_TX_MODE_HE_SU:
-	case ENUM_TX_MODE_HE_ER:
-	case ENUM_TX_MODE_HE_MU:
+	if (prWtblTxConfig->fgIsHE)
 		return prWtblTxConfig->fgHeLDPC;
-#endif
-	case ENUM_TX_MODE_CCK:
-	case ENUM_TX_MODE_OFDM:
-	default:
-		return 0;
-	}
+	else if (prWtblTxConfig->fgIsVHT)
+		return prWtblTxConfig->fgVhtLDPC;
+	else
+		return prWtblTxConfig->fgLDPC;
 }
 
-uint16_t nicGetStatIdxInfo(struct ADAPTER *prAdapter,
-				  uint8_t ucWlanIdx)
+uint16_t nicGetStatIdxInfo(IN struct ADAPTER *prAdapter,
+				  IN uint8_t ucWlanIdx)
 {
 	static uint8_t aucWlanIdxArray[CFG_STAT_DBG_PEER_NUM] = {0};
 	static uint16_t u2ValidBitMask;	/* support max 16 peers */
@@ -893,7 +889,7 @@ uint16_t nicGetStatIdxInfo(struct ADAPTER *prAdapter,
 	return 0xFFFF;
 }
 
-int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
+int32_t nicGetTxRateInfo(IN char *pcCommand, IN int i4TotalLen,
 			u_int8_t fgDumpAll,
 			struct PARAM_HW_WLAN_INFO *prHwWlanInfo,
 			struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics)
@@ -901,9 +897,6 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 	uint8_t i, txmode, rate, stbc, sgi;
 	uint8_t nsts;
 	int32_t i4BytesWritten = 0;
-#if (CFG_SUPPORT_CONNAC2X == 1)
-	uint8_t dcm, ersu106t;
-#endif
 
 	for (i = 0; i < AUTO_RATE_NUM; i++) {
 		txmode = HW_TX_RATE_TO_MODE(
@@ -917,17 +910,7 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 		stbc = HW_TX_RATE_TO_STBC(
 			prHwWlanInfo->rWtblRateInfo.au2RateCode[i]);
 		sgi = nicGetTxSgiInfo(&prHwWlanInfo->rWtblPeerCap, txmode);
-#if (CFG_SUPPORT_CONNAC2X == 1)
-		dcm = HW_TX_RATE_TO_DCM(
-			prHwWlanInfo->rWtblRateInfo.au2RateCode[i]);
-		ersu106t = HW_TX_RATE_TO_106T(
-			prHwWlanInfo->rWtblRateInfo.au2RateCode[i]);
 
-		if (dcm)
-			rate = CONNAC2X_HW_TX_RATE_UNMASK_DCM(rate);
-		if (ersu106t)
-			rate = CONNAC2X_HW_TX_RATE_UNMASK_106T(rate);
-#endif
 		if (fgDumpAll) {
 			i4BytesWritten += kalScnprintf(
 				pcCommand + i4BytesWritten,
@@ -1052,31 +1035,16 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 #endif
 
 		if (prQueryStaStatistics->ucSkipAr) {
-#if (CFG_SUPPORT_CONNAC2X == 1)
 			i4BytesWritten += kalScnprintf(
 				pcCommand + i4BytesWritten,
 				i4TotalLen - i4BytesWritten,
-				"%s%s%s%s%s\n",
+				"%s%s%s\n",
 				txmode <= ENUM_TX_MODE_NUM ?
 				    HW_TX_MODE_STR[txmode] : "N/A",
-				dcm ? ", DCM" : "", ersu106t ? ", 106t" : "",
 				stbc ? ", STBC, " : ", ",
-				nicGetTxLdpcInfo(txmode,
+				nicGetTxLdpcInfo(
 				    &prHwWlanInfo->rWtblTxConfig) == 0 ?
 				    "BCC" : "LDPC");
-#else
-			i4BytesWritten += kalScnprintf(
-				pcCommand + i4BytesWritten,
-				i4TotalLen - i4BytesWritten,
-				"%s%s%s%s%s\n",
-				txmode <= ENUM_TX_MODE_NUM ?
-				    HW_TX_MODE_STR[txmode] : "N/A",
-				"", "",
-				stbc ? ", STBC, " : ", ",
-				nicGetTxLdpcInfo(txmode,
-				    &prHwWlanInfo->rWtblTxConfig) == 0 ?
-				    "BCC" : "LDPC");
-#endif
 		} else {
 #if (CFG_SUPPORT_RA_GEN == 0)
 			if (prQueryStaStatistics->aucArRatePer[
@@ -1088,7 +1056,7 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 					txmode < ENUM_TX_MODE_NUM ?
 					    HW_TX_MODE_STR[txmode] : "N/A",
 					stbc ? ", STBC, " : ", ",
-					((nicGetTxLdpcInfo(txmode,
+					((nicGetTxLdpcInfo(
 					    &prHwWlanInfo->rWtblTxConfig) == 0)
 					    || (txmode == TX_RATE_MODE_CCK)
 					    || (txmode == TX_RATE_MODE_OFDM)) ?
@@ -1101,7 +1069,7 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 					txmode < ENUM_TX_MODE_NUM ?
 					    HW_TX_MODE_STR[txmode] : "N/A",
 					stbc ? ", STBC, " : ", ",
-					((nicGetTxLdpcInfo(txmode,
+					((nicGetTxLdpcInfo(
 					    &prHwWlanInfo->rWtblTxConfig) == 0)
 					    || (txmode == TX_RATE_MODE_CCK)
 					    || (txmode == TX_RATE_MODE_OFDM))
@@ -1110,35 +1078,18 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 					    prQueryStaStatistics
 					    ->aucRateEntryIndex[i]]);
 #else
-#if (CFG_SUPPORT_CONNAC2X == 1)
 			i4BytesWritten += kalScnprintf(
 				pcCommand + i4BytesWritten,
 				i4TotalLen - i4BytesWritten,
-				"%s%s%s%s%s\n",
+				"%s%s%s\n",
 				txmode < ENUM_TX_MODE_NUM ?
 				    HW_TX_MODE_STR[txmode] : "N/A",
-				dcm ? ", DCM" : "", ersu106t ? ", 106t" : "",
 				stbc ? ", STBC, " : ", ",
-				((nicGetTxLdpcInfo(txmode,
+				((nicGetTxLdpcInfo(
 				    &prHwWlanInfo->rWtblTxConfig) == 0) ||
 				    (txmode == TX_RATE_MODE_CCK) ||
 				    (txmode == TX_RATE_MODE_OFDM)) ?
 				    "BCC" : "LDPC");
-#else
-			i4BytesWritten += kalScnprintf(
-				pcCommand + i4BytesWritten,
-				i4TotalLen - i4BytesWritten,
-				"%s%s%s%s%s\n",
-				txmode < ENUM_TX_MODE_NUM ?
-				    HW_TX_MODE_STR[txmode] : "N/A",
-				"", "",
-				stbc ? ", STBC, " : ", ",
-				((nicGetTxLdpcInfo(txmode,
-				    &prHwWlanInfo->rWtblTxConfig) == 0) ||
-				    (txmode == TX_RATE_MODE_CCK) ||
-				    (txmode == TX_RATE_MODE_OFDM)) ?
-				    "BCC" : "LDPC");
-#endif
 #endif
 		}
 
@@ -1149,34 +1100,24 @@ int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
 	return i4BytesWritten;
 }
 
-int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, char *pcCommand,
-				 int i4TotalLen, uint8_t ucWlanIdx)
+int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, IN char *pcCommand,
+				 IN int i4TotalLen, IN uint8_t ucWlanIdx)
 {
 	uint32_t txmode, rate, frmode, sgi, nsts, ldpc, stbc, groupid, mu;
 	int32_t i4BytesWritten = 0;
-	uint32_t au4RxV[2] = {0};
-	uint8_t ucStaIdx = 0;
+	uint32_t u4RxVector0 = 0, u4RxVector1 = 0;
+	uint8_t ucStaIdx;
 	struct CHIP_DBG_OPS *prChipDbg;
-	uint32_t *prRxV = NULL;
 
 	if (wlanGetStaIdxByWlanIdx(prAdapter, ucWlanIdx, &ucStaIdx) ==
 	    WLAN_STATUS_SUCCESS) {
-		prRxV = prAdapter->arStaRec[ucStaIdx].au4RxV;
-		au4RxV[0] = prRxV[0];
-		au4RxV[1] = prRxV[1];
+		u4RxVector0 = prAdapter->arStaRec[ucStaIdx].u4RxVector0;
+		u4RxVector1 = prAdapter->arStaRec[ucStaIdx].u4RxVector1;
 		DBGLOG(REQ, LOUD, "****** RX Vector0 = 0x%08x ******\n",
-		       au4RxV[0]);
+		       u4RxVector0);
 		DBGLOG(REQ, LOUD, "****** RX Vector1 = 0x%08x ******\n",
-		       au4RxV[1]);
+		       u4RxVector1);
 	} else {
-		i4BytesWritten += kalScnprintf(pcCommand + i4BytesWritten,
-			i4TotalLen - i4BytesWritten,
-			"%-20s%s", "Last RX Rate", " = NOT SUPPORT");
-		return i4BytesWritten;
-	}
-
-	if (wlanGetStaIdxByWlanIdx(prAdapter, ucWlanIdx, &ucStaIdx)
-		    != WLAN_STATUS_SUCCESS) {
 		i4BytesWritten += kalScnprintf(pcCommand + i4BytesWritten,
 			i4TotalLen - i4BytesWritten,
 			"%-20s%s", "Last RX Rate", " = NOT SUPPORT");
@@ -1194,14 +1135,14 @@ int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, char *pcCommand,
 		return i4BytesWritten;
 	}
 
-	txmode = (au4RxV[0] & RX_VT_RX_MODE_MASK) >> RX_VT_RX_MODE_OFFSET;
-	rate = (au4RxV[0] & RX_VT_RX_RATE_MASK) >> RX_VT_RX_RATE_OFFSET;
-	frmode = (au4RxV[0] & RX_VT_FR_MODE_MASK) >> RX_VT_FR_MODE_OFFSET;
-	nsts = (au4RxV[1] & RX_VT_NSTS_MASK) >> RX_VT_NSTS_OFFSET;
-	stbc = (au4RxV[0] & RX_VT_STBC_MASK) >> RX_VT_STBC_OFFSET;
-	sgi = au4RxV[0] & RX_VT_SHORT_GI;
-	ldpc = au4RxV[0] & RX_VT_LDPC;
-	groupid = (au4RxV[1] & RX_VT_GROUP_ID_MASK) >> RX_VT_GROUP_ID_OFFSET;
+	txmode = (u4RxVector0 & RX_VT_RX_MODE_MASK) >> RX_VT_RX_MODE_OFFSET;
+	rate = (u4RxVector0 & RX_VT_RX_RATE_MASK) >> RX_VT_RX_RATE_OFFSET;
+	frmode = (u4RxVector0 & RX_VT_FR_MODE_MASK) >> RX_VT_FR_MODE_OFFSET;
+	nsts = ((u4RxVector1 & RX_VT_NSTS_MASK) >> RX_VT_NSTS_OFFSET);
+	stbc = (u4RxVector0 & RX_VT_STBC_MASK) >> RX_VT_STBC_OFFSET;
+	sgi = u4RxVector0 & RX_VT_SHORT_GI;
+	ldpc = u4RxVector0 & RX_VT_LDPC;
+	groupid = (u4RxVector1 & RX_VT_GROUP_ID_MASK) >> RX_VT_GROUP_ID_OFFSET;
 
 	if (groupid && groupid != 63) {
 		mu = 1;
@@ -1266,16 +1207,4 @@ int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, char *pcCommand,
 	return i4BytesWritten;
 }
 
-uint16_t nicRateInfo2RateCode(uint32_t  u4TxMode,
-	uint32_t  u4Rate)
-{
-	uint16_t u2RateCode = 0;
 
-	if (u4TxMode < 5) {
-		u2RateCode |= (u4TxMode << 6);
-		u2RateCode |= u4Rate;
-	} else
-		return -1;
-
-	return u2RateCode;
-}

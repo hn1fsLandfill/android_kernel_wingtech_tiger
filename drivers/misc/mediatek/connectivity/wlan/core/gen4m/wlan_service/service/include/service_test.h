@@ -90,13 +90,6 @@ enum {
 	SERV_TEST_TXPWR_SET_PWR_MAN,
 };
 
-/* Service test frequency offset type */
-enum {
-	SERV_FREQ_C1 = 1,
-	SERV_FREQ_C2,
-
-};
-
 /*****************************************************************************
  *	Data struct definition
  *****************************************************************************/
@@ -161,17 +154,14 @@ s_int32 mt_serv_start_tx(struct service_test *serv_test);
 s_int32 mt_serv_stop_tx(struct service_test *serv_test);
 s_int32 mt_serv_start_rx(struct service_test *serv_test);
 s_int32 mt_serv_stop_rx(struct service_test *serv_test);
-s_int32 mt_serv_set_freq_offset(struct service_test *serv_test, u_int32 type);
+s_int32 mt_serv_set_freq_offset(struct service_test *serv_test);
 s_int32 mt_serv_tx_power_operation(
 	struct service_test *serv_test, u_int32 item);
 s_int32 mt_serv_get_freq_offset(
-	struct service_test *serv_test, u_int32 type, u_int32 *freq_offset);
+	struct service_test *serv_test, u_int32 *freq_offset);
 s_int32 mt_serv_get_cfg_on_off(
 	struct service_test *serv_test,
-	u_int32 type,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 *result);
+	u_int32 type, u_int32 *result);
 s_int32 mt_serv_get_tx_tone_pwr(
 	struct service_test *serv_test,
 	u_int32 ant_idx, u_int32 *power);
@@ -186,13 +176,6 @@ s_int32 mt_serv_set_dpd(
 	struct service_test *serv_test,
 	u_int32 on_off,
 	u_int32 wf_sel);
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-s_int32 mt_serv_set_max_pac_ext(
-	struct service_test *serv_test,
-	u_int32 max_pac_ext);
-#endif
-
 s_int32 mt_serv_set_tssi(
 	struct service_test *serv_test,
 	u_int32 on_off,
@@ -262,12 +245,7 @@ s_int32 mt_serv_get_band_mode(struct service_test *serv_test);
 s_int32 mt_serv_log_on_off(
 	struct service_test *serv_test, u_int32 log_type,
 	u_int32 log_ctrl, u_int32 log_size);
-s_int32 mt_serv_set_cfg_on_off(
-	struct service_test *serv_test,
-	u_int32 type,
-	u_int32 enable,
-	u_int32 band_idx,
-	u_int32 ch_band);
+s_int32 mt_serv_set_cfg_on_off(struct service_test *serv_test);
 s_int32 mt_serv_set_rx_filter_pkt_len(struct service_test *serv_test);
 s_int32 mt_serv_get_wf_path_comb(struct service_test *serv_test,
 	u_int8 band_idx, boolean dbdc_mode_en, u_int8 *path, u_int8 *path_len);
@@ -302,33 +280,6 @@ s_int32 mt_serv_get_rx_stat(struct service_test *serv_test, u_int8 band_idx,
 	u_int8 blk_idx, u_int8 test_rx_stat_cat, struct test_rx_stat_u *st);
 s_int32 mt_serv_listmode_cmd(struct service_test *serv_test,
 	u_int8 *para, u_int16 para_len, u_int32 *rsp_len, void *rsp_data);
-s_int32 mt_serv_set_efem_mode(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 mode,
-	u_int32 level);
-s_int32 mt_serv_set_tx_gain(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_type,
-	u_int32 value);
-s_int32 mt_serv_set_etssi_gain(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 ch_band,
-	u_int32 wf_path,
-	u_int32 enable,
-	u_int32 gain_value);
-s_int32 mt_serv_get_tssi_meas_dbv(
-	struct service_test *serv_test,
-	u_int32 band_idx,
-	u_int32 wf_path,
-	u_int32 *dbv_value);
+
 
 #endif /* __SERVICE_TEST_H__ */

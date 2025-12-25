@@ -82,6 +82,11 @@
 extern u_int8_t wlan_fb_power_down;
 extern uint8_t aucDebugModule[];
 extern uint32_t au4LogLevel[];
+
+extern void set_logtoomuch_enable(int value) __attribute__((weak));
+extern int get_logtoomuch_enable(void) __attribute__((weak));
+extern uint32_t get_wifi_standalone_log_mode(void) __attribute__((weak));
+
 extern struct MIB_INFO_STAT g_arMibInfo[ENUM_BAND_NUM];
 
 /*******************************************************************************
@@ -128,7 +133,6 @@ extern struct MIB_INFO_STAT g_arMibInfo[ENUM_BAND_NUM];
 #define DEG_HIF_PSE             BIT(4)
 #define DEG_HIF_PLE             BIT(5)
 #define DEG_HIF_MAC             BIT(6)
-#define DEG_HIF_PHY             BIT(7)
 
 #define DEG_HIF_DEFAULT_DUMP					\
 	(DEG_HIF_HOST_CSR | DEG_HIF_PDMA | DEG_HIF_DMASCH |	\
@@ -147,19 +151,8 @@ extern struct MIB_INFO_STAT g_arMibInfo[ENUM_BAND_NUM];
 #endif
 
 #define CFG_STAT_DBG_PEER_NUM		10
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-#define AGG_RANGE_SEL_4BYTE_NUM		8
-#else
 #define AGG_RANGE_SEL_4BYTE_NUM		4
-#endif
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-#define AGG_RANGE_SEL_0_MASK		BITS(0, 9)
-#define AGG_RANGE_SEL_0_OFFSET		0
-#define AGG_RANGE_SEL_1_MASK		BITS(16, 25)
-#define AGG_RANGE_SEL_1_OFFSET		16
-#else
 #define AGG_RANGE_SEL_0_MASK		BITS(0, 7)
 #define AGG_RANGE_SEL_0_OFFSET		0
 #define AGG_RANGE_SEL_1_MASK		BITS(8, 15)
@@ -174,23 +167,11 @@ extern struct MIB_INFO_STAT g_arMibInfo[ENUM_BAND_NUM];
 #define AGG_RANGE_SEL_5_OFFSET		AGG_RANGE_SEL_1_OFFSET
 #define AGG_RANGE_SEL_6_MASK		AGG_RANGE_SEL_2_MASK
 #define AGG_RANGE_SEL_6_OFFSET		AGG_RANGE_SEL_2_OFFSET
-#endif
 
-#define DBG_PLE_INT_MOD_RX				0
-#define DBG_PLE_INT_MOD_TX				1
-#define DBG_PLE_INT_MOD_UMAC			4
-#define DBG_PLE_INT_MOD_WFDMA			5
-#define DBG_PLE_INT_MOD_SEC				10
-
-#define DBG_PLE_INT_REASON_MANUAL		0
-#define DBG_PLE_INT_REASON_UMAC_TX		1
-#define DBG_PLE_INT_REASON_UMAC_RX		2
-#define DBG_PLE_INT_REASON_WFDMA		5
-
+#define DBG_PLE_INT_TX_MASK        BIT(8)
 #define DBG_PLE_INT_FW_SYNC_MASK   BIT(29)
 #define DBG_PLE_INT_DRV_SYNC_MASK  BIT(30)
 #define DBG_PLE_INT_TRIGGER_MASK   BIT(31)
-#define DBG_PLE_INT_MODULE_SHIFT   8
 #define DBG_PLE_INT_BAND_BSS_SHIFT 14
 #define DBG_PLE_INT_VER_SHIFT      24
 #define DBG_PLE_INT_FW_READY_MASK  0xFFFF
@@ -237,17 +218,12 @@ enum ENUM_DBG_MODULE {
 	DBG_WNM_IDX,		/* 0x20 *//* WNM */
 	DBG_WMM_IDX,		/* 0x21 *//* WMM */
 	DBG_TRACE_IDX,		/* 0x22 *//* TRACE *//* don't add before */
-	DBG_TWT_REQUESTER_IDX,	/* 0x23 *//* TWT REQ */
-	DBG_TWT_PLANNER_IDX,	/* 0x24 *//* TWT Planner */
-	DBG_TWT_RESPONDER_IDX,	/* 0x25 *//* TWT Hotspot */
-	DBG_SMC_IDX,		/* 0x26 *//* SMC */
-	DBG_RRM_IDX,		/* 0x27 *//* radio resource management */
-	DBG_ML_IDX,		/* 0x28 *//* multi-link operation */
-	DBG_RTT_IDX,		/* 0x29 */
-	DBG_NAN_IDX,		/* 0x2A */
-	DBG_ICS_IDX,		/* 0x2B *//* In-chip sniffer */
-	DBG_HIF_WMM_ENHANCE_IDX,/* 0x2C */
-	DBG_APS_IDX,		/* 0x2D *//* AP selection */
+	DBG_TWT_REQUESTER_IDX,
+	DBG_TWT_PLANNER_IDX,
+	DBG_RRM_IDX,
+#if CFG_SUPPORT_NAN
+	DBG_NAN_IDX,
+#endif
 	DBG_MODULE_NUM		/* Notice the XLOG check */
 };
 enum ENUM_DBG_ASSERT_CTRL_LEVEL {
@@ -259,16 +235,6 @@ enum ENUM_DBG_ASSERT_PATH {
 	DBG_ASSERT_PATH_WIFI,
 	DBG_ASSERT_PATH_WMT
 };
-enum ENUM_MCU_DBG_FLAG {
-	DBG_MCU_DBG_CURRENT_PC,
-	DBG_MCU_DBG_ALL
-};
-
-enum FAIL_SCENARIO {
-	SLEEP = 0,
-	SLAVENORESP,
-};
-
 
 struct wfdma_group_info {
 	char name[20];
@@ -324,8 +290,6 @@ struct DMASHDL_CFG {
 	uint16_t u2HifAckCntTh;
 	uint16_t u2HifGupActMap;
 	uint32_t u4GroupNum;
-	uint8_t ucQueueNum;
-	uint8_t ucPriorityNum;
 
 	struct CODA_CR_INFO rPlePacketMaxSize;
 	struct CODA_CR_INFO rPsePacketMaxSize;
@@ -520,13 +484,13 @@ struct CHIP_DBG_OPS {
 		uint32_t u4Index,
 		char *pcCommand,
 		int32_t i4TotalLen);
-#if (CFG_SUPPORT_CONNAC2X == 1 || CFG_SUPPORT_CONNAC3X == 1)
-	int32_t (*showUmacWtblInfo)(
+#if (CFG_SUPPORT_CONNAC2X == 1)
+	int32_t (*showUmacFwtblInfo)(
 		struct ADAPTER *prAdapter,
 		uint32_t u4Index,
 		char *pcCommand,
 		int32_t i4TotalLen);
-#endif
+#endif /* CFG_SUPPORT_CONNAC2X == 1 */
 	void (*showHifInfo)(struct ADAPTER *prAdapter);
 	void (*printHifDbgInfo)(struct ADAPTER *prAdapter);
 	int32_t (*show_rx_rate_info)(
@@ -547,50 +511,28 @@ struct CHIP_DBG_OPS {
 		struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics,
 		uint8_t fgResetCnt,
 		uint32_t u4StatGroup);
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	int32_t (*show_mld_info)(
-		struct ADAPTER *prAdapter,
-		char *pcCommand,
-		int32_t i4TotalLen,
-		struct PARAM_MLD_REC *mld);
-#endif
-	void (*show_wfdma_dbg_probe_info)(struct ADAPTER *prAdapter,
-		enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
 #if defined(_HIF_PCIE) || defined(_HIF_AXI)
-	void (*show_wfdma_wrapper_info)(struct ADAPTER *prAdapter,
-		enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
-#endif
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+	void (*show_wfdma_dbg_probe_info)(IN struct ADAPTER *prAdapter,
+		IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
+	void (*show_wfdma_wrapper_info)(IN struct ADAPTER *prAdapter,
+		IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 	int (*get_rx_rate_info)(
-		const uint32_t *prRxV,
-		struct RxRateInfo *prRxRateInfo);
+		struct ADAPTER *prAdapter,
+		uint8_t ucBssIdx,
+		uint32_t *pu4Rate,
+		uint32_t *pu4Nss,
+		uint32_t *pu4RxMode,
+		uint32_t *pu4FrMode,
+		uint32_t *pu4Sgi);
 #endif
-	int32_t (*get_tx_info_from_txv)(
-		char *pcCommand, int i4TotalLen,
-		struct TX_VECTOR_BBP_LATCH *prTxV);
-	void (*dumpPhyInfo)(struct ADAPTER *prAdapter);
+#endif
 
 #if CFG_SUPPORT_LLS
 	void (*get_rx_link_stats)(
-		struct ADAPTER *prAdapter,
-		struct SW_RFB *prRetSwRfb,
-		uint32_t *pu4RxV);
-#endif
-	u_int8_t (*show_mcu_debug_info)(
-		struct ADAPTER *prAdapter,
-		uint8_t *pucBuf,
-		uint32_t u4Max,
-		uint8_t ucFlag,
-		uint32_t *pu4Length);
-#if (CFG_SUPPORT_DEBUG_SOP == 1)
-	u_int8_t (*show_debug_sop_info)(
-		struct ADAPTER *prAdapter,
-		uint8_t ucCase);
-#endif
-	void (*dumpwfsyscpupcr)(struct ADAPTER *prAdapter);
-	void (*dumpBusHangCr)(struct ADAPTER *prAdapter);
-#if IS_ENABLED(CFG_MTK_WIFI_CONNV3_SUPPORT)
-	void (*dumpPcieCr)(void);
+		IN struct ADAPTER *prAdapter,
+		IN struct SW_RFB *prRetSwRfb,
+		IN uint32_t u4RxVector0);
 #endif
 };
 
@@ -699,8 +641,8 @@ enum WAKE_DATA_TYPE {
  * #endif
  */
 #if DBG_DISABLE_ALL_LOG
-#define DBGLOG(_Module, _Class, _Fmt, ...)
-#define DBGLOG_LIMITED(_Module, _Class, _Fmt, ...)
+#define DBGLOG(_Module, _Class, _Fmt)
+#define DBGLOG_LIMITED(_Module, _Class, _Fmt)
 #define DBGLOG_HEX(_Module, _Class, _StartAddr, _Length)
 #define DBGLOG_MEM8(_Module, _Class, _StartAddr, _Length)
 #define DBGLOG_MEM32(_Module, _Class, _StartAddr, _Length)
@@ -875,31 +817,30 @@ enum WAKE_DATA_TYPE {
 #define log_mem8_dbg		DBGLOG_MEM8
 #define log_mem32_dbg		DBGLOG_MEM32
 #define log_tool_dbg		TOOL_PRINTLOG
-
 /*******************************************************************************
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-void dumpHex(uint8_t *pucStartAddr, uint16_t u2Length);
-void dumpMemory8(uint8_t *pucStartAddr,
-		 uint32_t u4Length);
-void dumpMemory32(uint32_t *pu4StartAddr,
-		  uint32_t u4Length);
-void dumpMemory128(uint32_t *pu4StartAddr,
-		  uint32_t u4Length);
+void dumpHex(IN uint8_t *pucStartAddr, uint16_t u2Length);
+void dumpMemory8(IN uint8_t *pucStartAddr,
+		 IN uint32_t u4Length);
+void dumpMemory32(IN uint32_t *pu4StartAddr,
+		  IN uint32_t u4Length);
+void dumpMemory128(IN uint32_t *pu4StartAddr,
+		  IN uint32_t u4Length);
 void wlanPrintFwLog(uint8_t *pucLogContent,
 		    uint16_t u2MsgSize, uint8_t ucMsgType,
 		    const uint8_t *pucFmt, ...);
 
 void wlanDbgLogLevelInit(void);
 void wlanDbgLogLevelUninit(void);
-uint32_t wlanDbgLevelUiSupport(struct ADAPTER *prAdapter,
+uint32_t wlanDbgLevelUiSupport(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t ucModule);
-uint32_t wlanDbgGetLogLevelImpl(struct ADAPTER *prAdapter,
+uint32_t wlanDbgGetLogLevelImpl(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t ucModule);
-void wlanDbgSetLogLevelImpl(struct ADAPTER *prAdapter,
+void wlanDbgSetLogLevelImpl(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t u4Module, uint32_t u4level);
-void wlanDbgSetLogLevel(struct ADAPTER *prAdapter,
+void wlanDbgSetLogLevel(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t u4Module,
 		uint32_t u4level, u_int8_t fgEarlySet);
 void wlanDriverDbgLevelSync(void);
@@ -909,25 +850,31 @@ u_int8_t wlanDbgSetGlobalLogLevel(uint32_t u4Module, uint32_t u4Level);
 void wlanFillTimestamp(struct ADAPTER *prAdapter, void *pvPacket,
 		       uint8_t ucPhase);
 
-void halShowPseInfo(struct ADAPTER *prAdapter);
+void halShowPseInfo(IN struct ADAPTER *prAdapter);
 uint32_t halGetPleInt(struct ADAPTER *prAdapter);
 void halSetPleInt(struct ADAPTER *prAdapter, bool fgTrigger,
 		  uint32_t u4SetMask, uint32_t u4ClrMask);
-void halShowPleInfo(struct ADAPTER *prAdapter,
+void halShowPleInfo(IN struct ADAPTER *prAdapter,
 	u_int8_t fgDumpTxd);
-void halShowDmaschInfo(struct ADAPTER *prAdapter);
-void haldumpMacInfo(struct ADAPTER *prAdapter);
+void halShowDmaschInfo(IN struct ADAPTER *prAdapter);
+void haldumpMacInfo(IN struct ADAPTER *prAdapter);
+void halDumpTxdInfo(IN struct ADAPTER *prAdapter, uint8_t *tmac_info);
 void halShowTxdInfo(
 	struct ADAPTER *prAdapter,
 	u_int32_t fid);
 int32_t halShowStatInfo(struct ADAPTER *prAdapter,
-			char *pcCommand, int i4TotalLen,
+			IN char *pcCommand, IN int i4TotalLen,
 			struct PARAM_HW_WLAN_INFO *prHwWlanInfo,
 			struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics,
 			u_int8_t fgResetCnt, uint32_t u4StatGroup);
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
-int connac_get_rx_rate_info(const uint32_t *prRxV,
-		struct RxRateInfo *prRxRateInfo);
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+int connac_get_rx_rate_info(struct ADAPTER *prAdapter,
+	uint8_t ucBssIdx,
+	uint32_t *pu4Rate,
+	uint32_t *pu4Nss,
+	uint32_t *pu4RxMode,
+	uint32_t *pu4FrMode,
+	uint32_t *pu4Sgi);
 #endif
 
 #if (CFG_SUPPORT_CONNAC2X == 1)
@@ -987,15 +934,15 @@ void connac2x_show_wfdma_dbg_flag_log(
 	struct ADAPTER *prAdapter,
 	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
 	uint32_t u4DmaNum);
-void connac2x_show_wfdma_desc(struct ADAPTER *prAdapter);
+void connac2x_show_wfdma_desc(IN struct ADAPTER *prAdapter);
 
 void connac2x_show_wfdma_info_by_type(
 	struct ADAPTER *prAdapter,
 	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
 	uint32_t u4DmaNum);
 
-void connac2x_show_wfdma_info(struct ADAPTER *prAdapter);
-void connac2x_show_dmashdl_info(struct ADAPTER *prAdapter);
+void connac2x_show_wfdma_info(IN struct ADAPTER *prAdapter);
+void connac2x_show_dmashdl_info(IN struct ADAPTER *prAdapter);
 uint32_t connac2x_get_ple_int(struct ADAPTER *prAdapter);
 void connac2x_set_ple_int(struct ADAPTER *prAdapter, bool fgTrigger,
 			  uint32_t u4ClrMask, uint32_t u4SetMask);
@@ -1011,121 +958,22 @@ void connac2x_dump_format_memory32(
 void connac2x_DumpCrRange(
 	struct ADAPTER *prAdapter,
 	uint32_t cr_start, uint32_t word_count, char *str);
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 int connac2x_get_rx_rate_info(
-	const uint32_t *prRxV,
-	struct RxRateInfo *prRxRateInfo);
+	struct ADAPTER *prAdapter,
+	uint8_t ucBssIdx,
+	uint32_t *pu4Rate,
+	uint32_t *pu4Nss,
+	uint32_t *pu4RxMode,
+	uint32_t *pu4FrMode,
+	uint32_t *pu4Sgi);
 #endif
+
 #endif /* CFG_SUPPORT_CONNAC2X == 1 */
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-void connac3x_show_txd_Info(
-	struct ADAPTER *prAdapter,
-	u_int32_t fid);
-void connac3x_dump_tmac_info(
-	struct ADAPTER *prAdapter,
-	uint8_t *tmac_info);
-void connac3x_get_lwtbl(
-	struct ADAPTER *prAdapter,
-	uint32_t u4Index,
-	uint8_t *wtbl_raw_dw
-);
-int32_t connac3x_show_wtbl_info(
-	struct ADAPTER *prAdapter,
-	uint32_t u4Index,
-	char *pcCommand,
-	int i4TotalLen);
-int32_t connac3x_show_umac_wtbl_info(
-	struct ADAPTER *prAdapter,
-	uint32_t u4Index,
-	char *pcCommand,
-	int i4TotalLen);
-int32_t connac3x_show_rx_rate_info(
-	struct ADAPTER *prAdapter,
-	char *pcCommand,
-	int32_t i4TotalLen,
-	uint8_t ucStaIdx);
-
-int32_t connac3x_show_rx_rssi_info(
-	struct ADAPTER *prAdapter,
-	char *pcCommand,
-	int32_t i4TotalLen,
-	uint8_t ucStaIdx);
-
-int32_t connac3x_show_stat_info(
-	struct ADAPTER *prAdapter,
-	char *pcCommand,
-	int32_t i4TotalLen,
-	struct PARAM_HW_WLAN_INFO *prHwWlanInfo,
-	struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics,
-	uint8_t fgResetCnt,
-	uint32_t u4StatGroup);
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-int32_t connac3x_show_mld_info(
-		struct ADAPTER *prAdapter,
-		char *pcCommand,
-		int32_t i4TotalLen,
-		struct PARAM_MLD_REC *mld);
+#if (CFG_SUPPORT_CONNINFRA == 1)
+void fw_log_bug_hang_register(void *);
 #endif
-
-void connac3x_show_wfdma_interrupt_info(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t u4DmaNum);
-
-void connac3x_show_wfdma_glo_info(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t u4DmaNum);
-
-void connac3x_show_wfdma_ring_info(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
-
-void connac3x_show_wfdma_dbg_flag_log(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t u4DmaNum);
-
-void connac3x_show_wfdma_info_by_type(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t u4DmaNum);
-
-void connac3x_show_wfdma_info(struct ADAPTER *prAdapter);
-void connac3x_show_dmashdl_info(struct ADAPTER *prAdapter);
-uint32_t connac3x_get_ple_int(struct ADAPTER *prAdapter);
-void connac3x_set_ple_int(struct ADAPTER *prAdapter, bool fgTrigger,
-			  uint32_t u4ClrMask, uint32_t u4SetMask);
-void connac3x_set_ple_int_no_read(struct ADAPTER *prAdapter, bool fgTrigger,
-			  uint32_t u4ClrMask, uint32_t u4SetMask);
-void connac3x_show_ple_info(struct ADAPTER *prAdapter, u_int8_t fgDumpTxd);
-void connac3x_show_pse_info(struct ADAPTER *prAdapter);
-#if (CFG_SUPPORT_HOST_OFFLOAD == 1)
-void connac3x_show_mawd_info(struct ADAPTER *prAdapter);
-void connac3x_show_rro_info(struct ADAPTER *prAdapter);
-#endif
-void connac3x_DumpWfsyscpupcr(struct ADAPTER *prAdapter);
-void connac3x_DbgCrRead(
-	struct ADAPTER *prAdapter, uint32_t addr, unsigned int *val);
-void connac3x_DbgCrWrite(
-	struct ADAPTER *prAdapter, uint32_t addr, unsigned int val);
-void connac3x_dump_format_memory32(
-	uint32_t *pu4StartAddr, uint32_t u4Count, char *aucInfo);
-void connac3x_DumpCrRange(
-	struct ADAPTER *prAdapter,
-	uint32_t cr_start, uint32_t word_count, char *str);
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
-int connac3x_get_rx_rate_info(
-	const uint32_t *prRxV,
-	struct RxRateInfo *prRxRateInfo);
-#endif
-int32_t connac3x_get_tx_info_from_txv(
-	char *pcCommand, int i4TotalLen,
-	struct TX_VECTOR_BBP_LATCH *prTxV);
-
-#endif /* CFG_SUPPORT_CONNAC3X == 1 */
 
 #if (CFG_SUPPORT_STATISTICS == 1)
 void wlanWakeStaticsInit(void);

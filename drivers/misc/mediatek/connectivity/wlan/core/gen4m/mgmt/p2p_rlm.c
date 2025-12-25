@@ -113,26 +113,17 @@ void rlmUpdate6GOpInfo(struct ADAPTER *prAdapter,
 	uint8_t ucMaxBandwidth, ucS1, ucS2;
 
 	if (IS_BSS_APGO(prBssInfo) && prBssInfo->eBand == BAND_6G) {
-		uint8_t ucVhtChannelWidth = kal_min_t(
-			uint8_t,
-			prBssInfo->ucVhtChannelWidth,
-			VHT_OP_CHANNEL_WIDTH_160);
-
 		HE_SET_6G_OP_INFOR_PRESENT(prBssInfo->ucHeOpParams);
 
-		/* HE bandwidth is no more than bw160 */
-		ucMaxBandwidth = kal_min_t(
-			uint8_t,
-			rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo),
-			MAX_BW_160MHZ);
+		ucMaxBandwidth = rlmGetBssOpBwByVhtAndHtOpInfo(prBssInfo);
 
 		ucS1 = nicGetS1(prBssInfo->eBand,
 				prBssInfo->ucPrimaryChannel,
-				ucVhtChannelWidth);
+				prBssInfo->ucVhtChannelWidth);
 
 		ucS2 = nicGetS2(prBssInfo->eBand,
 				prBssInfo->ucPrimaryChannel,
-				ucVhtChannelWidth,
+				prBssInfo->ucVhtChannelWidth,
 				ucS1);
 
 		prBssInfo->r6gOperInfor.rControl.bits.ChannelWidth =
@@ -216,9 +207,8 @@ void rlmBssUpdateChannelParams(struct ADAPTER *prAdapter,
 			(VHT_CAP_INFO_MCS_MAP_MCS9
 				<< VHT_CAP_INFO_MCS_1SS_OFFSET);
 
-		ucMaxBw = cnmOpModeGetMaxBw(prAdapter,
-			prBssInfo);
-
+		ucMaxBw = cnmGetDbdcBwCapability(prAdapter,
+			prBssInfo->ucBssIndex);
 		rlmFillVhtOpInfoByBssOpBw(prBssInfo, ucMaxBw);
 
 		/* If the S1 is invalid, force to change bandwidth */
@@ -238,12 +228,21 @@ void rlmBssUpdateChannelParams(struct ADAPTER *prAdapter,
 					VHT_OP_CHANNEL_WIDTH_20_40;
 			}
 		}
+	} else {
+		prBssInfo->ucVhtChannelWidth = VHT_OP_CHANNEL_WIDTH_20_40;
+		prBssInfo->ucVhtChannelFrequencyS1 = 0;
+		prBssInfo->ucVhtChannelFrequencyS2 = 0;
 	}
 
 #if (CFG_SUPPORT_802_11AX == 1)
 	/* Filled the HE Operation IE */
 	if (prBssInfo->ucPhyTypeSet & PHY_TYPE_BIT_HE) {
 		memset(prBssInfo->ucHeOpParams, 0, HE_OP_BYTE_NUM);
+
+		prBssInfo->ucHeOpParams[0]
+			|= HE_OP_PARAM0_TXOP_DUR_RTS_THRESHOLD_MASK;
+		prBssInfo->ucHeOpParams[1]
+			|= HE_OP_PARAM1_TXOP_DUR_RTS_THRESHOLD_MASK;
 
 		/* Disable BSS color support*/
 		if (!prAdapter->rWifiVar.fgSapAddTPEIE)
@@ -258,14 +257,6 @@ void rlmBssUpdateChannelParams(struct ADAPTER *prAdapter,
 			prBssInfo->u2HeBasicMcsSet |=
 				(HE_CAP_INFO_MCS_NOT_SUPPORTED << 2 * i);
 
-		if (IS_FEATURE_ENABLED(
-			prAdapter->rWifiVar.fgBssMaxIdle)) {
-			prBssInfo->u2MaxIdlePeriod =
-				prAdapter->rWifiVar.u2BssMaxIdlePeriod;
-			prBssInfo->ucIdleOptions =
-				secIsProtectedBss(prAdapter, prBssInfo);
-		}
-
 #if (CFG_SUPPORT_WIFI_6G == 1)
 		rlmUpdate6GOpInfo(prAdapter, prBssInfo);
 #endif
@@ -273,29 +264,34 @@ void rlmBssUpdateChannelParams(struct ADAPTER *prAdapter,
 		memset(prBssInfo->ucHeOpParams, 0, HE_OP_BYTE_NUM);
 		prBssInfo->ucBssColorInfo = 0;
 		prBssInfo->u2HeBasicMcsSet = 0;
-		prBssInfo->u2MaxIdlePeriod = 0;
-		prBssInfo->ucIdleOptions = 0;
 	}
 #endif
 
 #if (CFG_SUPPORT_802_11BE == 1)
 	if (prBssInfo->ucPhyTypeSet & PHY_TYPE_BIT_EHT) {
-		EHT_RESET_OP(prBssInfo->ucEhtOpParams);
+		memset(prBssInfo->ucEhtOpParams, 0, EHT_OP_BYTE_NUM);
 		/* TODO */
 	} else {
-		EHT_RESET_OP(prBssInfo->ucEhtOpParams);
+		memset(prBssInfo->ucEhtOpParams, 0, EHT_OP_BYTE_NUM);
 	}
 #endif
 
 	/*ERROR HANDLE*/
-	if ((prBssInfo->ucVhtChannelWidth >= VHT_OP_CHANNEL_WIDTH_80) &&
-	    (prBssInfo->ucVhtChannelFrequencyS1 == 0)) {
-		DBGLOG(RLM, INFO,
-			"Wrong AP S1 parameter setting, back to BW20!!!\n");
+	if ((prBssInfo->ucVhtChannelWidth == VHT_OP_CHANNEL_WIDTH_80)
+		|| (prBssInfo->ucVhtChannelWidth
+			== VHT_OP_CHANNEL_WIDTH_160)
+		|| (prBssInfo->ucVhtChannelWidth
+			== VHT_OP_CHANNEL_WIDTH_80P80)) {
 
-		prBssInfo->ucVhtChannelWidth = VHT_OP_CHANNEL_WIDTH_20_40;
-		prBssInfo->ucVhtChannelFrequencyS1 = 0;
-		prBssInfo->ucVhtChannelFrequencyS2 = 0;
+		if (prBssInfo->ucVhtChannelFrequencyS1 == 0) {
+			DBGLOG(RLM, INFO,
+				"Wrong AP S1 parameter setting, back to BW20!!!\n");
+
+			prBssInfo->ucVhtChannelWidth =
+				VHT_OP_CHANNEL_WIDTH_20_40;
+			prBssInfo->ucVhtChannelFrequencyS1 = 0;
+			prBssInfo->ucVhtChannelFrequencyS2 = 0;
+		}
 	}
 }
 
@@ -448,8 +444,7 @@ u_int8_t rlmUpdateBwByChListForAP(struct ADAPTER *prAdapter,
 		prBssInfo->ucPrimaryChannel,
 		prBssInfo->eBssSCO);
 
-	if ((ucLevel == CHNL_LEVEL0) &&
-		!prAdapter->rWifiVar.fgSapSkipObss) {
+	if (ucLevel == CHNL_LEVEL0) {
 		/* Forced to 20MHz,
 		 * so extended channel is SCN and STA width is zero
 		 */
@@ -458,8 +453,6 @@ u_int8_t rlmUpdateBwByChListForAP(struct ADAPTER *prAdapter,
 		if (prBssInfo->ucHtOpInfo1 != (uint8_t) CHNL_EXT_SCN) {
 			prBssInfo->ucHtOpInfo1 = (uint8_t) CHNL_EXT_SCN;
 			fgBwChange = TRUE;
-			DBGLOG(RLM, INFO,
-				"BW40: Set fgObssActionForcedTo20M\n");
 		}
 
 		cnmTimerStartTimer(prAdapter,
@@ -489,7 +482,7 @@ u_int8_t rlmUpdateBwByChListForAP(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-void rlmProcessPublicAction2040Coexist(struct ADAPTER *prAdapter,
+void rlmProcessPublicAction(struct ADAPTER *prAdapter,
 		struct SW_RFB *prSwRfb)
 {
 	struct ACTION_20_40_COEXIST_FRAME *prRxFrame;
@@ -608,115 +601,6 @@ void rlmProcessPublicAction2040Coexist(struct ADAPTER *prAdapter,
 		rlmObssScanExemptionRsp(prAdapter, prBssInfo, prSwRfb);
 }
 
-#if CFG_SUPPORT_DFS
-void rlmProcessPublicActionExCsa(struct ADAPTER *prAdapter,
-		struct SW_RFB *prSwRfb)
-{
-	struct ACTION_EX_CHANNEL_SWITCH_FRAME *prRxFrame;
-	struct IE_EX_CHANNEL_SWITCH *prExCSAIE;
-	struct SWITCH_CH_AND_BAND_PARAMS *prCSAParams;
-	struct BSS_INFO *prBssInfo;
-	struct STA_RECORD *prStaRec;
-	uint8_t *pucIE;
-	uint16_t u2IELength, u2Offset;
-
-	ASSERT(prAdapter);
-	ASSERT(prSwRfb);
-
-	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
-	if (!prStaRec)
-		return;
-
-	if (prStaRec->ucBssIndex > prAdapter->ucHwBssIdNum)
-		return;
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
-	if (!prBssInfo)
-		return;
-
-	u2IELength = prSwRfb->u2PacketLen -
-		(uint16_t)OFFSET_OF(struct ACTION_EX_CHANNEL_SWITCH_FRAME,
-				aucInfoElem[0]);
-	prRxFrame =
-		(struct ACTION_EX_CHANNEL_SWITCH_FRAME *)prSwRfb->pvHeader;
-	pucIE = prRxFrame->aucInfoElem;
-
-	IE_FOR_EACH(pucIE, u2IELength, u2Offset)
-	{
-		switch (IE_ID(pucIE)) {
-		case ELEM_ID_EX_CH_SW_ANNOUNCEMENT:
-			prCSAParams = &prBssInfo->CSAParams;
-
-			if (IE_LEN(pucIE) !=
-				(sizeof(struct IE_EX_CHANNEL_SWITCH) - 2)) {
-				break;
-			}
-
-			prExCSAIE = (struct IE_EX_CHANNEL_SWITCH *)pucIE;
-
-			if (prExCSAIE->ucChannelSwitchMode == 1) {
-#if (CFG_SUPPORT_WIFI_6G == 1)
-				if (prExCSAIE->ucNewOperatingClass >= 131 &&
-					prExCSAIE->ucNewOperatingClass <= 135)
-					prCSAParams->eCsaBand = BAND_6G;
-				else
-#endif
-				if (prExCSAIE->ucNewChannelNum <= 14)
-					prCSAParams->eCsaBand = BAND_2G4;
-				else
-					prCSAParams->eCsaBand = BAND_5G;
-			} else {
-				DBGLOG(RLM, INFO,
-					"[CSA action] ucChannelSwitchMode=0\n");
-			}
-
-			DBGLOG(RLM, INFO,
-				"[CSA action] Op class[%d], Band[%d], CH[%d]\n",
-					prExCSAIE->ucNewOperatingClass,
-					prCSAParams->eCsaBand,
-					prExCSAIE->ucNewChannelNum);
-			break;
-
-		default:
-			break;
-		} /*end of switch IE_ID */
-	}	 /*end of IE_FOR_EACH */
-}
-#endif
-
-void rlmProcessPublicAction(struct ADAPTER *prAdapter,
-		struct SW_RFB *prSwRfb)
-{
-	struct STA_RECORD *prStaRec = NULL;
-	struct WLAN_ACTION_FRAME *prActFrame = NULL;
-
-	ASSERT(prAdapter);
-	ASSERT(prSwRfb);
-
-	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
-	if (!prStaRec)
-		return;
-
-	if (prStaRec->ucBssIndex > prAdapter->ucHwBssIdNum)
-		return;
-
-	prActFrame = (struct WLAN_ACTION_FRAME *) prSwRfb->pvHeader;
-
-	switch (prActFrame->ucAction) {
-	case ACTION_PUBLIC_20_40_COEXIST:
-		rlmProcessPublicAction2040Coexist(prAdapter, prSwRfb);
-		break;
-#if CFG_SUPPORT_DFS
-	case ACTION_PUBLIC_EX_CH_SW_ANNOUNCEMENT:
-		rlmProcessPublicActionExCsa(prAdapter, prSwRfb);
-		break;
-#endif
-	case ACTION_PUBLIC_VENDOR_SPECIFIC:
-	default:
-		break;
-	}
-}
-
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief
@@ -739,7 +623,7 @@ void rlmHandleObssStatusEventPkt(struct ADAPTER *prAdapter,
 	prBssInfo =
 		GET_BSS_INFO_BY_INDEX(prAdapter, prObssStatus->ucBssIndex);
 
-	if (!prBssInfo || prBssInfo->eCurrentOPMode != OP_MODE_ACCESS_POINT)
+	if (prBssInfo->eCurrentOPMode != OP_MODE_ACCESS_POINT)
 		return;
 
 	prBssInfo->fgObssErpProtectMode =
@@ -906,7 +790,7 @@ u_int8_t rlmUpdateParamsForAP(struct ADAPTER *prAdapter,
  * \return boolean value if probe response frame is
  */
 /*----------------------------------------------------------------------------*/
-void rlmFuncInitialChannelList(struct ADAPTER *prAdapter)
+void rlmFuncInitialChannelList(IN struct ADAPTER *prAdapter)
 {
 	struct P2P_CONNECTION_SETTINGS *prP2pConnSetting =
 		(struct P2P_CONNECTION_SETTINGS *) NULL;
@@ -999,9 +883,9 @@ void rlmFuncInitialChannelList(struct ADAPTER *prAdapter)
 
 			prChannelEntryField =
 				(struct CHANNEL_ENTRY_FIELD *)
-				((uintptr_t) prChannelEntryField +
+				((unsigned long) prChannelEntryField +
 				P2P_ATTRI_LEN_CHANNEL_ENTRY +
-				(uintptr_t)
+				(unsigned long)
 				prChannelEntryField->ucNumberOfChannels);
 
 		}
@@ -1103,9 +987,9 @@ void rlmFuncInitialChannelList(struct ADAPTER *prAdapter)
  */
 /*----------------------------------------------------------------------------*/
 void
-rlmFuncCommonChannelList(struct ADAPTER *prAdapter,
-		struct CHANNEL_ENTRY_FIELD *prChannelEntryII,
-		uint8_t ucChannelListSize)
+rlmFuncCommonChannelList(IN struct ADAPTER *prAdapter,
+		IN struct CHANNEL_ENTRY_FIELD *prChannelEntryII,
+		IN uint8_t ucChannelListSize)
 {
 	struct P2P_CONNECTION_SETTINGS *prP2pConnSetting =
 		(struct P2P_CONNECTION_SETTINGS *) NULL;
@@ -1156,10 +1040,10 @@ rlmFuncCommonChannelList(struct ADAPTER *prAdapter,
 
 					prChannelEntryIII =
 						(struct CHANNEL_ENTRY_FIELD *)
-						((uintptr_t)
+						((unsigned long)
 						prChannelEntryIII +
 						P2P_ATTRI_LEN_CHANNEL_ENTRY +
-						(uintptr_t)
+						(unsigned long)
 						prChannelEntryIII
 						->ucNumberOfChannels);
 				}
@@ -1169,9 +1053,9 @@ rlmFuncCommonChannelList(struct ADAPTER *prAdapter,
 
 				prChannelEntryI =
 					(struct CHANNEL_ENTRY_FIELD *)
-					((uintptr_t) prChannelEntryI +
+					((unsigned long) prChannelEntryI +
 					P2P_ATTRI_LEN_CHANNEL_ENTRY +
-					(uintptr_t)
+					(unsigned long)
 					prChannelEntryI->ucNumberOfChannels);
 
 			}
@@ -1181,9 +1065,9 @@ rlmFuncCommonChannelList(struct ADAPTER *prAdapter,
 				+ prChannelEntryII->ucNumberOfChannels);
 
 			prChannelEntryII = (struct CHANNEL_ENTRY_FIELD *)
-				((uintptr_t) prChannelEntryII +
+				((unsigned long) prChannelEntryII +
 				P2P_ATTRI_LEN_CHANNEL_ENTRY +
-				(uintptr_t)
+				(unsigned long)
 				prChannelEntryII->ucNumberOfChannels);
 
 		}
@@ -1205,8 +1089,8 @@ rlmFuncCommonChannelList(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-uint8_t rlmFuncFindOperatingClass(struct ADAPTER *prAdapter,
-	uint8_t ucChannelNum)
+uint8_t rlmFuncFindOperatingClass(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucChannelNum)
 {
 	uint8_t ucRegulatoryClass = 0, ucBufferSize = 0;
 	struct P2P_CONNECTION_SETTINGS *prP2pConnSetting =
@@ -1244,9 +1128,9 @@ uint8_t rlmFuncFindOperatingClass(struct ADAPTER *prAdapter,
 
 			prChannelEntryField =
 				(struct CHANNEL_ENTRY_FIELD *)
-				((uintptr_t) prChannelEntryField +
+				((unsigned long) prChannelEntryField +
 				P2P_ATTRI_LEN_CHANNEL_ENTRY +
-				(uintptr_t)
+				(unsigned long)
 				prChannelEntryField->ucNumberOfChannels);
 
 			ucBufferSize -=
@@ -1270,11 +1154,11 @@ uint8_t rlmFuncFindOperatingClass(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 u_int8_t
-rlmFuncFindAvailableChannel(struct ADAPTER *prAdapter,
-		uint8_t ucCheckChnl,
-		uint8_t *pucSuggestChannel,
-		u_int8_t fgIsSocialChannel,
-		u_int8_t fgIsDefaultChannel)
+rlmFuncFindAvailableChannel(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucCheckChnl,
+		IN uint8_t *pucSuggestChannel,
+		IN u_int8_t fgIsSocialChannel,
+		IN u_int8_t fgIsDefaultChannel)
 {
 	u_int8_t fgIsResultAvailable = FALSE;
 	struct CHANNEL_ENTRY_FIELD *prChannelEntry =
@@ -1342,9 +1226,9 @@ rlmFuncFindAvailableChannel(struct ADAPTER *prAdapter,
 
 			prChannelEntry =
 				(struct CHANNEL_ENTRY_FIELD *)
-				((uintptr_t) prChannelEntry +
+				((unsigned long) prChannelEntry +
 				P2P_ATTRI_LEN_CHANNEL_ENTRY +
-				(uintptr_t)
+				(unsigned long)
 				prChannelEntry->ucNumberOfChannels);
 
 		}
@@ -1449,19 +1333,6 @@ enum ENUM_CHNL_EXT rlmDecideScoForAP(struct ADAPTER *prAdapter,
 				eTempSCO =
 					(enum ENUM_CHNL_EXT)
 						prAdapter->rWifiVar.ucApSco;
-#if ((CFG_SUPPORT_TWT == 1) && (CFG_SUPPORT_TWT_HOTSPOT == 1))
-				prBssInfo->twt_flow_id_bitmap = 0;
-				prBssInfo->aeTWTRespState = 0;
-				LINK_INITIALIZE(&prBssInfo->twt_sch_link);
-
-				for (i = 0; i < TWT_MAX_FLOW_NUM; i++)
-					prBssInfo->arTWTSta[i].agrt_tbl_idx = i;
-
-				DBGLOG(RLM, INFO,
-					"WLAN AP BSS_INFO[%d] TWT flow id bitmap=%d\n",
-					prBssInfo->ucBssIndex,
-					prBssInfo->twt_flow_id_bitmap);
-#endif
 		}
 		/* P2P mode */
 		else {
@@ -1707,10 +1578,10 @@ uint8_t rlmGetVhtS1ForAP(struct ADAPTER *prAdapter,
 }
 
 void rlmGetChnlInfoForCSA(struct ADAPTER *prAdapter,
-	enum ENUM_BAND eBand,
-	uint8_t ucCh,
-	uint8_t ucBssIdx,
-	struct RF_CHANNEL_INFO *prRfChnlInfo)
+	IN enum ENUM_BAND eBand,
+	IN uint8_t ucCh,
+	IN uint8_t ucBssIdx,
+	OUT struct RF_CHANNEL_INFO *prRfChnlInfo)
 {
 	struct BSS_INFO *prBssInfo = NULL;
 	enum ENUM_BAND eBandOrig, eBandCsa;
@@ -1725,7 +1596,13 @@ void rlmGetChnlInfoForCSA(struct ADAPTER *prAdapter,
 	/* temp replace BSS eBand to get BW of CSA band */
 	eBandOrig = prBssInfo->eBand;
 	prBssInfo->eBand = eBandCsa;
-	prRfChnlInfo->ucChnlBw = cnmGetBssMaxBw(prAdapter, ucBssIdx);
+	if (prRfChnlInfo->eBand == BAND_5G &&
+		prRfChnlInfo->ucChannelNum == 165)
+		prRfChnlInfo->ucChnlBw =
+			cnmOpModeGetMaxBw(prAdapter, prBssInfo);
+	else
+		prRfChnlInfo->ucChnlBw =
+			cnmGetBssMaxBw(prAdapter, ucBssIdx);
 	prBssInfo->eBand = eBandOrig; /* Restore BSS eBand */
 
 	prRfChnlInfo->u2PriChnlFreq =
@@ -1739,7 +1616,7 @@ void rlmGetChnlInfoForCSA(struct ADAPTER *prAdapter,
 
 	if ((eBand == BAND_5G) &&
 		(ucCh >= 52 && ucCh <= 144))
-		prRfChnlInfo->fgDFS = TRUE;
+		prRfChnlInfo->eDFS = NL80211_DFS_USABLE;
 	else
-		prRfChnlInfo->fgDFS = FALSE;
+		prRfChnlInfo->eDFS = NL80211_DFS_AVAILABLE;
 }

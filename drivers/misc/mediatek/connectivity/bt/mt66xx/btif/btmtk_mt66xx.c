@@ -18,10 +18,6 @@
 #include "connsys_debug_utility.h"
 #include "connfem_api.h"
 
-//#ifdef OPLUS_BUG_STABILITY
-// add for MTK ANT SWAP
-#include <soc/oplus/system/oplus_project.h>
-//#endif /* OPLUS_BUG_STABILITY */
 
 /*******************************************************************************
 *                                 M A C R O S
@@ -93,13 +89,7 @@ enum FWP_CHECK_STATUS {
 static const uint8_t WMT_OVER_HCI_CMD_HDR[] = { 0x01, 0x6F, 0xFC, 0x00 };
 
 #if (CUSTOMER_FW_UPDATE == 1)
-//Add for fw sau
-#if (OPLUS_FEATURE_BT_FW_SAU_MTK == 1)
-static bool g_fwp_update_enable = TRUE;
-#else /* OPLUS_FEATURE_BT_FW_SAU_MTK */
 static bool g_fwp_update_enable = FALSE;
-#endif /* OPLUS_FEATURE_BT_FW_SAU_MTK */
-
 uint8_t g_fwp_names[PATCH_FILE_NUM][2][FW_NAME_LEN] = {};
 #else
 uint8_t g_fwp_names[PATCH_FILE_NUM][1][FW_NAME_LEN] = {};
@@ -223,7 +213,7 @@ static void fwp_update_info(struct fwp_info *info) {
 	struct timespec64 time;
 	struct rtc_time tm;
 	unsigned long local_time;
-	//int i;
+	int i;
 
 	ktime_get_real_ts64(&time);
 	local_time = (uint32_t)(time.tv_nsec/1000 - (sys_tz.tz_minuteswest * 60));
@@ -354,7 +344,7 @@ static void bgfsys_cal_data_backup(
 	if (!conninfra_reg_readable()) {
 		int32_t ret = conninfra_is_bus_hang();
 		if (ret > 0)
-			BTMTK_ERR("%s: conninfra bus is hang, needs reset", __func__);
+			BTMTK_ERR("%s: conninfra bus is hang, needs reset ret = %d", __func__, ret);
 		else
 			BTMTK_ERR("%s: conninfra not readable, but not bus hang ret = %d", __func__, ret);
 		return;
@@ -399,7 +389,7 @@ static void bgfsys_cal_data_restore(uint32_t start_addr,
 	if (!conninfra_reg_readable()) {
 		int32_t ret = conninfra_is_bus_hang();
 		if (ret > 0)
-			BTMTK_ERR("%s: conninfra bus is hang, needs reset", __func__);
+			BTMTK_ERR("%s: conninfra bus is hang, needs reset ret = %d", __func__, ret);
 		else
 			BTMTK_ERR("%s: conninfra not readable, but not bus hang ret = %d", __func__, ret);
 		return;
@@ -703,10 +693,10 @@ static void bt_hw_and_mcu_off(void)
 	BTMTK_INFO("%s", __func__);
 	/* Close hardware bus interface */
 	btmtk_wcn_btif_close();
-	BTMTK_INFO("%s: bt_disable_irq start", __func__);
+
 	bt_disable_irq(BGF2AP_SW_IRQ);
 	bt_disable_irq(BGF2AP_BTIF_WAKEUP_IRQ);
-	BTMTK_INFO("%s: bt_free_irq  start", __func__);
+
 	/* Free all registered IRQs */
 	bt_free_irq(BGF2AP_SW_IRQ);
 	bt_free_irq(BGF2AP_BTIF_WAKEUP_IRQ);
@@ -715,7 +705,6 @@ static void bt_hw_and_mcu_off(void)
 		bt_disable_irq(BT_CONN2AP_SW_IRQ);
 		bt_free_irq(BT_CONN2AP_SW_IRQ);
 	}
-	BTMTK_INFO("%s: bgfsys_power_off  start", __func__);
 	/* BGFSYS hardware power off */
 	bgfsys_power_off();
 }
@@ -874,11 +863,18 @@ static int32_t _send_wmt_get_cal_data_cmd(
 
 	if (p_inter_cmd->result == WMT_EVT_SUCCESS)
 		ret = 0;
-	else {
+	else if (!conninfra_reg_readable()) {
+		ret = conninfra_is_bus_hang();
+		if (ret > 0)
+			BTMTK_ERR("%s: conninfra bus is hang, needs reset ret = %d", __func__, ret);
+		else
+			BTMTK_ERR("%s: conninfra not readable, but not bus hang ret = %d", __func__, ret);
+		ret = -EIO;
+	} else {
 		uint32_t offset = *p_start_addr & 0x00000FFF;
 		uint8_t *data = NULL;
 
-		if(offset > 0x1000)
+		if (offset > 0x1000)
 			BTMTK_ERR("Error calibration offset (%d)", offset);
 		else {
 			data = (uint8_t *)(CON_REG_INFRA_SYS_ADDR + offset);
@@ -1069,35 +1065,13 @@ int32_t btmtk_intcmd_wmt_send_antenna_cmd(struct hci_dev *hdev)
 	uint8_t cmd[32] = {0};
 	long val = 0;
 	uint8_t cmd_header[] =  {0x01, 0x6F, 0xFC, 0x00, 0x01, 0x55, 0x03, 0x00, 0x00};
-        //#ifndef /* OPLUS_BUG_STABILITY */
-        // add for MTK ANT SWAP
-        /*
+
 	BTMTK_DBG("%s: load config [%s]", __func__, BT_FW_CFG_FILE);
 	btmtk_load_code_from_bin(&p_img, BT_FW_CFG_FILE, NULL, &len, 10);
-        */
-        //#else /* OPLUS_BUG_STABILITY */
-        uint32_t dev_prj = 0;
-        char str[32];
-
-        dev_prj = get_project();
-        if (dev_prj != 0) {
-            sprintf(str, "BT_FW_%d.cfg",dev_prj);
-            BTMTK_INFO("%s: try to load [%s]  ", __func__, str);
-            if (btmtk_load_code_from_bin(&p_img, str, NULL, &len, 2) == -1) {
-                BTMTK_INFO("%s: [%s] file not exist,load [%s]  ", __func__, str, BT_FW_CFG_FILE);
-                btmtk_load_code_from_bin(&p_img, BT_FW_CFG_FILE, NULL, &len, 10);
-            }
-        } else {
-            BTMTK_INFO("%s: load config [%s]", __func__, BT_FW_CFG_FILE);
-            btmtk_load_code_from_bin(&p_img, BT_FW_CFG_FILE, NULL, &len, 10);
-        }
-        //#endif /* OPLUS_BUG_STABILITY */
-
 	if (p_img == NULL) {
 		BTMTK_WARN("%s: get config file fail!", __func__);
 		return 0;
 	}
-	BTMTK_INFO("%s: load config finish [%s]", __func__, BT_FW_CFG_FILE);
 
 	/* find tag: [BT_FW_CFG_TAG][CONNAC20_CHIPID] */
 	if (snprintf(findTag, sizeof(findTag), "%s[%d] ", BT_FW_CFG_TAG, CONNAC20_CHIPID) < 0) {
@@ -1168,8 +1142,6 @@ int32_t btmtk_intcmd_wmt_send_antenna_cmd(struct hci_dev *hdev)
 	p_inter_cmd->pending_cmd_opcode = 0xFC6F;
 	p_inter_cmd->wmt_opcode = WMT_OPCODE_ANT_EFEM;
 	p_inter_cmd->result = WMT_EVT_INVALID;
-
-	BTMTK_INFO("[Before btmtk_main_send_cmd] %s done", __func__);
 
 	btmtk_main_send_cmd(g_sbdev, cmd, len, NULL, 0, 0, 0, BTMTK_TX_WAIT_VND_EVT);
 
@@ -1317,6 +1289,7 @@ int32_t btmtk_intcmd_query_thermal(void)
 
 	if (ret <= 0) {
 		BTMTK_ERR("Unable to send thermal cmd");
+		up(&cif_dev->internal_cmd_sem);
 		return -1;
 	}
 
@@ -1620,6 +1593,7 @@ int32_t btmtk_set_power_on(struct hci_dev *hdev, u_int8_t for_precal)
 	struct sched_param sch_param;
 	struct btmtk_dev *bdev = hci_get_drvdata(hdev);
 	struct btmtk_btif_dev *cif_dev = (struct btmtk_btif_dev *)g_sbdev->cif_dev;
+	bool is_wmt_power_on_error = false;
 
 	if (g_bt_trace_pt)
 		bt_dbg_tp_evt(TP_ACT_PWR_ON, 0, 0, NULL);
@@ -1801,6 +1775,7 @@ int32_t btmtk_set_power_on(struct hci_dev *hdev, u_int8_t for_precal)
 	else if (ret) {
 		BTMTK_ERR("btmtk_intcmd_wmt_power_on fail");
 		skip_up_sem = TRUE;
+		is_wmt_power_on_error = true;
 		goto wmt_power_on_error;
 	}
 
@@ -1832,6 +1807,9 @@ mcu_error:
 		conninfra_pwr_off(CONNDRV_TYPE_BT);
 		bt_pwrctrl_post_off();
 	}
+
+	if (!is_wmt_power_on_error)
+		up(&cif_dev->halt_sem);
 
 conninfra_error:
 	cif_dev->bt_state = FUNC_OFF;

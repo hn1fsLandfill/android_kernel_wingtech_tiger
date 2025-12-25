@@ -10,13 +10,9 @@
 #ifndef _IE_SORT_H
 #define _IE_SORT_H
 
-int sortMsduPayloadOffset(struct ADAPTER *prAdapter,
-		    struct MSDU_INFO *prMsduInfo);
-int sortGetPayloadOffset(struct ADAPTER *prAdapter,
-		    uint8_t *pucFrame);
-
-void sortMgmtFrameIE(struct ADAPTER *prAdapter,
-		    struct MSDU_INFO *prMsduInfo);
+void sortAssocReqIE(IN struct ADAPTER *prAdapter,
+			IN struct MSDU_INFO *prMsduInfo,
+			IN uint8_t fgIsReAssoc);
 
 #endif /* !_IE_SORT_H */
 

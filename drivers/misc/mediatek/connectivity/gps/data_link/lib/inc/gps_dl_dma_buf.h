@@ -61,11 +61,6 @@ struct gdl_dma_buf_entry {
 #else
 #define GPS_DL_DMA_BUF_ENTRY_MAX (4)
 #endif
-#define GPS_MCUDL_DMA_BUF_ENTRY_MAX (96)
-
-/* Max(GPS_DL_DMA_BUF_ENTRY_MAX, GPS_MCUDL_DMA_BUF_ENTRY_MAX) */
-#define GPS_DL_DMA_BUF_ENTRY_ARRAY_MAX (96)
-
 struct gps_dl_dma_buf {
 	int dev_index;
 	enum gps_dl_dma_dir dir;
@@ -87,13 +82,12 @@ struct gps_dl_dma_buf {
 	bool has_pending_rx;
 
 	struct gdl_dma_buf_entry dma_working_entry;
-	struct gdl_dma_buf_entry data_entries[GPS_DL_DMA_BUF_ENTRY_ARRAY_MAX];
+	struct gdl_dma_buf_entry data_entries[GPS_DL_DMA_BUF_ENTRY_MAX];
 	unsigned int entry_r;
 	unsigned int entry_w;
-	unsigned int entry_l;
 
 	unsigned int dma_working_counter;
-	bool is_for_mcudl;
+
 #if 0
 	struct gdl_dma_buf_idx reader;
 	struct gdl_dma_buf_idx writer;
@@ -115,8 +109,6 @@ void gps_dma_buf_reset(struct gps_dl_dma_buf *p_dma);
 void gps_dma_buf_show(struct gps_dl_dma_buf *p_dma, bool is_warning);
 void gps_dma_buf_align_as_byte_mode(struct gps_dl_dma_buf *p_dma);
 bool gps_dma_buf_is_empty(struct gps_dl_dma_buf *p_dma);
-unsigned int gps_dma_buf_count_data_byte(struct gps_dl_dma_buf *p_dma);
-unsigned int gps_dma_buf_count_data_entry(struct gps_dl_dma_buf *p_dma);
 
 /* enum GDL_RET_STATUS gdl_dma_buf_init(struct gps_dl_dma_buf *p_dma); */
 /* enum GDL_RET_STATUS gdl_dma_buf_deinit(struct gps_dl_dma_buf *p_dma); */
@@ -133,21 +125,20 @@ enum GDL_RET_STATUS gdl_dma_buf_get_data_entry(struct gps_dl_dma_buf *p_dma,
 	struct gdl_dma_buf_entry *p_entry);
 
 enum GDL_RET_STATUS gdl_dma_buf_set_data_entry(struct gps_dl_dma_buf *p_dma,
-	const struct gdl_dma_buf_entry *p_entry);
+	struct gdl_dma_buf_entry *p_entry);
 
 enum GDL_RET_STATUS gdl_dma_buf_get_free_entry(struct gps_dl_dma_buf *p_dma,
 	struct gdl_dma_buf_entry *p_entry, bool nospace_set_pending_rx);
 
 enum GDL_RET_STATUS gdl_dma_buf_set_free_entry(struct gps_dl_dma_buf *p_dma,
-	const struct gdl_dma_buf_entry *p_entry);
+	struct gdl_dma_buf_entry *p_entry);
 
 
 enum GDL_RET_STATUS gdl_dma_buf_entry_to_buf(const struct gdl_dma_buf_entry *p_entry,
 	unsigned char *p_buf, unsigned int buf_len, unsigned int *p_data_len);
 
 enum GDL_RET_STATUS gdl_dma_buf_buf_to_entry(const struct gdl_dma_buf_entry *p_entry,
-	const unsigned char *p_buf, unsigned int data_len, unsigned int *p_write_index,
-	bool padding_to_4byte_alignment);
+	const unsigned char *p_buf, unsigned int data_len, unsigned int *p_write_index);
 
 enum GDL_RET_STATUS gdl_dma_buf_entry_to_transfer(
 	const struct gdl_dma_buf_entry *p_entry,

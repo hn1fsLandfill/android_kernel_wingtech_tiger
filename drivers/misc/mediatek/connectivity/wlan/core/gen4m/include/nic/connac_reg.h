@@ -210,12 +210,11 @@
 #define MCU_INT_SER_TRIGGER_FROM_HOST   BIT(2)
 #define MCU_INT_PDMA0_RECOVERY_DONE     BIT(3)
 #define MCU_INT_DRIVER_SER              BIT(4)
-#if (CFG_SUPPORT_CONNAC2X == 1 || CFG_SUPPORT_CONNAC3X == 1)
-#define MCU_INT_NOTIFY_MD_CRASH         BIT(2)
-#else
+#if (CFG_SUPPORT_CONNAC2X == 0)
 #define MCU_INT_NOTIFY_MD_CRASH         BIT(5)
+#else
+#define MCU_INT_NOTIFY_MD_CRASH         BIT(2)
 #endif
-#define CONNAC_SUBSYS_INT BIT(28)
 #define CONNAC_MCU_SW_INT BIT(29)
 
 #define ERROR_DETECT_STOP_PDMA_WITH_FW_RELOAD BIT(1)
@@ -223,18 +222,6 @@
 #define ERROR_DETECT_RESET_DONE BIT(3)
 #define ERROR_DETECT_RECOVERY_DONE BIT(4)
 #define ERROR_DETECT_MCU_NORMAL_STATE  BIT(5)
-/*
- * BIT(6) is 1 means L1 reset is triggered when HIF is suspend.
- *           0 means no L1 reset is triggered when HIF is suspend.
- */
-#define ERROR_DETECT_SER_TRIGGER_IN_SUSPEND BIT(6)
-/*
- * BIT(7) is only meaningful when BIT(6) is 1.
- *           1 means L1 reset is done after being triggered in HIF is
- *             suspend.
- *           0 means L1 reset is still on-going.
- */
-#define ERROR_DETECT_SER_DONE_IN_SUSPEND BIT(7)
 #define CP_LMAC_HANG_WORKAROUND_STEP1 BIT(8)
 #define CP_LMAC_HANG_WORKAROUND_STEP2 BIT(9)
 #define ERROR_DETECT_LMAC_ERROR BIT(24)

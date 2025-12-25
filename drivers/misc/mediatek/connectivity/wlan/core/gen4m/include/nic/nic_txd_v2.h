@@ -91,15 +91,13 @@ uint8_t nic_txd_v2_queue_idx_op(
 #if (CFG_TCP_IP_CHKSUM_OFFLOAD == 1)
 void nic_txd_v2_chksum_op(
 	void *prTxDesc,
-	uint8_t ucChksumFlag,
-	struct MSDU_INFO *prMsduInfo);
+	uint8_t ucChksumFlag);
 #endif /* CFG_TCP_IP_CHKSUM_OFFLOAD == 1 */
 void nic_txd_v2_header_format_op(
 	void *prTxDesc,
 	struct MSDU_INFO *prMsduInfo);
 
 void nic_txd_v2_fill_by_pkt_option(
-	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo,
 	void *prTxD);
 
@@ -109,6 +107,11 @@ void nic_txd_v2_compose(
 	u_int32_t u4TxDescLength,
 	u_int8_t fgIsTemplate,
 	u_int8_t *prTxDescBuffer);
+void nic_txd_v2_compose_security_frame(
+	struct ADAPTER *prAdapter,
+	struct CMD_INFO *prCmdInfo,
+	uint8_t *prTxDescBuffer,
+	uint8_t *pucTxDescLength);
 void nic_txd_v2_set_pkt_fixed_rate_option_full(
 	struct MSDU_INFO *prMsduInfo,
 	uint16_t u2RateCode,

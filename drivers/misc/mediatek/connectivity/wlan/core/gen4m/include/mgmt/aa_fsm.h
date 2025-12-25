@@ -105,9 +105,6 @@
 #define TX_ASSOCIATE_TIMEOUT_TU        2048 /* TU. */
 #define JOIN_MAX_RETRY_OVERLOAD_RN		    1	/* Times */
 
-#if CFG_AP_80211KVR_INTERFACE
-#define SAP_CHAN_NOISE_GET_INFO_PERIOD              5000 /* ms */
-#endif
 
 /*******************************************************************************
  *                             D A T A   T Y P E S
@@ -160,92 +157,80 @@ enum ENUM_AA_FRM_TYPE {
 /* Routines in saa_fsm.c                                                      */
 /*----------------------------------------------------------------------------*/
 void
-saaFsmSteps(struct ADAPTER *prAdapter,
-	    struct STA_RECORD *prStaRec,
-	    enum ENUM_AA_STATE eNextState,
-	    struct SW_RFB *prRetainedSwRfb);
+saaFsmSteps(IN struct ADAPTER *prAdapter,
+	    IN struct STA_RECORD *prStaRec,
+	    IN enum ENUM_AA_STATE eNextState,
+	    IN struct SW_RFB *prRetainedSwRfb);
 
 uint32_t
-saaFsmSendEventJoinComplete(struct ADAPTER *prAdapter,
+saaFsmSendEventJoinComplete(IN struct ADAPTER *prAdapter,
 			    uint32_t rJoinStatus, struct STA_RECORD *prStaRec,
 			    struct SW_RFB *prSwRfb);
 
-void saaFsmRunEventStart(struct ADAPTER *prAdapter,
-			 struct MSG_HDR *prMsgHdr);
+void saaFsmRunEventStart(IN struct ADAPTER *prAdapter,
+			 IN struct MSG_HDR *prMsgHdr);
 
 uint32_t
-saaFsmRunEventTxDone(struct ADAPTER *prAdapter,
-		     struct MSDU_INFO *prMsduInfo,
-		     enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+saaFsmRunEventTxDone(IN struct ADAPTER *prAdapter,
+		     IN struct MSDU_INFO *prMsduInfo,
+		     IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-void saaFsmRunEventTxReqTimeOut(struct ADAPTER
-				*prAdapter, uintptr_t plParamPtr);
+void saaFsmRunEventTxReqTimeOut(IN struct ADAPTER
+				*prAdapter, IN unsigned long plParamPtr);
 
-void saaFsmRunEventRxRespTimeOut(struct ADAPTER
-				 *prAdapter, uintptr_t ulParamPtr);
+void saaFsmRunEventRxRespTimeOut(IN struct ADAPTER
+				 *prAdapter, IN unsigned long ulParamPtr);
 
-void saaFsmRunEventRxAuth(struct ADAPTER *prAdapter,
-			  struct SW_RFB *prSwRfb);
+void saaFsmRunEventRxAuth(IN struct ADAPTER *prAdapter,
+			  IN struct SW_RFB *prSwRfb);
 
-uint32_t saaFsmRunEventRxAssoc(struct ADAPTER *prAdapter,
-			       struct SW_RFB *prSwRfb);
+uint32_t saaFsmRunEventRxAssoc(IN struct ADAPTER *prAdapter,
+			       IN struct SW_RFB *prSwRfb);
 
-uint32_t saaFsmRunEventRxDeauth(struct ADAPTER
-				*prAdapter, struct SW_RFB *prSwRfb);
+uint32_t saaFsmRunEventRxDeauth(IN struct ADAPTER
+				*prAdapter, IN struct SW_RFB *prSwRfb);
 
-uint32_t saaFsmRunEventRxDisassoc(struct ADAPTER
-				  *prAdapter, struct SW_RFB *prSwRfb);
+uint32_t saaFsmRunEventRxDisassoc(IN struct ADAPTER
+				  *prAdapter, IN struct SW_RFB *prSwRfb);
 
-void saaFsmRunEventAbort(struct ADAPTER *prAdapter,
-			 struct MSG_HDR *prMsgHdr);
+void saaFsmRunEventAbort(IN struct ADAPTER *prAdapter,
+			 IN struct MSG_HDR *prMsgHdr);
 
-void saaChkDeauthfrmParamHandler(struct ADAPTER
-				 *prAdapter, struct SW_RFB *prSwRfb,
-				 struct STA_RECORD *prStaRec);
-
-void
-saaChkDisassocfrmParamHandler(struct ADAPTER *prAdapter,
-			      struct WLAN_DISASSOC_FRAME *prDisassocFrame,
-			      struct STA_RECORD *prStaRec,
-			      struct SW_RFB *prSwRfb);
+void saaChkDeauthfrmParamHandler(IN struct ADAPTER
+				 *prAdapter, IN struct SW_RFB *prSwRfb,
+				 IN struct STA_RECORD *prStaRec);
 
 void
-saaSendDisconnectMsgHandler(struct ADAPTER *prAdapter,
-			    struct STA_RECORD *prStaRec,
-			    struct BSS_INFO *prAisBssInfo,
-			    enum ENUM_AA_FRM_TYPE eFrmType);
+saaChkDisassocfrmParamHandler(IN struct ADAPTER *prAdapter,
+			      IN struct WLAN_DISASSOC_FRAME *prDisassocFrame,
+			      IN struct STA_RECORD *prStaRec,
+			      IN struct SW_RFB *prSwRfb);
 
-void saaFsmRunEventFTContinue(struct ADAPTER *prAdapter,
-			      struct MSG_HDR *prMsgHdr);
+void
+saaSendDisconnectMsgHandler(IN struct ADAPTER *prAdapter,
+			    IN struct STA_RECORD *prStaRec,
+			    IN struct BSS_INFO *prAisBssInfo,
+			    IN enum ENUM_AA_FRM_TYPE eFrmType);
 
-void saaFsmRunEventExternalAuthDone(struct ADAPTER *prAdapter,
-				    struct MSG_HDR *prMsgHdr);
+void saaFsmRunEventFTContinue(IN struct ADAPTER *prAdapter,
+			      IN struct MSG_HDR *prMsgHdr);
+
+void saaFsmRunEventExternalAuthDone(IN struct ADAPTER *prAdapter,
+				    IN struct MSG_HDR *prMsgHdr);
 
 /*----------------------------------------------------------------------------*/
 /* Routines in aaa_fsm.c                                                      */
 /*----------------------------------------------------------------------------*/
-void aaaFsmRunEventRxAuth(struct ADAPTER *prAdapter,
-			  struct SW_RFB *prSwRfb);
+void aaaFsmRunEventRxAuth(IN struct ADAPTER *prAdapter,
+			  IN struct SW_RFB *prSwRfb);
 
-uint32_t aaaFsmRunEventRxAssoc(struct ADAPTER *prAdapter,
-			       struct SW_RFB *prSwRfb);
+uint32_t aaaFsmRunEventRxAssoc(IN struct ADAPTER *prAdapter,
+			       IN struct SW_RFB *prSwRfb);
 
 uint32_t
-aaaFsmRunEventTxDone(struct ADAPTER *prAdapter,
-		     struct MSDU_INFO *prMsduInfo,
-		     enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+aaaFsmRunEventTxDone(IN struct ADAPTER *prAdapter,
+		     IN struct MSDU_INFO *prMsduInfo,
+		     IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-#if CFG_AP_80211KVR_INTERFACE
-void aaaMulAPAgentChanNoiseInitWorkHandler(
-	struct work_struct *work);
 
-void aaaMulAPAgentChanNoiseCollectionWorkHandler(
-	struct work_struct *work);
-
-void aaaMulAPAgentStaEventNotify(struct STA_RECORD *prStaRec,
-	unsigned char *pucAddr, unsigned char fgIsConnected);
-
-void aaaMulAPAgentUnassocStaMeasureTimeout(
-	struct ADAPTER *prAdapter, uintptr_t ulParamPtr);
-#endif
 #endif /* _AA_FSM_H */

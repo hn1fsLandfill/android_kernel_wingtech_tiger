@@ -98,13 +98,11 @@ struct BSS_TRANSITION_MGT_PARAM {
 	/* for Request */
 	uint8_t ucDialogToken;
 	uint8_t ucRequestMode;
-	uint32_t u4ReauthDelay;
+	uint16_t u2DisassocTimer;
 	uint16_t u2TermDuration;
 	uint8_t aucTermTsf[8];
 	uint8_t ucSessionURLLen;
 	uint8_t aucSessionURL[255];
-	uint8_t ucDisImmiState;
-	uint8_t aucBSSID[MAC_ADDR_LEN];
 	/* for Respone */
 	uint8_t fgPendingResponse:1;
 	uint8_t fgIsMboPresent:1;
@@ -135,7 +133,6 @@ struct BSS_TRANSITION_MGT_PARAM {
 #define WNM_BSS_TM_REQ_DISASSOC_IMMINENT BIT(2)
 #define WNM_BSS_TM_REQ_BSS_TERMINATION_INCLUDED BIT(3)
 #define WNM_BSS_TM_REQ_ESS_DISASSOC_IMMINENT BIT(4)
-#define WNM_BSS_TM_REQ_LINK_REMOVAL_IMMINENT BIT(5)
 
 /* IEEE Std 802.11-2012 - Table 8-253 */
 enum BSS_TRANS_MGMT_STATUS_CODE {
@@ -162,36 +159,26 @@ enum BSS_TRANS_MGMT_STATUS_CODE {
  *******************************************************************************
  */
 
-void wnmWNMAction(struct ADAPTER *prAdapter,
-		  struct SW_RFB *prSwRfb);
+void wnmWNMAction(IN struct ADAPTER *prAdapter,
+		  IN struct SW_RFB *prSwRfb);
 
-void wnmReportTimingMeas(struct ADAPTER *prAdapter,
-			 uint8_t ucStaRecIndex, uint32_t u4ToD,
-			 uint32_t u4ToA);
+void wnmReportTimingMeas(IN struct ADAPTER *prAdapter,
+			 IN uint8_t ucStaRecIndex, IN uint32_t u4ToD,
+			 IN uint32_t u4ToA);
 
 #if WNM_UNIT_TEST
 void wnmTimingMeasUnitTest1(struct ADAPTER *prAdapter,
 			    uint8_t ucStaRecIndex);
 #endif
 
-void wnmRecvBTMRequest(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
+void wnmRecvBTMRequest(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb);
 
-void wnmSendBTMQueryFrame(struct ADAPTER *prAdapter,
-		 struct STA_RECORD *prStaRec, uint8_t ucQueryReason);
+void wnmSendBTMQueryFrame(IN struct ADAPTER *prAdapter,
+		 IN struct STA_RECORD *prStaRec, IN uint8_t ucQueryReason);
 
-uint8_t wnmSendBTMResponse(struct ADAPTER *prAdapter,
-	const uint8_t *aucBssid, uint8_t ucStatus,
-	uint8_t ucReason, uint8_t ucBssIndex);
-
-#if CFG_AP_80211V_SUPPORT
-void wnmMulAPAgentSendBTMRequestFrame(
-			struct ADAPTER *prAdapter,
-			struct STA_RECORD *prStaRec,
-			struct PARAM_CUSTOM_BTM_REQ_STRUCT *prSetBtmReqInfo);
-
-void wnmMulAPAgentRecvBTMResponse(struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb);
-#endif /* CFG_AP_80211V_SUPPORT */
+uint8_t wnmSendBTMResponse(IN struct ADAPTER *prAdapter,
+	IN const uint8_t *aucBssid, IN uint8_t ucStatus,
+	IN uint8_t ucReason, IN uint8_t ucBssIndex);
 
 /*******************************************************************************
  *                              F U N C T I O N S

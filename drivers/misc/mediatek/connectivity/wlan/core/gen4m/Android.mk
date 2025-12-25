@@ -4,7 +4,6 @@ ifeq ($(MTK_WLAN_SUPPORT), yes)
 
 ifeq ($(WLAN_BUILD_COMMON), true)
 	# for layer decoupling 2.0, we have to build all configurations
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
 	WLAN_CHIP_ID := 6893
 	WIFI_CHIP := CONNAC2X2_SOC3_0
 	WIFI_IP_SET := 1
@@ -16,7 +15,6 @@ ifeq ($(WLAN_BUILD_COMMON), true)
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac2.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
 	WLAN_CHIP_ID := 6983
 	WIFI_CHIP := CONNAC2X2_SOC7_0
 	WIFI_IP_SET := 1
@@ -28,7 +26,6 @@ ifeq ($(WLAN_BUILD_COMMON), true)
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac2.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
 	WLAN_CHIP_ID := 6879
 	WIFI_CHIP := CONNAC2X2_SOC7_0
 	WIFI_IP_SET := 1
@@ -40,7 +37,6 @@ ifeq ($(WLAN_BUILD_COMMON), true)
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac2.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
 	WLAN_CHIP_ID := 6895
 	WIFI_CHIP := CONNAC2X2_SOC7_0
 	WIFI_IP_SET := 1
@@ -52,23 +48,10 @@ ifeq ($(WLAN_BUILD_COMMON), true)
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac2.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6886
-	WIFI_CHIP := CONNAC2X2_SOC7_0
-	WIFI_IP_SET := 1
-	CONNAC_VER := 2_0
-	WIFI_HIF := axi
-	WIFI_WMT := y
-	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6886
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac2.ko
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
 	WLAN_CHIP_ID := 6855
 	WIFI_CHIP := SOC2_1X1
 	WIFI_IP_SET := 1
-	CONNAC_VER := 1_0
+	CONNAC_VER :=
 	WIFI_HIF := axi
 	WIFI_WMT := y
 	WIFI_EMI := y
@@ -76,83 +59,21 @@ ifeq ($(WLAN_BUILD_COMMON), true)
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := bellwether
-	WIFI_CHIP := BELLWETHER
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
-	WIFI_WMT := y
-	WIFI_EMI := n
-	WIFI_NAME := wlan_drv_gen4m_6983_bellwether
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6983
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6639
-	WIFI_CHIP := MT6639
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
+	WLAN_CHIP_ID := 6789
+	WIFI_CHIP := SOC2_1X1
+	WIFI_IP_SET := 1
+	CONNAC_VER :=
+	WIFI_HIF := axi
 	WIFI_WMT := y
 	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6983_6639
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6983
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6639
-	WIFI_CHIP := MT6639
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
-	WIFI_WMT := y
-	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6985_6639
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6985
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6639
-	WIFI_CHIP := MT6639
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
-	WIFI_WMT := y
-	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6985_6639_mp2
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6985
-	CONFIG_WLAN_MT6985_MP2 := y
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6639
-	WIFI_CHIP := MT6639
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
-	WIFI_WMT := y
-	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6985_6639_offload
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6985
-	WIFI_HOST_OFFLOAD_SUPPORT := y
-	include $(LOCAL_PATH)/build_wlan_drv.mk
-
-	include $(LOCAL_PATH)/clear_wlan_drv.mk
-	WLAN_CHIP_ID := 6639
-	WIFI_CHIP := MT6639
-	CONNAC_VER := 3_0
-	WIFI_HIF := pcie
-	WIFI_WMT := y
-	WIFI_EMI := y
-	WIFI_NAME := wlan_drv_gen4m_6985_6639_mp2_lp
-	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi_connac3.ko
-	CONFIG_WLAN_PLATFORM := mt6985
-	CONFIG_WLAN_MT6985_MP2 := y
-	CONFIG_WLAN_MT6985_MP2_LP := y
+	WIFI_NAME := wlan_drv_gen4m_6789
+	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 else
 	WIFI_NAME := wlan_drv_gen4m
+	WIFI_HIF := axi
+	WIFI_WMT := y
+	WIFI_EMI := y
 	WIFI_CHRDEV_MODULE := wmt_chrdev_wifi.ko
 	include $(LOCAL_PATH)/build_wlan_drv.mk
 endif

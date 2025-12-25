@@ -252,8 +252,8 @@ void dumpQueue(struct ADAPTER *prAdapter)
 	       prQM->arTxQueue[0].u4NumElem);
 	DBGLOG(SW4, INFO, "Pending %d\n",
 	       prGlueInfo->i4TxPendingFrameNum);
-	DBGLOG(SW4, INFO, "Pending CmdData %d\n",
-	       prGlueInfo->i4TxPendingCmdDataFrameNum);
+	DBGLOG(SW4, INFO, "Pending Security %d\n",
+	       prGlueInfo->i4TxPendingSecurityFrameNum);
 #if defined(LINUX)
 	for (i = 0; i < 4; i++) {
 		for (j = 0; j < CFG_MAX_TXQ_NUM; j++) {
@@ -265,11 +265,11 @@ void dumpQueue(struct ADAPTER *prAdapter)
 #endif
 
 	DBGLOG(SW4, INFO, " rFreeSwRfbList %u\n",
-		RX_GET_FREE_RFB_CNT(&prAdapter->rRxCtrl));
+	       prAdapter->rRxCtrl.rFreeSwRfbList.u4NumElem);
 	DBGLOG(SW4, INFO, " rReceivedRfbList %u\n",
-		RX_GET_RECEIVED_RFB_CNT(&prAdapter->rRxCtrl));
+	       prAdapter->rRxCtrl.rReceivedRfbList.u4NumElem);
 	DBGLOG(SW4, INFO, " rIndicatedRfbList %u\n",
-		RX_GET_INDICATED_RFB_CNT(&prAdapter->rRxCtrl));
+	       prAdapter->rRxCtrl.rIndicatedRfbList.u4NumElem);
 	DBGLOG(SW4, INFO, " ucNumIndPacket %u\n",
 	       prAdapter->rRxCtrl.ucNumIndPacket);
 	DBGLOG(SW4, INFO, " ucNumRetainedPacket %u\n",
@@ -709,19 +709,11 @@ void swCtrlCmdCategory0(struct ADAPTER *prAdapter,
 
 			case 1:
 #if QM_FORWARDING_FAIRNESS
-#if (CFG_TX_RSRC_WMM_ENHANCE == 1)
-				if (ucOpt1 >= TC_NUM) {
-					DBGLOG(SW4, WARN, "ucOpt1 %u invalid\n",
-					   ucOpt1);
-					break;
-				}
-#else
 				if (ucOpt1 >= NUM_OF_PER_STA_TX_QUEUES) {
 					DBGLOG(SW4, WARN, "ucOpt1 %u invalid\n",
 					   ucOpt1);
 					break;
 				}
-#endif
 				g_au4SwCr[1] =
 					prQM->au4ResourceUsedCount[ucOpt1];
 				g_au4SwCr[2] = prQM->au4HeadStaRecIndex[ucOpt1];
@@ -850,13 +842,13 @@ void swCtrlCmdCategory1(struct ADAPTER *prAdapter,
 #if TEST_PS
 
 void
-testPsSendQoSNullFrame(struct ADAPTER *prAdapter,
-		       struct STA_RECORD *prStaRec,
-		       uint8_t ucUP,
-		       uint8_t ucBssIndex,
-		       u_int8_t fgBMC,
-		       u_int8_t fgIsBurstEnd, u_int8_t ucPacketType,
-		       u_int8_t ucPsSessionID, u_int8_t fgSetEOSP)
+testPsSendQoSNullFrame(IN struct ADAPTER *prAdapter,
+		       IN struct STA_RECORD *prStaRec,
+		       IN uint8_t ucUP,
+		       IN uint8_t ucBssIndex,
+		       IN u_int8_t fgBMC,
+		       IN u_int8_t fgIsBurstEnd, IN u_int8_t ucPacketType,
+		       IN u_int8_t ucPsSessionID, IN u_int8_t fgSetEOSP)
 {
 	struct MSDU_INFO *prMsduInfo;
 	uint16_t u2EstimatedFrameLen;
@@ -881,7 +873,7 @@ testPsSendQoSNullFrame(struct ADAPTER *prAdapter,
 	}
 	/* 4 <2> Compose Null frame in MSDU_INfO_T. */
 	bssComposeQoSNullFrame(prAdapter,
-		(uint8_t *) ((uintptr_t) (prMsduInfo->prPacket) +
+		(uint8_t *) ((unsigned long) (prMsduInfo->prPacket) +
 		MAC_TX_RESERVED_FIELD),
 		prStaRec, ucUP, fgSetEOSP);
 
@@ -895,7 +887,7 @@ testPsSendQoSNullFrame(struct ADAPTER *prAdapter,
 	prMsduInfo->ucPacketType = ucPacketType;
 
 	prQoSNullFrame = (struct WLAN_MAC_HEADER_QOS *) ((uint8_t *)
-			 ((uintptr_t) (prMsduInfo->prPacket) +
+			 ((unsigned long) (prMsduInfo->prPacket) +
 			  MAC_TX_RESERVED_FIELD));
 
 	if (fgBMC)
@@ -908,8 +900,8 @@ testPsSendQoSNullFrame(struct ADAPTER *prAdapter,
 
 }
 
-void testPsSetupBss(struct ADAPTER *prAdapter,
-		    uint8_t ucBssIndex)
+void testPsSetupBss(IN struct ADAPTER *prAdapter,
+		    IN uint8_t ucBssIndex)
 {
 	struct BSS_INFO *prBssInfo;
 	uint8_t _aucZeroMacAddr[] = NULL_MAC_ADDR;
@@ -924,10 +916,6 @@ void testPsSetupBss(struct ADAPTER *prAdapter,
 	}
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (prBssInfo == NULL) {
-		DBGLOG(SW4, WARN, "Get BSS info by index fail.\n");
-		return;
-	}
 
 	/* 4 <1.2> Initiate PWR STATE */
 	/* SET_NET_PWR_STATE_IDLE(prAdapter, ucNetworkTypeIndex); */
@@ -942,6 +930,8 @@ void testPsSetupBss(struct ADAPTER *prAdapter,
 	prBssInfo->eCurrentOPMode = OP_MODE_ACCESS_POINT;
 	prBssInfo->fgIsNetActive = TRUE;
 	prBssInfo->ucBssIndex = ucBssIndex;
+	prBssInfo->ucReasonOfDisconnect =
+		DISCONNECT_REASON_CODE_RESERVED;
 
 	/* Depend on eBand */
 	prBssInfo->ucPhyTypeSet =
@@ -1266,7 +1256,7 @@ void swCrDebugInit(struct ADAPTER *prAdapter)
 
 	cnmTimerInitTimer(prAdapter, &g_rSwcrDebugTimer,
 			  (PFN_MGMT_TIMEOUT_FUNC) swCrDebugCheckTimeout,
-			  (uintptr_t) NULL);
+			  (unsigned long) NULL);
 
 	if (g_u4SwcrDebugCheckTimeout)
 		swCrDebugCheckEnable(prAdapter, TRUE,
@@ -1468,8 +1458,8 @@ void swCrDebugCheck(struct ADAPTER *prAdapter,
 				   g_u4SwcrDebugCheckTimeout * MSEC_PER_SEC);
 }
 
-void swCrDebugCheckTimeout(struct ADAPTER *prAdapter,
-			   uintptr_t ulParamPtr)
+void swCrDebugCheckTimeout(IN struct ADAPTER *prAdapter,
+			   unsigned long ulParamPtr)
 {
 	struct CMD_SW_DBG_CTRL rCmdSwCtrl = {0};
 	uint32_t rStatus;
@@ -1492,8 +1482,8 @@ void swCrDebugCheckTimeout(struct ADAPTER *prAdapter,
 	ASSERT(rStatus == WLAN_STATUS_PENDING);
 }
 
-void swCrDebugQuery(struct ADAPTER *prAdapter,
-		    struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void swCrDebugQuery(IN struct ADAPTER *prAdapter,
+		    IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	ASSERT(prAdapter);
 
@@ -1501,8 +1491,8 @@ void swCrDebugQuery(struct ADAPTER *prAdapter,
 		       (struct CMD_SW_DBG_CTRL *) (pucEventBuf));
 }
 
-void swCrDebugQueryTimeout(struct ADAPTER *prAdapter,
-			   struct CMD_INFO *prCmdInfo)
+void swCrDebugQueryTimeout(IN struct ADAPTER *prAdapter,
+			   IN struct CMD_INFO *prCmdInfo)
 {
 	ASSERT(prAdapter);
 

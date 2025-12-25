@@ -12,20 +12,13 @@
 #include "gps_each_link.h"
 #include "gps/gps_usrt_apb.h"
 #include "gps/gps_l5_usrt_apb.h"
-#if GPS_DL_HAS_MCUDL_HAL
-#include "gps_mcudl_hal_ccif.h"
-#endif
 
 /* TODO: IRQ hwirq, irq_id, gdl_irq_index */
 /* On CTP: hwirq == irq_id */
 /* On Linux: hwirq != irq_id */
 #if GPS_DL_ON_CTP
 /* x_define_irq.h 198 -> 415 */
-#if GPS_DL_CONNAC3
-#define GPS_DL_IRQ_BASE_ID          (GPS_L1_IRQ_BIT0_ID)
-#elif GPS_DL_CONNAC2
-#define GPS_DL_IRQ_BASE_ID          (GPS_L1_IRQ_BUS_BIT0_ID)
-#endif
+#define GPS_DL_IRQ_BASE_ID			(GPS_L1_IRQ_BUS_BIT0_ID)
 #else
 #define GPS_DL_IRQ_BASE_ID          (383) /* (415 - 32) */
 #endif
@@ -37,13 +30,6 @@
 #define GPS_IRQ_ID_DL1_HAS_NODATA   (GPS_DL_IRQ_BASE_ID + 4)
 #define GPS_IRQ_ID_DL1_MCUB         (GPS_DL_IRQ_BASE_ID + 5)
 #define GPS_IRQ_ID_DMA_DONE         (GPS_DL_IRQ_BASE_ID + 6)
-#if GPS_DL_HAS_MCUDL
-#define GPS_IRQ_ID_CCIF             (GPS_DL_IRQ_BASE_ID + 7)
-#define GPS_IRQ_ID_CONN2AP          (GPS_DL_IRQ_BASE_ID + 8)
-#define GPS_IRQ_ID_WDT              (GPS_DL_IRQ_BASE_ID + 9)
-#define GPS_IRQ_ID_HIF_ON           (GPS_DL_IRQ_BASE_ID + 10)
-#endif
-
 
 #if GPS_DL_ON_LINUX
 /* TODO: hwirq and linux irq id */
@@ -61,12 +47,6 @@ int g_gps_irq_index_to_id_table[GPS_DL_IRQ_NUM] = {
 	[GPS_DL_IRQ_LINK1_NODATA] = GPS_IRQ_ID_DL1_HAS_NODATA,
 	[GPS_DL_IRQ_LINK1_MCUB]   = GPS_IRQ_ID_DL1_MCUB,
 	[GPS_DL_IRQ_DMA]          = GPS_IRQ_ID_DMA_DONE,
-#if GPS_DL_HAS_MCUDL
-	[GPS_DL_IRQ_CCIF]         = GPS_IRQ_ID_CCIF,
-	[GPS_DL_IRQ_CONN2AP]      = GPS_IRQ_ID_CONN2AP,
-	[GPS_DL_IRQ_WDT]          = GPS_IRQ_ID_WDT,
-	[GPS_DL_IRQ_HIF_ON]       = GPS_IRQ_ID_HIF_ON,
-#endif
 };
 #endif
 
@@ -343,30 +323,6 @@ void gps_dl_isr_dl1_has_nodata(void)
 void gps_dl_isr_dl1_mcub(void)
 {
 	gps_dl_isr_mcub(GPS_DATA_LINK_ID1);
-}
-#endif
-
-#if GPS_DL_HAS_MCUDL
-void gps_dl_isr_ccif(void)
-{
-#if GPS_DL_HAS_MCUDL_HAL
-	gps_mcudl_hal_ccif_rx_isr();
-#endif
-}
-
-void gps_dl_isr_conn2ap(void)
-{
-}
-
-void gps_dl_isr_wdt(void)
-{
-#if GPS_DL_HAS_MCUDL_HAL
-	gps_mcudl_hal_wdt_isr();
-#endif
-}
-
-void gps_dl_isr_hif_on(void)
-{
 }
 #endif
 

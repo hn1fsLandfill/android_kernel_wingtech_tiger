@@ -161,11 +161,27 @@ static struct platform_driver mtk_axi_driver = {
 	.remove = NULL,
 };
 
+struct platform_device *g_prPlatDev;
+
 static struct GLUE_INFO *g_prGlueInfo;
 static void *CSRBaseAddress;
 static u64 g_u8CsrOffset;
 static u32 g_u4CsrSize;
 static u_int8_t g_fgDriverProbed = FALSE;
+
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+struct HIF_PREALLOC_MEM grMem;
+unsigned long long gWifiRsvMemSize;
+
+struct wifi_rsrv_mem {
+	phys_addr_t phy_base;
+	void *vir_base;
+	unsigned long long size;
+};
+
+/* Assume reserved memory size < BIT(32) */
+static struct wifi_rsrv_mem wifi_rsrv_mems[32];
+#endif
 
 /*******************************************************************************
  *                                 M A C R O S
@@ -176,6 +192,61 @@ static u_int8_t g_fgDriverProbed = FALSE;
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+static int _init_resv_mem(struct platform_device *pdev);
+
+static void axiAllocTxDesc(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDescRing,
+			   uint32_t u4Num);
+static void axiAllocRxDesc(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDescRing,
+			   uint32_t u4Num);
+static bool axiAllocTxCmdBuf(struct RTMP_DMABUF *prDmaBuf,
+			     uint32_t u4Num, uint32_t u4Idx);
+#else
+static void axiAllocDesc(struct GL_HIF_INFO *prHifInfo,
+			 struct RTMP_DMABUF *prDescRing,
+			 uint32_t u4Num);
+static void *axiAllocRuntimeMem(uint32_t u4SrcLen);
+static phys_addr_t axiMapTxBuf(struct GL_HIF_INFO *prHifInfo,
+			       void *pucBuf, uint32_t u4Offset, uint32_t u4Len);
+static phys_addr_t axiMapRxBuf(struct GL_HIF_INFO *prHifInfo,
+			       void *pucBuf, uint32_t u4Offset, uint32_t u4Len);
+static void axiUnmapTxBuf(struct GL_HIF_INFO *prHifInfo,
+			  phys_addr_t rDmaAddr, uint32_t u4Len);
+static void axiUnmapRxBuf(struct GL_HIF_INFO *prHifInfo,
+			  phys_addr_t rDmaAddr, uint32_t u4Len);
+static void axiFreeDesc(struct GL_HIF_INFO *prHifInfo,
+			struct RTMP_DMABUF *prDescRing);
+static void axiFreeBuf(void *pucSrc, uint32_t u4Len);
+static void axiFreePacket(void *pvPacket);
+#endif /* AXI_CFG_PREALLOC_MEMORY_BUFFER */
+
+static void axiAllocTxDataBuf(struct MSDU_TOKEN_ENTRY *prToken, uint32_t u4Idx);
+static void *axiAllocRxBuf(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDmaBuf,
+			   uint32_t u4Num, uint32_t u4Idx);
+static bool axiCopyCmd(struct GL_HIF_INFO *prHifInfo,
+		       struct RTMP_DMACB *prTxCell, void *pucBuf,
+		       void *pucSrc1, uint32_t u4SrcLen1,
+		       void *pucSrc2, uint32_t u4SrcLen2);
+static bool axiCopyEvent(struct GL_HIF_INFO *prHifInfo,
+			 struct RTMP_DMACB *pRxCell,
+			 struct RXD_STRUCT *pRxD,
+			 struct RTMP_DMABUF *prDmaBuf,
+			 uint8_t *pucDst, uint32_t u4Len);
+static bool axiCopyTxData(struct MSDU_TOKEN_ENTRY *prToken,
+			  void *pucSrc, uint32_t u4Len);
+static bool axiCopyRxData(struct GL_HIF_INFO *prHifInfo,
+			  struct RTMP_DMACB *pRxCell,
+			  struct RTMP_DMABUF *prDmaBuf,
+			  struct SW_RFB *prSwRfb);
+static void axiDumpTx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_TX_RING *prTxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen);
+static void axiDumpRx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_RX_RING *prRxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen);
 
 /*******************************************************************************
  *                              F U N C T I O N S
@@ -184,7 +255,12 @@ static u_int8_t g_fgDriverProbed = FALSE;
 
 struct mt66xx_hif_driver_data *get_platform_driver_data(void)
 {
-	return (struct mt66xx_hif_driver_data *) mtk_axi_ids[0].driver_data;
+	ASSERT(g_prPlatDev);
+	if (!g_prPlatDev)
+		return NULL;
+
+	return (struct mt66xx_hif_driver_data *) platform_get_drvdata(
+			g_prPlatDev);
 }
 
 static int hifAxiProbe(void)
@@ -198,10 +274,32 @@ static int hifAxiProbe(void)
 	prDriverData = get_platform_driver_data();
 	prChipInfo = prDriverData->chip_info;
 
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+	mtk_wcn_consys_hw_wifi_paldo_ctrl(1);
+#else
+#if (CFG_SUPPORT_POWER_THROTTLING == 1)
+	conn_pwr_drv_pre_on(CONN_PWR_DRV_WIFI, &prDriverData->u4PwrLevel);
+	conn_pwr_send_msg(CONN_PWR_DRV_WIFI, CONN_PWR_MSG_GET_TEMP,
+			&prDriverData->rTempInfo);
+#endif
+	ret = asicConnac2xPwrOnWmMcu(prChipInfo);
+	if (ret != 0) {
+		asicConnac2xPwrOffWmMcu(prChipInfo);
+		goto out;
+	}
+#endif
+#endif
+
 	if (pfWlanProbe((void *) g_prPlatDev, (void *) prDriverData) !=
 			WLAN_STATUS_SUCCESS) {
 		DBGLOG(INIT, INFO, "pfWlanProbe fail!\n");
 		ret = -1;
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 1)
+		asicConnac2xPwrOffWmMcu(prChipInfo);
+#endif
+#endif
 		goto out;
 	}
 	g_fgDriverProbed = TRUE;
@@ -225,11 +323,119 @@ int hifAxiRemove(void)
 		DBGLOG(INIT, TRACE, "pfWlanRemove done\n");
 	}
 
+#if (CFG_SUPPORT_CONNINFRA == 1)
+	if (prChipInfo->coexpccifoff) {
+		prChipInfo->coexpccifoff();
+		DBGLOG(INIT, TRACE, "pccif off\n");
+	}
+#endif
+
+	if (prChipInfo->coantVFE28Dis)
+		prChipInfo->coantVFE28Dis();
+
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+	mtk_wcn_consys_hw_wifi_paldo_ctrl(0);
+#else
+	asicConnac2xPwrOffWmMcu(prChipInfo);
+#if (CFG_SUPPORT_POWER_THROTTLING == 1)
+	conn_pwr_drv_post_off(CONN_PWR_DRV_WIFI);
+#endif /* CFG_SUPPORT_POWER_THROTTLING */
+#endif /* CFG_SUPPORT_CONNINFRA */
+#endif /* CFG_MTK_ANDROID_WMT */
 	g_fgDriverProbed = FALSE;
 
 	DBGLOG(INIT, TRACE, "hifAxiRemove() done\n");
 	return 0;
 }
+
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+static int hifAxiGetBusCnt(void)
+{
+	if (!g_prGlueInfo)
+		return 0;
+
+	return g_prGlueInfo->rHifInfo.u4HifCnt;
+}
+
+static int hifAxiClrBusCnt(void)
+{
+	if (g_prGlueInfo)
+		g_prGlueInfo->rHifInfo.u4HifCnt = 0;
+
+	return 0;
+}
+
+static int hifAxiSetMpuProtect(bool enable)
+{
+#if CFG_MTK_ANDROID_EMI
+	kalSetEmiMpuProtection(gConEmiPhyBaseFinal, enable);
+#endif
+	return 0;
+}
+
+
+static int hifAxiIsWifiDrvOwn(void)
+{
+	if (!g_prGlueInfo || !g_prGlueInfo->prAdapter)
+		return 0;
+
+	return (g_prGlueInfo->prAdapter->fgIsFwOwn == FALSE) ? 1 : 0;
+}
+
+static void register_wmt_cb(void)
+{
+	struct _MTK_WCN_WMT_WLAN_CB_INFO rWmtCb;
+
+	memset(&rWmtCb, 0, sizeof(struct _MTK_WCN_WMT_WLAN_CB_INFO));
+	rWmtCb.wlan_probe_cb = hifAxiProbe;
+	rWmtCb.wlan_remove_cb = hifAxiRemove;
+	rWmtCb.wlan_bus_cnt_get_cb = hifAxiGetBusCnt;
+	rWmtCb.wlan_bus_cnt_clr_cb = hifAxiClrBusCnt;
+	rWmtCb.wlan_emi_mpu_set_protection_cb = hifAxiSetMpuProtect;
+	rWmtCb.wlan_is_wifi_drv_own_cb = hifAxiIsWifiDrvOwn;
+
+	mtk_wcn_wmt_wlan_reg(&rWmtCb);
+}
+
+#else
+
+static void register_conninfra_cb(void)
+{
+	struct MTK_WCN_WLAN_CB_INFO rWlanCb;
+	struct sub_drv_ops_cb conninfra_wf_cb;
+
+	memset(&rWlanCb, 0, sizeof(struct MTK_WCN_WLAN_CB_INFO));
+	rWlanCb.wlan_probe_cb = hifAxiProbe;
+	rWlanCb.wlan_remove_cb = hifAxiRemove;
+	mtk_wcn_wlan_reg(&rWlanCb);
+
+	memset(&conninfra_wf_cb, 0, sizeof(struct sub_drv_ops_cb));
+	conninfra_wf_cb.rst_cb.pre_whole_chip_rst =
+			glRstwlanPreWholeChipReset;
+	conninfra_wf_cb.rst_cb.post_whole_chip_rst =
+			glRstwlanPostWholeChipReset;
+	conninfra_wf_cb.time_change_notify = kalSyncTimeToFWByIoctl;
+#if (CFG_SUPPORT_PRE_ON_PHY_ACTION == 1)
+	/* Register conninfra call back */
+	conninfra_wf_cb.pre_cal_cb.pwr_on_cb = wlanPreCalPwrOn;
+	conninfra_wf_cb.pre_cal_cb.do_cal_cb = wlanPreCal;
+	conninfra_wf_cb.pre_cal_cb.get_cal_result_cb = wlanGetCalResultCb;
+#endif /* (CFG_SUPPORT_PRE_ON_PHY_ACTION == 1) */
+
+	conninfra_sub_drv_ops_register(CONNDRV_TYPE_WIFI,
+		&conninfra_wf_cb);
+
+#if (CFG_SUPPORT_POWER_THROTTLING == 1)
+	/* Register callbacks for connsys power throttling feature. */
+	conn_pwr_register_event_cb(CONN_PWR_DRV_WIFI,
+			(CONN_PWR_EVENT_CB)connsys_power_event_notification);
+#endif
+}
+
+#endif
+#endif /* CFG_MTK_ANDROID_WMT */
 
 static int axiDmaSetup(struct platform_device *pdev,
 		struct mt66xx_hif_driver_data *prDriverData)
@@ -240,7 +446,8 @@ static int axiDmaSetup(struct platform_device *pdev,
 
 	prChipInfo = prDriverData->chip_info;
 
-	ret = halInitResvMem(pdev);
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+	ret = _init_resv_mem(pdev);
 	if (ret)
 		goto exit;
 	ret = of_reserved_mem_device_init(&pdev->dev);
@@ -249,6 +456,14 @@ static int axiDmaSetup(struct platform_device *pdev,
 				ret);
 		goto exit;
 	}
+#else
+	ret = of_dma_configure(&pdev->dev, pdev->dev.of_node, true);
+	if (ret) {
+		DBGLOG(INIT, ERROR, "of_dma_configure failed(%d).\n",
+				ret);
+		goto exit;
+	}
+#endif
 
 	dma_mask = DMA_BIT_MASK(prChipInfo->bus_info->u4DmaMask);
 	ret = dma_set_mask_and_coherent(&pdev->dev, dma_mask);
@@ -317,11 +532,6 @@ static bool axiCsrIoremap(struct platform_device *pdev)
 	}
 
 	prChipInfo->CSRBaseAddress = CSRBaseAddress;
-	prChipInfo->u4CsrOffset = (uint32_t)(g_u8CsrOffset & BITS(0, 31));
-
-	prChipInfo->HostCSRBaseAddress = CSRBaseAddress;
-	prChipInfo->u4HostCsrOffset = (uint32_t)g_u8CsrOffset;
-	prChipInfo->u4HostCsrSize = g_u4CsrSize;
 
 	DBGLOG(INIT, INFO, "CSRBaseAddress:0x%lX ioremap region 0x%X @ 0x%lX\n",
 	       CSRBaseAddress, g_u4CsrSize, g_u8CsrOffset);
@@ -329,13 +539,10 @@ static bool axiCsrIoremap(struct platform_device *pdev)
 	return true;
 }
 
-static void axiCsrIounmap(struct platform_device *pdev,
-	struct mt66xx_chip_info *prChipInfo)
+static void axiCsrIounmap(struct platform_device *pdev)
 {
 	if (!CSRBaseAddress)
 		return;
-
-	prChipInfo->CSRBaseAddress = NULL;
 
 	/* Unmap CSR base address */
 	iounmap(CSRBaseAddress);
@@ -345,6 +552,223 @@ static void axiCsrIounmap(struct platform_device *pdev,
 	g_u8CsrOffset = 0;
 	g_u4CsrSize = 0;
 }
+
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+static bool axiGetRsvMemSizeRsvedByKernel(struct platform_device *pdev)
+{
+#ifdef CONFIG_OF
+	int ret = 0;
+	struct device_node *np;
+
+	np = of_parse_phandle(pdev->dev.of_node, "memory-region", 0);
+	if (!np) {
+		DBGLOG(INIT, ERROR, "can NOT find memory-region.\n");
+		return false;
+	}
+
+	ret = of_property_read_u64_array(np, "size", &gWifiRsvMemSize, 1);
+	if (ret != 0)
+		DBGLOG(INIT, ERROR, "get rsrv mem size failed(%d).\n", ret);
+	else
+		DBGLOG(INIT, INFO, "gWifiRsvMemSize: 0x%x\n", gWifiRsvMemSize);
+
+	of_node_put(np);
+	if (ret != 0)
+		return false;
+	else
+		return true;
+#else
+	return false;
+#endif
+}
+
+static bool axiAllocRsvMem(uint32_t u4Size, struct HIF_MEM *prMem)
+{
+	/* 8 bytes alignment */
+	if (u4Size & 7)
+		u4Size += 8 - (u4Size & 7);
+
+	if ((grMem.u4Offset + u4Size) >= gWifiRsvMemSize)
+		return false;
+
+	prMem->pa = grMem.pucRsvMemBase + grMem.u4Offset;
+	prMem->va = grMem.pucRsvMemVirBase + grMem.u4Offset;
+	grMem.u4Offset += u4Size;
+
+	return prMem->va != NULL;
+}
+
+static int axiAllocHifMem(struct platform_device *pdev,
+		struct mt66xx_hif_driver_data *prDriverData)
+{
+	struct mt66xx_chip_info *prChipInfo;
+	uint32_t u4Idx, u4Size;
+	uint32_t i = sizeof(wifi_rsrv_mems) / sizeof(struct wifi_rsrv_mem);
+
+	prChipInfo = prDriverData->chip_info;
+
+	/* Allocation size should be a power of two */
+	while (i > 0) {
+		i--;
+		if (!(gWifiRsvMemSize & BIT(i)))
+			continue;
+
+		wifi_rsrv_mems[i].size = BIT(i);
+		wifi_rsrv_mems[i].vir_base = KAL_DMA_ALLOC_COHERENT(&pdev->dev,
+				wifi_rsrv_mems[i].size,
+				&wifi_rsrv_mems[i].phy_base);
+		if (!wifi_rsrv_mems[i].vir_base) {
+			DBGLOG(INIT, ERROR,
+				"[%d] DMA_ALLOC_COHERENT failed, size: 0x%x\n",
+				i, wifi_rsrv_mems[i].size);
+			return -1;
+		}
+		if (!grMem.pucRsvMemBase) {
+			grMem.pucRsvMemBase = wifi_rsrv_mems[i].phy_base;
+			grMem.pucRsvMemVirBase = wifi_rsrv_mems[i].vir_base;
+			grMem.u4RsvMemSize = (uint64_t) gWifiRsvMemSize;
+		}
+	}
+	if (!grMem.pucRsvMemBase)
+		return -1;
+	DBGLOG(INIT, INFO, "pucRsvMemBase[%pa], pucRsvMemVirBase[%pa]\n",
+	       &grMem.pucRsvMemBase,
+	       &grMem.pucRsvMemVirBase);
+
+	if (axiGetRsvMemSizeRsvedByKernel(pdev) == true)
+		kalSetDrvEmiMpuProtection(grMem.pucRsvMemBase, 0,
+			grMem.u4RsvMemSize);
+
+	for (u4Idx = 0; u4Idx < NUM_OF_TX_RING; u4Idx++) {
+		if (u4Idx == TX_RING_DATA1_IDX_1 &&
+				!prChipInfo->bus_info->tx_ring1_data_idx)
+			continue;
+		else if (u4Idx == TX_RING_DATA2_IDX_2 &&
+				!prChipInfo->bus_info->tx_ring2_data_idx)
+			continue;
+		if (!axiAllocRsvMem(TX_RING_SIZE * TXD_SIZE,
+				    &grMem.rTxDesc[u4Idx]))
+			DBGLOG(INIT, ERROR, "TxDesc[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < NUM_OF_RX_RING; u4Idx++) {
+		if (u4Idx == RX_RING_DATA_IDX_0 || u4Idx == RX_RING_DATA1_IDX_2)
+			u4Size = RX_RING0_SIZE;
+		else
+			u4Size = RX_RING1_SIZE;
+		if (!axiAllocRsvMem(u4Size * RXD_SIZE, &grMem.rRxDesc[u4Idx]))
+			DBGLOG(INIT, ERROR, "RxDesc[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < TX_RING_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(AXI_TX_CMD_BUFF_SIZE,
+				    &grMem.rTxCmdBuf[u4Idx]))
+			DBGLOG(INIT, ERROR, "TxCmdBuf[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < RX_RING0_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(CFG_RX_MAX_PKT_SIZE,
+				    &grMem.rRxDataBuf[u4Idx]))
+			DBGLOG(INIT, ERROR,
+			       "RxDataBuf[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < RX_RING1_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(RX_BUFFER_AGGRESIZE,
+				    &grMem.rRxEventBuf[u4Idx]))
+			DBGLOG(INIT, ERROR,
+			       "RxEventBuf[%u] alloc fail\n", u4Idx);
+	}
+
+#if (CFG_SUPPORT_CONNAC2X == 1)
+	for (u4Idx = 0; u4Idx < RX_RING0_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(RX_BUFFER_AGGRESIZE,
+				    &grMem.rRxData1Buf[u4Idx]))
+			DBGLOG(INIT, ERROR,
+			       "RxData1Buf[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < RX_RING1_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(RX_BUFFER_AGGRESIZE,
+				    &grMem.rTxFreeDoneEvent0Buf[u4Idx]))
+			DBGLOG(INIT, ERROR,
+			       "TxFreeDoneEvent0Buf[%u] alloc fail\n", u4Idx);
+	}
+
+	for (u4Idx = 0; u4Idx < RX_RING1_SIZE; u4Idx++) {
+		if (!axiAllocRsvMem(RX_BUFFER_AGGRESIZE,
+				    &grMem.rTxFreeDoneEvent1Buf[u4Idx]))
+			DBGLOG(INIT, ERROR,
+			       "TxFreeDoneEvent1Buf[%u] alloc fail\n", u4Idx);
+	}
+#endif
+
+#if HIF_TX_PREALLOC_DATA_BUFFER
+	for (u4Idx = 0; u4Idx < HIF_TX_MSDU_TOKEN_NUM; u4Idx++) {
+		if (!axiAllocRsvMem(AXI_TX_MAX_SIZE_PER_FRAME +
+				    prChipInfo->txd_append_size,
+				    &grMem.rMsduBuf[u4Idx]))
+			DBGLOG(INIT, ERROR, "MsduBuf[%u] alloc fail\n", u4Idx);
+	}
+#endif
+
+	DBGLOG(INIT, INFO, "grMem.u4Offset[0x%x]\n", grMem.u4Offset);
+
+	return 0;
+}
+
+static void axiFreeHifMem(struct platform_device *pdev)
+{
+	uint32_t i = 0;
+	uint32_t count = sizeof(wifi_rsrv_mems) / sizeof(struct wifi_rsrv_mem);
+
+	for (i = 0; i < count; i++) {
+		if (!wifi_rsrv_mems[i].vir_base)
+			continue;
+		KAL_DMA_FREE_COHERENT(&pdev->dev,
+			wifi_rsrv_mems[i].size,
+			wifi_rsrv_mems[i].vir_base,
+			(dma_addr_t) wifi_rsrv_mems[i].phy_base);
+	}
+}
+
+static int _init_resv_mem(struct platform_device *pdev)
+{
+#ifdef CONFIG_OF
+	int ret = 0;
+	struct device_node *node = NULL;
+	unsigned int RsvMemSize;
+
+	node = pdev->dev.of_node;
+	if (!node) {
+		DBGLOG(INIT, ERROR, "WIFI-OF: get wifi device node fail\n");
+		of_node_put(node);
+		return false;
+	}
+
+	if (axiGetRsvMemSizeRsvedByKernel(pdev) == false) {
+		ret = of_property_read_u32(node, "emi-size", &RsvMemSize);
+		if (ret != 0)
+			DBGLOG(INIT, ERROR,
+				"MPU-in-lk get rsrv mem size failed(%d).\n",
+				ret);
+		else {
+			gWifiRsvMemSize = (unsigned long long) RsvMemSize;
+			DBGLOG(INIT, INFO, "MPU-in-lk gWifiRsvMemSize: 0x%x\n",
+				gWifiRsvMemSize);
+		}
+	}
+
+	of_node_put(node);
+
+	return ret;
+#else
+	DBGLOG(INIT, ERROR, "kernel option CONFIG_OF not enabled.\n");
+	return -1;
+#endif
+}
+
+#endif /* AXI_CFG_PREALLOC_MEMORY_BUFFER */
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -383,12 +807,23 @@ static irqreturn_t mtk_axi_interrupt(int irq, void *dev_instance)
 	kalSetIntEvent(prGlueInfo);
 #if AXI_ISR_DEBUG_LOG
 	if (__ratelimit(&_rs))
-		LOG_FUNC("In HIF ISR.\n");
+		pr_debug("In HIF ISR.\n");
 #endif
 
 	return IRQ_HANDLED;
 }
 #if (CFG_SUPPORT_CONNINFRA == 1)
+void kalSetRstEvent(void)
+{
+	KAL_WAKE_LOCK(NULL, g_IntrWakeLock);
+
+	set_bit(GLUE_FLAG_RST_START_BIT, &g_ulFlag);
+
+	/* when we got interrupt, we wake up servie thread */
+	wake_up_interruptible(&g_waitq_rst);
+
+}
+
 static irqreturn_t mtk_sw_int_top_handler(int irq, void *dev_instance)
 {
 	struct ADAPTER *prAdapter = (struct ADAPTER *)dev_instance;
@@ -421,15 +856,18 @@ exit:
 }
 #endif
 
+#define TARGET_KEY "flavor_bin"
 static void axiSetupFwFlavor(struct platform_device *pdev,
 	struct mt66xx_hif_driver_data *driver_data)
 {
-	struct device *dev = &pdev->dev;
-	struct device_node *node = dev->of_node;
+	struct device_node *node = NULL;
 
-	if (of_property_read_string(node,
-				    FW_BIN_FLAVOR_KEY,
-				    &driver_data->fw_flavor))
+	node = of_find_compatible_node(NULL, NULL, "mediatek,wifi");
+
+	if (!node)
+		return;
+
+	if (of_property_read_string(node, TARGET_KEY, &driver_data->fw_flavor))
 		return;
 
 	DBGLOG(HAL, INFO, "fw_flavor: %s\n", driver_data->fw_flavor);
@@ -445,7 +883,7 @@ static void axiSetupFwFlavor(struct platform_device *pdev,
  * \return void
  */
 /*----------------------------------------------------------------------------*/
-static int mtk_axi_probe(struct platform_device *pdev)
+static int mtk_axi_probe(IN struct platform_device *pdev)
 {
 	struct mt66xx_hif_driver_data *prDriverData;
 	struct mt66xx_chip_info *prChipInfo;
@@ -468,36 +906,59 @@ static int mtk_axi_probe(struct platform_device *pdev)
 	if (ret)
 		goto exit;
 
-	emi_mem_init(prChipInfo, pdev);
-	ret = halAllocHifMem(pdev, prDriverData);
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+	ret = axiAllocHifMem(pdev, prDriverData);
 	if (ret)
 		goto exit;
+#endif
+
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+	register_wmt_cb();
+#else
+	register_conninfra_cb();
+#endif
+#else
+	hifAxiProbe();
+#endif
 
 exit:
 	DBGLOG(INIT, INFO, "mtk_axi_probe() done, ret: %d\n", ret);
 	return ret;
 }
 
-static int mtk_axi_remove(struct platform_device *pdev)
+static int mtk_axi_remove(IN struct platform_device *pdev)
 {
-	struct mt66xx_hif_driver_data *prDriverData =
-		platform_get_drvdata(pdev);
-	struct mt66xx_chip_info *prChipInfo = prDriverData->chip_info;
+#if (CFG_SUPPORT_POWER_THROTTLING == 1)
+	conn_pwr_register_event_cb(CONN_PWR_DRV_WIFI, NULL);
+#endif
 
-	axiCsrIounmap(pdev, prChipInfo);
-	halFreeHifMem(pdev);
-	emi_mem_uninit(prChipInfo, pdev);
+	axiCsrIounmap(pdev);
+
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+	axiFreeHifMem(pdev);
+#endif
+
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+	mtk_wcn_wmt_wlan_unreg();
+#else
+	mtk_wcn_wlan_unreg();
+#endif /*end of CFG_SUPPORT_CONNINFRA == 0*/
+#else
+	hifAxiRemove();
+#endif
 	platform_set_drvdata(pdev, NULL);
 	return 0;
 }
 
-static int mtk_axi_suspend(struct platform_device *pdev,
-	pm_message_t state)
+static int mtk_axi_suspend(IN struct platform_device *pdev,
+	IN pm_message_t state)
 {
 	return 0;
 }
 
-int mtk_axi_resume(struct platform_device *pdev)
+int mtk_axi_resume(IN struct platform_device *pdev)
 {
 	return 0;
 }
@@ -563,15 +1024,11 @@ void glUnregisterBus(remove_card pfRemove)
 /*----------------------------------------------------------------------------*/
 void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie)
 {
-	struct mt66xx_chip_info *prChipInfo = NULL;
 	struct GL_HIF_INFO *prHif = NULL;
-	struct BUS_INFO *prBusInfo;
 	struct HIF_MEM_OPS *prMemOps;
 
 	g_prGlueInfo = prGlueInfo;
 	prHif = &prGlueInfo->rHifInfo;
-	glGetChipInfo((void **)&prChipInfo);
-	prBusInfo = prChipInfo->bus_info;
 	prMemOps = &prHif->rMemOps;
 
 	prHif->pdev = (struct platform_device *)ulCookie;
@@ -583,21 +1040,20 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie)
 
 	prGlueInfo->u4InfType = MT_DEV_INF_AXI;
 
-	prHif->fgIsPowerOn = true;
-	prHif->fgForceReadWriteReg = false;
-	prHif->u4RxDataRingSize = prBusInfo->rx_data_ring_size;
-	prHif->u4RxEvtRingSize = prBusInfo->rx_evt_ring_size;
+	prHif->fgIsPowerOff = true;
+	prHif->fgIsDumpLog = false;
 
-	prMemOps->allocTxDesc = halCopyPathAllocTxDesc;
-	prMemOps->allocRxDesc = halCopyPathAllocRxDesc;
-	prMemOps->allocTxCmdBuf = halCopyPathAllocTxCmdBuf;
-	prMemOps->allocTxDataBuf = halCopyPathAllocTxDataBuf;
-	prMemOps->allocRxBuf = halCopyPathAllocRxBuf;
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+	prMemOps->allocTxDesc = axiAllocTxDesc;
+	prMemOps->allocRxDesc = axiAllocRxDesc;
+	prMemOps->allocTxCmdBuf = axiAllocTxCmdBuf;
+	prMemOps->allocTxDataBuf = axiAllocTxDataBuf;
+	prMemOps->allocRxBuf = axiAllocRxBuf;
 	prMemOps->allocRuntimeMem = NULL;
-	prMemOps->copyCmd = halCopyPathCopyCmd;
-	prMemOps->copyEvent = halCopyPathCopyEvent;
-	prMemOps->copyTxData = halCopyPathCopyTxData;
-	prMemOps->copyRxData = halCopyPathCopyRxData;
+	prMemOps->copyCmd = axiCopyCmd;
+	prMemOps->copyEvent = axiCopyEvent;
+	prMemOps->copyTxData = axiCopyTxData;
+	prMemOps->copyRxData = axiCopyRxData;
 	prMemOps->mapTxBuf = NULL;
 	prMemOps->mapRxBuf = NULL;
 	prMemOps->unmapTxBuf = NULL;
@@ -605,8 +1061,29 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie)
 	prMemOps->freeDesc = NULL;
 	prMemOps->freeBuf = NULL;
 	prMemOps->freePacket = NULL;
-	prMemOps->dumpTx = halCopyPathDumpTx;
-	prMemOps->dumpRx = halCopyPathDumpRx;
+	prMemOps->dumpTx = axiDumpTx;
+	prMemOps->dumpRx = axiDumpRx;
+#else
+	prMemOps->allocTxDesc = axiAllocDesc;
+	prMemOps->allocRxDesc = axiAllocDesc;
+	prMemOps->allocTxCmdBuf = NULL;
+	prMemOps->allocTxDataBuf = axiAllocTxDataBuf;
+	prMemOps->allocRxBuf = axiAllocRxBuf;
+	prMemOps->allocRuntimeMem = axiAllocRuntimeMem;
+	prMemOps->copyCmd = axiCopyCmd;
+	prMemOps->copyEvent = axiCopyEvent;
+	prMemOps->copyTxData = axiCopyTxData;
+	prMemOps->copyRxData = axiCopyRxData;
+	prMemOps->mapTxBuf = axiMapTxBuf;
+	prMemOps->mapRxBuf = axiMapRxBuf;
+	prMemOps->unmapTxBuf = axiUnmapTxBuf;
+	prMemOps->unmapRxBuf = axiUnmapRxBuf;
+	prMemOps->freeDesc = axiFreeDesc;
+	prMemOps->freeBuf = axiFreeBuf;
+	prMemOps->freePacket = axiFreePacket;
+	prMemOps->dumpTx = axiDumpTx;
+	prMemOps->dumpRx = axiDumpRx;
+#endif /* AXI_CFG_PREALLOC_MEMORY_BUFFER */
 }
 
 /*----------------------------------------------------------------------------*/
@@ -621,20 +1098,6 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie)
 void glClearHifInfo(struct GLUE_INFO *prGlueInfo)
 {
 }
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief This function reset necessary hif related info when chip reset.
-*
-* \param[in] prGlueInfo Pointer to glue info structure
-*
-* \return (none)
-*/
-/*----------------------------------------------------------------------------*/
-void glResetHifInfo(struct GLUE_INFO *prGlueInfo)
-{
-	ASSERT(prGlueInfo);
-} /* end of glResetHifInfo() */
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -793,11 +1256,9 @@ void glBusFreeIrq(void *pvData, void *pvCookie)
 	pdev = prHifInfo->pdev;
 
 	synchronize_irq(prHifInfo->u4IrqId);
-	irq_set_affinity_hint(prHifInfo->u4IrqId, NULL);
 	free_irq(prHifInfo->u4IrqId, prGlueInfo);
 #if (CFG_SUPPORT_CONNINFRA == 1)
 	synchronize_irq(prHifInfo->u4IrqId_1);
-	irq_set_affinity_hint(prHifInfo->u4IrqId_1, NULL);
 	free_irq(prHifInfo->u4IrqId_1, prGlueInfo->prAdapter);
 #endif
 }
@@ -807,11 +1268,11 @@ u_int8_t glIsReadClearReg(uint32_t u4Address)
 	return TRUE;
 }
 
-void glSetPowerState(struct GLUE_INFO *prGlueInfo, uint32_t ePowerMode)
+void glSetPowerState(IN struct GLUE_INFO *prGlueInfo, IN uint32_t ePowerMode)
 {
 }
 
-void glGetDev(void *ctx, void **dev)
+void glGetDev(void *ctx, struct device **dev)
 {
 	*dev = &((struct platform_device *)ctx)->dev;
 }
@@ -827,19 +1288,453 @@ void glGetChipInfo(void **prChipInfo)
 
 	prDriverData = get_platform_driver_data();
 	if (!prDriverData)
-		*prChipInfo = NULL;
+		return;
+
+	*prChipInfo = (void *)prDriverData->chip_info;
+}
+
+#if AXI_CFG_PREALLOC_MEMORY_BUFFER
+static void axiAllocTxDesc(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDescRing,
+			   uint32_t u4Num)
+{
+	prDescRing->AllocVa = grMem.rTxDesc[u4Num].va;
+	prDescRing->AllocPa = grMem.rTxDesc[u4Num].pa;
+	if (prDescRing->AllocVa == NULL)
+		DBGLOG(HAL, ERROR, "prDescRing->AllocVa is NULL\n");
 	else
-		*prChipInfo = (void *)prDriverData->chip_info;
+		memset(prDescRing->AllocVa, 0, prDescRing->AllocSize);
 }
 
-int32_t glBusFuncOn(void)
+static void axiAllocRxDesc(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDescRing,
+			   uint32_t u4Num)
 {
-	return hifAxiProbe();
+	prDescRing->AllocVa = grMem.rRxDesc[u4Num].va;
+	prDescRing->AllocPa = grMem.rRxDesc[u4Num].pa;
+	if (prDescRing->AllocVa == NULL)
+		DBGLOG(HAL, ERROR, "prDescRing->AllocVa is NULL\n");
+	else
+		memset(prDescRing->AllocVa, 0, prDescRing->AllocSize);
 }
 
-void glBusFuncOff(void)
+static bool axiAllocTxCmdBuf(struct RTMP_DMABUF *prDmaBuf,
+			     uint32_t u4Num, uint32_t u4Idx)
 {
-	hifAxiRemove();
-	g_fgDriverProbed = FALSE;
+	/* only for cmd & fw download ring */
+#if CFG_TRI_TX_RING
+	if (u4Num == TX_RING_CMD_IDX_4 || u4Num == TX_RING_FWDL_IDX_5) {
+#else
+	if (u4Num == TX_RING_CMD_IDX_3 || u4Num == TX_RING_FWDL_IDX_4) {
+#endif
+		prDmaBuf->AllocSize = AXI_TX_CMD_BUFF_SIZE;
+		prDmaBuf->AllocPa = grMem.rTxCmdBuf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rTxCmdBuf[u4Idx].va;
+		if (prDmaBuf->AllocVa  == NULL) {
+			DBGLOG(HAL, ERROR, "prDescRing->AllocVa is NULL\n");
+			return false;
+		}
+		memset(prDmaBuf->AllocVa, 0, prDmaBuf->AllocSize);
+	}
+	return true;
 }
 
+static void axiAllocTxDataBuf(struct MSDU_TOKEN_ENTRY *prToken, uint32_t u4Idx)
+{
+	prToken->prPacket = grMem.rMsduBuf[u4Idx].va;
+	prToken->rDmaAddr = grMem.rMsduBuf[u4Idx].pa;
+}
+
+static void *axiAllocRxBuf(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDmaBuf,
+			   uint32_t u4Num, uint32_t u4Idx)
+{
+	switch (u4Num) {
+	case RX_RING_DATA_IDX_0:
+		prDmaBuf->AllocPa = grMem.rRxDataBuf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rRxDataBuf[u4Idx].va;
+		break;
+	case RX_RING_EVT_IDX_1:
+		prDmaBuf->AllocPa = grMem.rRxEventBuf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rRxEventBuf[u4Idx].va;
+		break;
+#if (CFG_SUPPORT_CONNAC2X == 1)
+	case RX_RING_DATA1_IDX_2:
+		prDmaBuf->AllocPa = grMem.rRxData1Buf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rRxData1Buf[u4Idx].va;
+		break;
+	case RX_RING_TXDONE0_IDX_3:
+		prDmaBuf->AllocPa = grMem.rTxFreeDoneEvent0Buf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rTxFreeDoneEvent0Buf[u4Idx].va;
+		break;
+	case RX_RING_TXDONE1_IDX_4:
+		prDmaBuf->AllocPa = grMem.rTxFreeDoneEvent1Buf[u4Idx].pa;
+		prDmaBuf->AllocVa = grMem.rTxFreeDoneEvent1Buf[u4Idx].va;
+		break;
+#endif
+	default:
+		DBGLOG(RX, ERROR, "RX alloc fail error number=%d\n", u4Num);
+		return prDmaBuf->AllocVa;
+	}
+
+	if (prDmaBuf->AllocVa == NULL)
+		DBGLOG(HAL, ERROR, "prDmaBuf->AllocVa is NULL\n");
+	else
+		memset(prDmaBuf->AllocVa, 0, prDmaBuf->AllocSize);
+
+	return prDmaBuf->AllocVa;
+}
+
+static bool axiCopyCmd(struct GL_HIF_INFO *prHifInfo,
+		       struct RTMP_DMACB *prTxCell, void *pucBuf,
+		       void *pucSrc1, uint32_t u4SrcLen1,
+		       void *pucSrc2, uint32_t u4SrcLen2)
+{
+	struct RTMP_DMABUF *prDmaBuf = &prTxCell->DmaBuf;
+
+	memcpy(prDmaBuf->AllocVa, pucSrc1, u4SrcLen1);
+	if (pucSrc2 != NULL && u4SrcLen2 > 0)
+		memcpy(prDmaBuf->AllocVa + u4SrcLen1, pucSrc2, u4SrcLen2);
+	prTxCell->PacketPa = prDmaBuf->AllocPa;
+
+	return true;
+}
+
+static bool axiCopyEvent(struct GL_HIF_INFO *prHifInfo,
+			 struct RTMP_DMACB *pRxCell,
+			 struct RXD_STRUCT *pRxD,
+			 struct RTMP_DMABUF *prDmaBuf,
+			 uint8_t *pucDst, uint32_t u4Len)
+{
+	memcpy(pucDst, prDmaBuf->AllocVa, u4Len);
+
+	return true;
+}
+
+static bool axiCopyTxData(struct MSDU_TOKEN_ENTRY *prToken,
+			  void *pucSrc, uint32_t u4Len)
+{
+	memcpy(prToken->prPacket, pucSrc, u4Len);
+
+	return true;
+}
+
+static bool axiCopyRxData(struct GL_HIF_INFO *prHifInfo,
+			  struct RTMP_DMACB *pRxCell,
+			  struct RTMP_DMABUF *prDmaBuf,
+			  struct SW_RFB *prSwRfb)
+{
+	struct RXD_STRUCT *pRxD = (struct RXD_STRUCT *)pRxCell->AllocVa;
+	struct sk_buff *prSkb = ((struct sk_buff *)prSwRfb->pvPacket);
+	uint32_t u4Size = pRxD->SDLen0;
+
+	if (prSkb == NULL) {
+		DBGLOG(RX, ERROR, "prSkb == NULL\n");
+		return false;
+	}
+
+	if (prSkb->data == NULL) {
+		DBGLOG(RX, ERROR, "prSkb->data == NULL\n");
+		return false;
+	}
+
+	if (u4Size > CFG_RX_MAX_PKT_SIZE) {
+		DBGLOG(RX, ERROR, "Rx Data too large[%u]\n", u4Size);
+		return false;
+	}
+
+	memcpy(prSkb->data, prDmaBuf->AllocVa, u4Size);
+
+	return true;
+}
+
+static void axiDumpTx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_TX_RING *prTxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen)
+{
+	struct RTMP_DMACB *prTxCell;
+	struct RTMP_DMABUF *prDmaBuf;
+	void *prAddr = NULL;
+
+	prTxCell = &prTxRing->Cell[u4Idx];
+	prDmaBuf = &prTxCell->DmaBuf;
+
+	if (prTxCell->prToken)
+		prAddr = prTxCell->prToken->prPacket;
+	else if (prDmaBuf->AllocVa)
+		prAddr = prDmaBuf->AllocVa;
+
+	if (prAddr)
+		DBGLOG_MEM128(HAL, INFO, prAddr, u4DumpLen);
+}
+
+static void axiDumpRx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_RX_RING *prRxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen)
+{
+	struct RTMP_DMACB *prRxCell;
+	struct RTMP_DMABUF *prDmaBuf;
+
+	prRxCell = &prRxRing->Cell[u4Idx];
+	prDmaBuf = &prRxCell->DmaBuf;
+
+	if (prDmaBuf->AllocVa)
+		DBGLOG_MEM128(HAL, INFO, prDmaBuf->AllocVa, u4DumpLen);
+}
+#else /* AXI_CFG_PREALLOC_MEMORY_BUFFER */
+static void axiAllocDesc(struct GL_HIF_INFO *prHifInfo,
+			 struct RTMP_DMABUF *prDescRing,
+			 uint32_t u4Num)
+{
+	dma_addr_t rAddr;
+
+	prDescRing->AllocVa = (void *)KAL_DMA_ALLOC_COHERENT(
+		prHifInfo->prDmaDev, prDescRing->AllocSize, &rAddr);
+	prDescRing->AllocPa = (phys_addr_t)rAddr;
+	if (prDescRing->AllocVa)
+		memset(prDescRing->AllocVa, 0, prDescRing->AllocSize);
+}
+
+static void *axiAllocRxBuf(struct GL_HIF_INFO *prHifInfo,
+			   struct RTMP_DMABUF *prDmaBuf,
+			   uint32_t u4Num, uint32_t u4Idx)
+{
+	struct sk_buff *pkt = dev_alloc_skb(prDmaBuf->AllocSize);
+	dma_addr_t rAddr;
+
+	if (!pkt) {
+		DBGLOG(HAL, ERROR, "can't allocate rx %u size packet\n",
+		       prDmaBuf->AllocSize);
+		prDmaBuf->AllocPa = 0;
+		prDmaBuf->AllocVa = NULL;
+		return NULL;
+	}
+
+	prDmaBuf->AllocVa = (void *)pkt->data;
+	memset(prDmaBuf->AllocVa, 0, prDmaBuf->AllocSize);
+
+	rAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev, prDmaBuf->AllocVa,
+				   prDmaBuf->AllocSize, KAL_DMA_FROM_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rAddr)) {
+		DBGLOG(HAL, ERROR, "sk_buff dma mapping error!\n");
+		dev_kfree_skb(pkt);
+		return NULL;
+	}
+	prDmaBuf->AllocPa = (phys_addr_t)rAddr;
+	return (void *)pkt;
+}
+
+static void axiAllocTxDataBuf(struct MSDU_TOKEN_ENTRY *prToken, uint32_t u4Idx)
+{
+	prToken->prPacket = kalMemAlloc(prToken->u4DmaLength, PHY_MEM_TYPE);
+	prToken->rDmaAddr = 0;
+}
+
+static void *axiAllocRuntimeMem(uint32_t u4SrcLen)
+{
+	return kalMemAlloc(u4SrcLen, PHY_MEM_TYPE);
+}
+
+static bool axiCopyCmd(struct GL_HIF_INFO *prHifInfo,
+		       struct RTMP_DMACB *prTxCell, void *pucBuf,
+		       void *pucSrc1, uint32_t u4SrcLen1,
+		       void *pucSrc2, uint32_t u4SrcLen2)
+{
+	dma_addr_t rAddr;
+	uint32_t u4TotalLen = u4SrcLen1 + u4SrcLen2;
+
+	prTxCell->pBuffer = pucBuf;
+
+	memcpy(pucBuf, pucSrc1, u4SrcLen1);
+	if (pucSrc2 != NULL && u4SrcLen2 > 0)
+		memcpy(pucBuf + u4SrcLen1, pucSrc2, u4SrcLen2);
+	rAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev, pucBuf,
+				   u4TotalLen, KAL_DMA_TO_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rAddr)) {
+		DBGLOG(HAL, ERROR, "KAL_DMA_MAP_SINGLE() error!\n");
+		return false;
+	}
+
+	prTxCell->PacketPa = (phys_addr_t)rAddr;
+
+	return true;
+}
+
+static bool axiCopyEvent(struct GL_HIF_INFO *prHifInfo,
+			 struct RTMP_DMACB *pRxCell,
+			 struct RXD_STRUCT *pRxD,
+			 struct RTMP_DMABUF *prDmaBuf,
+			 uint8_t *pucDst, uint32_t u4Len)
+{
+	struct sk_buff *prSkb = NULL;
+	void *pRxPacket = NULL;
+	dma_addr_t rAddr;
+
+	KAL_DMA_UNMAP_SINGLE(prHifInfo->prDmaDev,
+			     (dma_addr_t)prDmaBuf->AllocPa,
+			     prDmaBuf->AllocSize, KAL_DMA_FROM_DEVICE);
+
+	pRxPacket = pRxCell->pPacket;
+	ASSERT(pRxPacket);
+
+	prSkb = (struct sk_buff *)pRxPacket;
+	memcpy(pucDst, (uint8_t *)prSkb->data, u4Len);
+
+	prDmaBuf->AllocVa = ((struct sk_buff *)pRxCell->pPacket)->data;
+	rAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev, prDmaBuf->AllocVa,
+				   prDmaBuf->AllocSize, KAL_DMA_FROM_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rAddr)) {
+		DBGLOG(HAL, ERROR, "KAL_DMA_MAP_SINGLE() error!\n");
+		return false;
+	}
+	prDmaBuf->AllocPa = (phys_addr_t)rAddr;
+	return true;
+}
+
+static bool axiCopyTxData(struct MSDU_TOKEN_ENTRY *prToken,
+			  void *pucSrc, uint32_t u4Len)
+{
+	memcpy(prToken->prPacket, pucSrc, u4Len);
+	return true;
+}
+
+static bool axiCopyRxData(struct GL_HIF_INFO *prHifInfo,
+			  struct RTMP_DMACB *pRxCell,
+			  struct RTMP_DMABUF *prDmaBuf,
+			  struct SW_RFB *prSwRfb)
+{
+	void *pRxPacket = NULL;
+	dma_addr_t rAddr;
+
+	pRxPacket = pRxCell->pPacket;
+	ASSERT(pRxPacket);
+
+	pRxCell->pPacket = prSwRfb->pvPacket;
+
+	KAL_DMA_UNMAP_SINGLE(prHifInfo->prDmaDev,
+			     (dma_addr_t)prDmaBuf->AllocPa,
+			     prDmaBuf->AllocSize, KAL_DMA_FROM_DEVICE);
+	prSwRfb->pvPacket = pRxPacket;
+
+	prDmaBuf->AllocVa = ((struct sk_buff *)pRxCell->pPacket)->data;
+	rAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev,
+		prDmaBuf->AllocVa, prDmaBuf->AllocSize, KAL_DMA_FROM_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rAddr)) {
+		DBGLOG(HAL, ERROR, "KAL_DMA_MAP_SINGLE() error!\n");
+		ASSERT(0);
+		return false;
+	}
+	prDmaBuf->AllocPa = (phys_addr_t)rAddr;
+
+	return true;
+}
+
+static phys_addr_t axiMapTxBuf(struct GL_HIF_INFO *prHifInfo,
+			 void *pucBuf, uint32_t u4Offset, uint32_t u4Len)
+{
+	dma_addr_t rDmaAddr = 0;
+
+	rDmaAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev, pucBuf + u4Offset,
+				      u4Len, KAL_DMA_TO_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rDmaAddr)) {
+		DBGLOG(HAL, ERROR, "KAL_DMA_MAP_SINGLE() error!\n");
+		return 0;
+	}
+
+	return (phys_addr_t)rDmaAddr;
+}
+
+static phys_addr_t axiMapRxBuf(struct GL_HIF_INFO *prHifInfo,
+			 void *pucBuf, uint32_t u4Offset, uint32_t u4Len)
+{
+	dma_addr_t rDmaAddr = 0;
+
+	rDmaAddr = KAL_DMA_MAP_SINGLE(prHifInfo->prDmaDev, pucBuf + u4Offset,
+				      u4Len, KAL_DMA_FROM_DEVICE);
+	if (KAL_DMA_MAPPING_ERROR(prHifInfo->prDmaDev, rDmaAddr)) {
+		DBGLOG(HAL, ERROR, "KAL_DMA_MAP_SINGLE() error!\n");
+		return 0;
+	}
+
+	return (phys_addr_t)rDmaAddr;
+}
+
+static void axiUnmapTxBuf(struct GL_HIF_INFO *prHifInfo,
+			  phys_addr_t rDmaAddr, uint32_t u4Len)
+{
+	KAL_DMA_UNMAP_SINGLE(prHifInfo->prDmaDev,
+			     (dma_addr_t)rDmaAddr,
+			     u4Len, KAL_DMA_TO_DEVICE);
+}
+
+static void axiUnmapRxBuf(struct GL_HIF_INFO *prHifInfo,
+			  phys_addr_t rDmaAddr, uint32_t u4Len)
+{
+	KAL_DMA_UNMAP_SINGLE(prHifInfo->prDmaDev,
+			     (dma_addr_t)rDmaAddr,
+			     u4Len, KAL_DMA_FROM_DEVICE);
+}
+
+static void axiFreeDesc(struct GL_HIF_INFO *prHifInfo,
+			struct RTMP_DMABUF *prDescRing)
+{
+	if (prDescRing->AllocVa == NULL)
+		return;
+
+	KAL_DMA_FREE_COHERENT(prHifInfo->prDmaDev,
+			      prDescRing->AllocSize,
+			      prDescRing->AllocVa,
+			      (dma_addr_t)prDescRing->AllocPa);
+	memset(prDescRing, 0, sizeof(struct RTMP_DMABUF));
+}
+
+static void axiFreeBuf(void *pucSrc, uint32_t u4Len)
+{
+	kalMemFree(pucSrc, PHY_MEM_TYPE, u4Len);
+}
+
+static void axiFreePacket(void *pvPacket)
+{
+	kalPacketFree(NULL, pvPacket);
+}
+
+static void axiDumpTx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_TX_RING *prTxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen)
+{
+	struct RTMP_DMACB *prTxCell;
+	void *prAddr = NULL;
+
+	prTxCell = &prTxRing->Cell[u4Idx];
+
+	if (prTxCell->prToken)
+		prAddr = prTxCell->prToken->prPacket;
+	else
+		prAddr = prTxCell->pBuffer;
+
+	if (prAddr)
+		DBGLOG_MEM32(HAL, INFO, prAddr, u4DumpLen);
+}
+
+static void axiDumpRx(struct GL_HIF_INFO *prHifInfo,
+		      struct RTMP_RX_RING *prRxRing,
+		      uint32_t u4Idx, uint32_t u4DumpLen)
+{
+	struct RTMP_DMACB *prRxCell;
+	struct RTMP_DMABUF *prDmaBuf;
+
+	prRxCell = &prRxRing->Cell[u4Idx];
+	prDmaBuf = &prRxCell->DmaBuf;
+
+	if (!prRxCell->pPacket)
+		return;
+
+	axiUnmapRxBuf(prHifInfo, prDmaBuf->AllocPa, prDmaBuf->AllocSize);
+
+	DBGLOG_MEM32(HAL, INFO, ((struct sk_buff *)prRxCell->pPacket)->data,
+		     u4DumpLen);
+
+	prDmaBuf->AllocPa = axiMapRxBuf(prHifInfo, prDmaBuf->AllocVa,
+					0, prDmaBuf->AllocSize);
+}
+#endif /* AXI_CFG_PREALLOC_MEMORY_BUFFER */

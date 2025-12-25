@@ -263,11 +263,6 @@ int32_t TxBfProfileTag_DesiredNc(struct net_device
 int32_t TxBfProfileTag_DesiredNr(struct net_device
 				 *prNetDev, union PFMU_PROFILE_TAG2 *prPfmuTag2,
 				 uint8_t ucDesiredNr);
-int32_t  TxBfProfileTagPartialBw(struct net_device *prNetDev,
-			   union PFMU_PROFILE_TAG1 *prPfmuTag1,
-			   uint8_t uBitmap, uint8_t uResolution);
-int32_t TxBfProfileTag_BandIdx(struct net_device
-				 *prNetDev, uint8_t uBandIdx);
 int32_t TxBfProfileTagWrite(struct net_device *prNetDev,
 			    union PFMU_PROFILE_TAG1 *prPfmuTag1,
 			    union PFMU_PROFILE_TAG2 *prPfmuTag2,
@@ -300,8 +295,8 @@ int32_t TxBfSounding(struct net_device *prNetDev,
 		    );
 int32_t TxBfSoundingStop(struct net_device *prNetDev);
 int32_t TxBfTxApply(struct net_device *prNetDev,
-		    uint16_t ucWlanId, uint8_t fgETxBf, uint8_t fgITxBf,
-		    uint8_t fgMuTxBf, uint8_t fgPhaseCali);
+		    uint8_t ucWlanId, uint8_t fgETxBf, uint8_t fgITxBf,
+		    uint8_t fgMuTxBf);
 
 int32_t TxBfManualAssoc(struct net_device *prNetDev,
 			uint8_t aucMac[MAC_ADDR_LEN],
@@ -311,7 +306,7 @@ int32_t TxBfManualAssoc(struct net_device *prNetDev,
 			uint8_t ucPhyMode,
 			uint8_t ucBw,
 			uint8_t ucNss, uint8_t ucPfmuId, uint8_t ucMarate,
-			uint8_t ucSpeIdx, uint8_t ucRca2);
+			uint8_t ucSpeIdx, uint8_t ucRca2, uint8_t ucRv);
 
 int32_t TxBfPfmuMemAlloc(struct net_device *prNetDev,
 			 uint8_t ucSuMuMode, uint8_t ucWlanIdx);
@@ -327,35 +322,15 @@ int32_t BssInfoUpdate(struct net_device *prNetDev,
 		      uint8_t u4OwnMacIdx, uint8_t u4BssIdx,
 		      uint8_t u4BssId[MAC_ADDR_LEN]);
 
-int32_t BssInfoConnectOwnDev(struct net_device *prNetDev,
-		      uint8_t ucOwnMacIdx, uint8_t ucBssIdx,
-		      uint8_t ucBandIdx);
-
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-int32_t BssInfoUpdateUnify(struct net_device *prNetDev,
-		      uint8_t ucOwnMacIdx, uint8_t ucBssIdx,
-		      uint8_t ucBandIdx, uint8_t ucBssId[MAC_ADDR_LEN]);
-#endif
-
 int32_t StaRecCmmUpdate(struct net_device *prNetDev,
 			uint8_t ucWlanId, uint8_t ucBssId, uint8_t u4Aid,
 			uint8_t aucMacAddr[MAC_ADDR_LEN]
 		       );
 
 int32_t StaRecBfUpdate(struct net_device *prNetDev,
-		       struct STA_REC_BF_UPD_ARGUMENT *prStaRecBfUpdArg,
+		       struct STA_REC_BF_UPD_ARGUMENT rStaRecBfUpdArg,
 		       uint8_t aucMemRow[4], uint8_t aucMemCol[4]
 		      );
-
-int32_t StaRecBfHeUpdate(struct net_device *prNetDev,
-			struct PFMU_HE_INFO *prPfmuHeInfo, uint32_t u4Config,
-			uint8_t ucSuMu, uint8_t ucRuStartIdx,
-			uint8_t ucRuEndIdx, uint8_t ucTriggerSu,
-			uint8_t ucTriggerMu, uint8_t ucNg16Su,
-			uint8_t ucNg16Mu, uint8_t ucCodebook42Su,
-			uint8_t ucCodebook75Mu,	uint8_t ucHeLtf,
-			uint8_t uciBfNcol, uint8_t uciBfNrow,
-			uint8_t ucNrBw160, uint8_t ucNcBw160);
 
 #if CFG_SUPPORT_TX_BF_FPGA
 int32_t TxBfPseudoTagUpdate(struct net_device *prNetDev,

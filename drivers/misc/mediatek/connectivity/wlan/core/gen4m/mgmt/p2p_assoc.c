@@ -116,16 +116,15 @@
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-uint8_t *p2pBuildReAssocReqFrameCommonIEs(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo,
-		uint8_t *pucBuffer)
+uint8_t *p2pBuildReAssocReqFrameCommonIEs(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo,
+		IN uint8_t *pucBuffer)
 {
 	struct BSS_INFO *prP2pBssInfo = (struct BSS_INFO *) NULL;
 
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
 	if (!prP2pBssInfo)
-		return pucBuffer;
-
+		return NULL;
 	/* Fill the SSID element. */
 	SSID_IE(pucBuffer)->ucId = ELEM_ID_SSID;
 

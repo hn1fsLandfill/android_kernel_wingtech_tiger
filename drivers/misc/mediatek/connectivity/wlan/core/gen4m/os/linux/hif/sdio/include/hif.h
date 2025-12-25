@@ -66,7 +66,6 @@
 #if MTK_WCN_HIF_SDIO
 #include "hif_sdio.h"
 #endif
-#include "mt66xx_reg.h"
 
 /*******************************************************************************
 *                         C O M P I L E R   F L A G S
@@ -97,29 +96,24 @@
 /* Enable driver timing profiling */
 #define CFG_SDIO_TIMING_PROFILING       0
 
-#define CFG_SDIO_CONTEXT_DEBUG		0
-#define CFG_SDIO_PORT_DEBUG		0
-
 #define CFG_SDIO_INT_LOG_CNT            8
 
 #define SDIO_X86_WORKAROUND_WRITE_MCR   0x00C4
 #define HIF_NUM_OF_QM_RX_PKT_NUM        512
 
-#define HIF_TX_INIT_CMD_PORT            TX_RING_FWDL
+#if CFG_TRI_TX_RING
+#define HIF_TX_INIT_CMD_PORT            TX_RING_FWDL_IDX_5
+#else
+#define HIF_TX_INIT_CMD_PORT		TX_RING_FWDL_IDX_4
+#endif /* CFG_TRI_TX_RING */
 
 #define HIF_IST_LOOP_COUNT              128
 #define HIF_IST_TX_THRESHOLD            32 /* Min msdu count to trigger Tx during INT polling state */
 
 #define HIF_TX_MAX_AGG_LENGTH           (511 * 512) /* 511 blocks x 512 */
 
-#if (CFG_SDIO_INTR_ENHANCE_FORMAT == 1)
-#define HIF_RX_MAX_AGG_NUM              16 /* 7663 SDIO HW limilation */
-#elif (CFG_SDIO_INTR_ENHANCE_FORMAT == 2)
-#define HIF_RX_MAX_AGG_NUM              128 /* 7961 SDIO HW limilation */
-#endif
-
-/*!< Setting the maximum RX aggregation number 0: no limited (128) */
-#define HIF_RX_CFG_AGG_NUM              SDIO_RX1_AGG_NUM
+#define HIF_RX_MAX_AGG_NUM              16
+/*!< Setting the maximum RX aggregation number 0: no limited (16) */
 
 #define HIF_TX_BUFF_COUNT_TC0           8
 #define HIF_TX_BUFF_COUNT_TC1           167
@@ -153,8 +147,7 @@
 #endif
 
 #if CFG_SDIO_RX_AGG
-#define HIF_RX_COALESCING_BUFFER_SIZE \
-	((HIF_RX_CFG_AGG_NUM  + 1) * CFG_RX_MAX_PKT_SIZE)
+#define HIF_RX_COALESCING_BUFFER_SIZE       ((HIF_RX_MAX_AGG_NUM  + 1) * CFG_RX_MAX_PKT_SIZE)
 #else
 #define HIF_RX_COALESCING_BUFFER_SIZE       (CFG_RX_MAX_PKT_SIZE)
 #endif
@@ -170,14 +163,6 @@
 #define SER_SDIO_N9_HOST_RESET_DONE                BIT(10)
 /* N9 Interrupt Host System Error Recovery Done */
 #define SER_SDIO_N9_HOST_RECOVERY_DONE             BIT(11)
-
-#define HIF_H2D_SW_INT_SHFT                 (16)
-/* bit16 */
-#define SDIO_MAILBOX_FUNC_READ_REG_IDX      (BIT(0) << HIF_H2D_SW_INT_SHFT)
-/* bit17 */
-#define SDIO_MAILBOX_FUNC_WRITE_REG_IDX     (BIT(1) << HIF_H2D_SW_INT_SHFT)
-/* bit18 */
-#define SDIO_MAILBOX_FUNC_CHECKSUN16_IDX    (BIT(2) << HIF_H2D_SW_INT_SHFT)
 
 /* WSICR host to device (H2D) */
 /* Host ACK HIF tx/rx ring stop operatio */
@@ -203,24 +188,6 @@ enum HIF_TX_COUNT_IDX_T {
 	HIF_TXC_IDX_13,
 	HIF_TXC_IDX_14,
 	HIF_TXC_IDX_15,
-#if (CFG_SDIO_INTR_ENHANCE_FORMAT == 2)
-	HIF_TXC_IDX_16,
-	HIF_TXC_IDX_17,
-	HIF_TXC_IDX_18,
-	HIF_TXC_IDX_19,
-	HIF_TXC_IDX_20,
-	HIF_TXC_IDX_21,
-	HIF_TXC_IDX_22,
-	HIF_TXC_IDX_23,
-	HIF_TXC_IDX_24,
-	HIF_TXC_IDX_25,
-	HIF_TXC_IDX_26,
-	HIF_TXC_IDX_27,
-	HIF_TXC_IDX_28,
-	HIF_TXC_IDX_29,
-	HIF_TXC_IDX_30,
-	HIF_TXC_IDX_31,
-#endif
 	HIF_TXC_IDX_NUM
 };
 
@@ -281,23 +248,11 @@ struct SDIO_RX_COALESCING_BUF {
 
 struct SDIO_INT_LOG_T {
 	uint32_t u4Idx;
-	struct ENHANCE_MODE_DATA_STRUCT rIntSts;
+	uint8_t aucIntSts[128];
 	uint32_t u4Flag;
-	uint16_t au2RxPktLen[HIF_RX_CFG_AGG_NUM];
-	uint32_t au4RxPktInfo[HIF_RX_CFG_AGG_NUM];
+	uint16_t au2RxPktLen[HIF_RX_MAX_AGG_NUM];
+	uint32_t au4RxPktInfo[HIF_RX_MAX_AGG_NUM];
 	uint8_t ucRxPktCnt;
-};
-
-enum sdio_state {
-	SDIO_STATE_WIFI_OFF, /* Hif power off wifi */
-	SDIO_STATE_LINK_DOWN,
-	SDIO_STATE_PRE_SUSPEND_START,
-	SDIO_STATE_PRE_SUSPEND_DONE,
-	SDIO_STATE_PRE_SUSPEND_FAIL,
-	SDIO_STATE_SUSPEND,
-	SDIO_STATE_PRE_RESUME,
-	SDIO_STATE_LINK_UP,
-	SDIO_STATE_READY
 };
 
 /* host interface's private data structure, which is attached to os glue
@@ -311,11 +266,6 @@ struct GL_HIF_INFO {
 #else
 	struct sdio_func *func;
 #endif
-
-	enum sdio_state state;
-
-	spinlock_t rStateLock;
-	spinlock_t rSuspendLock;
 
 	struct ENHANCE_MODE_DATA_STRUCT *prSDIOCtrl;
 
@@ -347,15 +297,11 @@ struct GL_HIF_INFO {
 };
 
 struct BUS_INFO {
-	void (*halTxGetFreeResource)(struct ADAPTER *prAdapter,
-			uint16_t *au2TxDoneCnt, uint16_t *au2TxRlsCnt);
-	void (*halTxReturnFreeResource)(struct ADAPTER *prAdapter,
-			uint16_t *au2TxDoneCnt);
-	void (*halRestoreTxResource)(struct ADAPTER *prAdapter);
-	void (*halUpdateTxDonePendingCount)(struct ADAPTER *prAdapter,
-					    u_int8_t isIncr, uint8_t ucTc,
-					    uint16_t u2Cnt);
-	void (*processAbnormalInterrupt)(struct ADAPTER *prAdapter);
+	void (*halTxGetFreeResource)(IN struct ADAPTER *prAdapter, IN uint16_t *au2TxDoneCnt, IN uint16_t *au2TxRlsCnt);
+	void (*halTxReturnFreeResource)(IN struct ADAPTER *prAdapter, IN uint16_t *au2TxDoneCnt);
+	void (*halRestoreTxResource)(IN struct ADAPTER *prAdapter);
+	void (*halUpdateTxDonePendingCount)(IN struct ADAPTER *prAdapter,
+					    IN u_int8_t isIncr, IN uint8_t ucTc, IN uint16_t u2Cnt);
 };
 
 enum HIF_SDIO_INT_STS {
@@ -368,9 +314,6 @@ enum HIF_SDIO_INT_STS {
 *                            P U B L I C   D A T A
 ********************************************************************************
 */
-#if CFG_SER_L05_DEBUG
-extern u_int8_t fgSerStopTxRxDB;
-#endif
 
 /*******************************************************************************
 *                           P R I V A T E   D A T A
@@ -409,8 +352,6 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie);
 
 void glClearHifInfo(struct GLUE_INFO *prGlueInfo);
 
-void glResetHifInfo(struct GLUE_INFO *prGlueInfo);
-
 u_int8_t glBusInit(void *pvData);
 
 void glBusRelease(void *pData);
@@ -419,66 +360,45 @@ int32_t glBusSetIrq(void *pvData, void *pfnIsr, void *pvCookie);
 
 void glBusFreeIrq(void *pvData, void *pvCookie);
 
-void glSetPowerState(struct GLUE_INFO *prGlueInfo, uint32_t ePowerMode);
+void glSetPowerState(IN struct GLUE_INFO *prGlueInfo, IN uint32_t ePowerMode);
 
-void glGetDev(void *ctx, void **dev);
+void glGetDev(void *ctx, struct device **dev);
 
 void glGetHifDev(struct GL_HIF_INFO *prHif, struct device **dev);
-
-struct mt66xx_hif_driver_data *get_platform_driver_data(void);
-
-void glGetChipInfo(void **prChipInfo);
 
 u_int8_t glWakeupSdio(struct GLUE_INFO *prGlueInfo);
 
 #if !CFG_SDIO_INTR_ENHANCE
-void halRxSDIOReceiveRFBs(struct ADAPTER *prAdapter);
+void halRxSDIOReceiveRFBs(IN struct ADAPTER *prAdapter);
 
-uint32_t halRxReadBuffer(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
+uint32_t halRxReadBuffer(IN struct ADAPTER *prAdapter, IN OUT struct SW_RFB *prSwRfb);
 
 #else
-void halRxSDIOEnhanceReceiveRFBs(struct ADAPTER *prAdapter);
+void halRxSDIOEnhanceReceiveRFBs(IN struct ADAPTER *prAdapter);
 
-uint32_t halRxEnhanceReadBuffer(struct ADAPTER *prAdapter, uint32_t u4DataPort,
-	uint16_t u2RxLength, struct SW_RFB *prSwRfb);
+uint32_t halRxEnhanceReadBuffer(IN struct ADAPTER *prAdapter, IN uint32_t u4DataPort,
+	IN uint16_t u2RxLength, IN OUT struct SW_RFB *prSwRfb);
 
-void halProcessEnhanceInterruptStatus(struct ADAPTER *prAdapter);
+void halProcessEnhanceInterruptStatus(IN struct ADAPTER *prAdapter);
 
 #endif /* CFG_SDIO_INTR_ENHANCE */
 
 #if CFG_SDIO_RX_AGG
-void halRxSDIOAggReceiveRFBs(struct ADAPTER *prAdapter);
+void halRxSDIOAggReceiveRFBs(IN struct ADAPTER *prAdapter);
 #endif
 
-void halPutMailbox(struct ADAPTER *prAdapter, uint32_t u4MailboxNum,
-		uint32_t u4Data);
-void halGetMailbox(struct ADAPTER *prAdapter, uint32_t u4MailboxNum,
-		uint32_t *pu4Data);
-void halDeAggRxPkt(struct ADAPTER *prAdapter,
-		struct SDIO_RX_COALESCING_BUF *prRxBuf);
-void halPrintMailbox(struct ADAPTER *prAdapter);
-void halPollDbgCr(struct ADAPTER *prAdapter, uint32_t u4LoopCount);
-void halTxGetFreeResource_v1(struct ADAPTER *prAdapter, uint16_t *au2TxDoneCnt,
-		uint16_t *au2TxRlsCnt);
+void halPutMailbox(IN struct ADAPTER *prAdapter, IN uint32_t u4MailboxNum, IN uint32_t u4Data);
+void halGetMailbox(IN struct ADAPTER *prAdapter, IN uint32_t u4MailboxNum, OUT uint32_t *pu4Data);
+void halDeAggRxPkt(struct ADAPTER *prAdapter, struct SDIO_RX_COALESCING_BUF *prRxBuf);
+void halPrintMailbox(IN struct ADAPTER *prAdapter);
+void halPollDbgCr(IN struct ADAPTER *prAdapter, IN uint32_t u4LoopCount);
+void halTxGetFreeResource_v1(IN struct ADAPTER *prAdapter, IN uint16_t *au2TxDoneCnt, IN uint16_t *au2TxRlsCnt);
 
-u_int8_t halIsPendingTxDone(struct ADAPTER *prAdapter);
-void halDumpIntLog(struct ADAPTER *prAdapter);
-void halTagIntLog(struct ADAPTER *prAdapter, enum HIF_SDIO_INT_STS eTag);
-void halRecIntLog(struct ADAPTER *prAdapter,
-		struct ENHANCE_MODE_DATA_STRUCT *prSDIOCtrl);
-struct SDIO_INT_LOG_T *halGetIntLog(struct ADAPTER *prAdapter, uint32_t u4Idx);
-void halPreSuspendCmd(struct ADAPTER *prAdapter);
-void halPreResumeCmd(struct ADAPTER *prAdapter);
-void glSdioSetState(struct GL_HIF_INFO *prHifInfo, enum sdio_state state);
-
-static inline int32_t glBusFuncOn(void)
-{
-	return 0;
-}
-
-static inline void glBusFuncOff(void)
-{
-}
+u_int8_t halIsPendingTxDone(IN struct ADAPTER *prAdapter);
+void halDumpIntLog(IN struct ADAPTER *prAdapter);
+void halTagIntLog(IN struct ADAPTER *prAdapter, IN enum HIF_SDIO_INT_STS eTag);
+void halRecIntLog(IN struct ADAPTER *prAdapter, IN struct ENHANCE_MODE_DATA_STRUCT *prSDIOCtrl);
+struct SDIO_INT_LOG_T *halGetIntLog(IN struct ADAPTER *prAdapter, IN uint32_t u4Idx);
 
 /*******************************************************************************
 *                              F U N C T I O N S

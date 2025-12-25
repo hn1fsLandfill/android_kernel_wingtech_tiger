@@ -100,10 +100,10 @@ static bool gDoTimeOut = FALSE;
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-static void cnmTimerStopTimer_impl(struct ADAPTER *prAdapter,
-		struct TIMER *prTimer, u_int8_t fgAcquireSpinlock);
-static u_int8_t cnmTimerIsTimerValid(struct ADAPTER *prAdapter,
-		struct TIMER *prTimer);
+static void cnmTimerStopTimer_impl(IN struct ADAPTER *prAdapter,
+		IN struct TIMER *prTimer, IN u_int8_t fgAcquireSpinlock);
+static u_int8_t cnmTimerIsTimerValid(IN struct ADAPTER *prAdapter,
+		IN struct TIMER *prTimer);
 
 /*******************************************************************************
  *                              F U N C T I O N S
@@ -121,7 +121,7 @@ static u_int8_t cnmTimerIsTimerValid(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 #if 0
-static void cnmTimerDumpTimer(struct ADAPTER *prAdapter)
+static void cnmTimerDumpTimer(IN struct ADAPTER *prAdapter)
 {
 	struct ROOT_TIMER *prRootTimer;
 	struct LINK_ENTRY *prLinkEntry;
@@ -158,8 +158,8 @@ static void cnmTimerDumpTimer(struct ADAPTER *prAdapter)
  *
  */
 /*----------------------------------------------------------------------------*/
-static u_int8_t cnmTimerIsTimerValid(struct ADAPTER *prAdapter,
-		struct TIMER *prTimer)
+static u_int8_t cnmTimerIsTimerValid(IN struct ADAPTER *prAdapter,
+		IN struct TIMER *prTimer)
 {
 	struct ROOT_TIMER *prRootTimer;
 	struct LINK *prTimerList;
@@ -199,9 +199,9 @@ static u_int8_t cnmTimerIsTimerValid(struct ADAPTER *prAdapter,
  *
  */
 /*----------------------------------------------------------------------------*/
-static u_int8_t cnmTimerSetTimer(struct ADAPTER *prAdapter,
-				OS_SYSTIME rTimeout,
-				enum ENUM_TIMER_WAKELOCK_TYPE_T eType)
+static u_int8_t cnmTimerSetTimer(IN struct ADAPTER *prAdapter,
+				IN OS_SYSTIME rTimeout,
+				IN enum ENUM_TIMER_WAKELOCK_TYPE_T eType)
 {
 	struct ROOT_TIMER *prRootTimer;
 	u_int8_t fgNeedWakeLock;
@@ -237,7 +237,7 @@ static u_int8_t cnmTimerSetTimer(struct ADAPTER *prAdapter,
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmTimerInitialize(struct ADAPTER *prAdapter)
+void cnmTimerInitialize(IN struct ADAPTER *prAdapter)
 {
 	struct ROOT_TIMER *prRootTimer;
 	struct LINK *prTimerList;
@@ -287,7 +287,7 @@ void cnmTimerInitialize(struct ADAPTER *prAdapter)
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmTimerDestroy(struct ADAPTER *prAdapter)
+void cnmTimerDestroy(IN struct ADAPTER *prAdapter)
 {
 	struct ROOT_TIMER *prRootTimer;
 
@@ -322,11 +322,11 @@ void cnmTimerDestroy(struct ADAPTER *prAdapter)
  */
 /*----------------------------------------------------------------------------*/
 void
-cnmTimerInitTimerOption(struct ADAPTER *prAdapter,
-			struct TIMER *prTimer,
-			PFN_MGMT_TIMEOUT_FUNC pfFunc,
-			uintptr_t ulDataPtr,
-			enum ENUM_TIMER_WAKELOCK_TYPE_T eType)
+cnmTimerInitTimerOption(IN struct ADAPTER *prAdapter,
+			IN struct TIMER *prTimer,
+			IN PFN_MGMT_TIMEOUT_FUNC pfFunc,
+			IN unsigned long ulDataPtr,
+			IN enum ENUM_TIMER_WAKELOCK_TYPE_T eType)
 {
 	struct LINK *prTimerList;
 	struct LINK_ENTRY *prLinkEntry;
@@ -384,8 +384,8 @@ cnmTimerInitTimerOption(struct ADAPTER *prAdapter,
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-static void cnmTimerStopTimer_impl(struct ADAPTER *prAdapter,
-	struct TIMER *prTimer, u_int8_t fgAcquireSpinlock)
+static void cnmTimerStopTimer_impl(IN struct ADAPTER *prAdapter,
+	IN struct TIMER *prTimer, IN u_int8_t fgAcquireSpinlock)
 {
 	struct ROOT_TIMER *prRootTimer;
 
@@ -432,7 +432,7 @@ static void cnmTimerStopTimer_impl(struct ADAPTER *prAdapter,
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmTimerStopTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer)
+void cnmTimerStopTimer(IN struct ADAPTER *prAdapter, IN struct TIMER *prTimer)
 {
 	ASSERT(prAdapter);
 	ASSERT(prTimer);
@@ -454,8 +454,8 @@ void cnmTimerStopTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer)
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmTimerStartTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer,
-	uint32_t u4TimeoutMs)
+void cnmTimerStartTimer(IN struct ADAPTER *prAdapter, IN struct TIMER *prTimer,
+	IN uint32_t u4TimeoutMs)
 {
 	struct ROOT_TIMER *prRootTimer;
 	struct LINK *prTimerList;
@@ -490,7 +490,7 @@ void cnmTimerStartTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer,
 
 	if (gDoTimeOut) {
 		/* monitor the timer start in callback */
-		log_dbg(CNM, INFO,
+		log_dbg(CNM, TRACE,
 			"In DoTimeOut, timer %p func %ps %d ms timercount %d\n",
 			prTimer, prTimer->pfMgmtTimeOutFunc,
 			u4TimeoutMs, prTimerList->u4NumElem);
@@ -523,12 +523,12 @@ void cnmTimerStartTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer,
 
 	/* Check if root timer expired but not timeout. */
 	if (TIME_BEFORE(prRootTimer->rNextExpiredSysTime, rCurSysTime) &&
-		!KAL_TEST_BIT(GLUE_FLAG_TIMEOUT_BIT,
-				       prAdapter->prGlueInfo->ulFlag)) {
+		!test_bit(GLUE_FLAG_TIMEOUT_BIT,
+				       &prAdapter->prGlueInfo->ulFlag)) {
 		log_dbg(CNM, WARN, "Invalid NextExpiredSysTime: %u, currentSysTime: %u\n",
 			prRootTimer->rNextExpiredSysTime, rCurSysTime);
-		KAL_SET_BIT(GLUE_FLAG_TIMEOUT_BIT,
-				       prAdapter->prGlueInfo->ulFlag);
+		set_bit(GLUE_FLAG_TIMEOUT_BIT,
+				       &prAdapter->prGlueInfo->ulFlag);
 	}
 
 	/* If no timer pending or the fast time interval is used. */
@@ -566,7 +566,7 @@ void cnmTimerStartTimer(struct ADAPTER *prAdapter, struct TIMER *prTimer,
  * \return (none)
  */
 /*----------------------------------------------------------------------------*/
-void cnmTimerDoTimeOutCheck(struct ADAPTER *prAdapter)
+void cnmTimerDoTimeOutCheck(IN struct ADAPTER *prAdapter)
 {
 	struct ROOT_TIMER *prRootTimer;
 	struct LINK *prTimerList;
@@ -574,7 +574,7 @@ void cnmTimerDoTimeOutCheck(struct ADAPTER *prAdapter)
 	struct TIMER *prTimer;
 	OS_SYSTIME rCurSysTime;
 	PFN_MGMT_TIMEOUT_FUNC pfMgmtTimeOutFunc;
-	uintptr_t ulTimeoutDataPtr;
+	unsigned long ulTimeoutDataPtr;
 	u_int8_t fgNeedWakeLock;
 	enum ENUM_TIMER_WAKELOCK_TYPE_T eType = TIMER_WAKELOCK_NONE;
 

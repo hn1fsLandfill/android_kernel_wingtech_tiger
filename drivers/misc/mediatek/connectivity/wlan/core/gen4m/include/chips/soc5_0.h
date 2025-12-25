@@ -82,11 +82,18 @@
 #define CONNSYS_ROM_DONE_CHECK  0x00001D1E
 
 #define WF_TRIGGER_AP2CONN_EINT 0x10001F00
+#define CONN_MCU_CONFG_HS_BASE 0x89040000
 
 #define WMMCU_ROM_PATCH_DATE_ADDR 0xF04954D0
 #define WMMCU_MCU_ROM_EMI_DATE_ADDR 0xF04954E0
 #define WMMCU_WIFI_ROM_EMI_DATE_ADDR 0xF04954F0
 #define DATE_CODE_SIZE 16
+
+#define CONN_INFRA_CFG_AP2WF_REMAP_1_ADDR \
+	(CONN_INFRA_CFG_BASE + 0x0120)
+
+#define CONN_INFRA_CFG_PCIE2AP_REMAP_2_ADDR \
+	(0x7C00E000 + 0x24C)
 
 #define WF_CONN_INFA_BUS_CLOCK_RATE 0x18009A00
 
@@ -95,9 +102,6 @@
 #define WF_PP_TOP_DBG_CS_0_ADDR    (WF_PP_TOP_BASE + 0x0104)
 #define WF_PP_TOP_DBG_CS_1_ADDR    (WF_PP_TOP_BASE + 0x0108)
 #define WF_PP_TOP_DBG_CS_2_ADDR    (WF_PP_TOP_BASE + 0x010C)
-
-#define SOC5_0_PCIE2AP_REMAP_BASE_ADDR	0x50000
-#define SOC5_0_REMAP_BASE_ADDR		0x7c500000
 
 /*------------------------------------------------------------------------------
  * MACRO for SOC5_0 RXVECTOR0(GROUP3 NEW FORMAT WITH ENTIRE RATE) Parsing
@@ -150,10 +154,23 @@
 		(((_prRxVector) & SOC5_0_RX_VT_TXMODE_MASK)	\
 			 >> SOC5_0_RX_VT_TXMODE_OFFSET)
 
+#define RXV_GET_MUMIMO(_prRxVector)				\
+		(((_prRxVector) & SOC5_0_RX_VT_MUMIMO_MASK)	\
+			 >> SOC5_0_RX_VT_MUMIMO_OFFSET)
+
 /*******************************************************************************
 *                         D A T A   T Y P E S
 ********************************************************************************
 */
+struct ROM_EMI_HEADER {
+	uint8_t ucDateTime[16];
+	uint8_t ucPLat[4];
+	uint16_t u2HwVer;
+	uint16_t u2SwVer;
+	uint32_t u4PatchAddr;
+	uint32_t u4PatchType;
+	uint32_t u4CRC[4];
+};
 
 /*******************************************************************************
 *                            P U B L I C   D A T A
@@ -161,11 +178,18 @@
 */
 #if (CFG_SUPPORT_CONNINFRA == 1)
 extern u_int8_t g_IsWfsysBusHang;
+extern struct completion g_triggerComp;
+extern u_int8_t fgIsResetting;
 extern u_int8_t g_fgRstRecover;
 #endif
 
-#if (CFG_WIFI_COREDUMP_SUPPORT == 1)
+#if (CFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT == 1)
 extern u_int8_t g_IsNeedWaitCoredump;
+#endif
+
+#if CFG_MTK_ANDROID_EMI
+extern phys_addr_t gConEmiPhyBaseFinal;
+extern unsigned long long gConEmiSizeFinal;
 #endif
 
 extern struct PLE_TOP_CR rSoc5_0_PleTopCr;
@@ -180,33 +204,93 @@ void soc5_0_show_wfdma_info(struct ADAPTER *prAdapter);
 void soc5_0_show_ple_info(struct ADAPTER *prAdapter, u_int8_t fgDumpTxd);
 void soc5_0_show_pse_info(struct ADAPTER *prAdapter);
 bool soc5_0_show_host_csr_info(struct ADAPTER *prAdapter);
-void soc5_0_show_wfdma_dbg_probe_info(struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
-void soc5_0_show_wfdma_wrapper_info(struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
+void soc5_0_show_wfdma_dbg_probe_info(IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
+void soc5_0_show_wfdma_wrapper_info(IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
 void soc5_0_dump_mac_info(
-	struct ADAPTER *prAdapter);
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
-int soc5_0_get_rx_rate_info(const uint32_t *prRxV,
-		struct RxRateInfo *prRxRateInfo);
+	IN struct ADAPTER *prAdapter);
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
+int soc5_0_get_rx_rate_info(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIdx,
+		OUT uint32_t *pu4Rate, OUT uint32_t *pu4Nss,
+		OUT uint32_t *pu4RxMode, OUT uint32_t *pu4FrMode,
+		OUT uint32_t *pu4Sgi);
 #endif
 
 #if CFG_SUPPORT_LLS
-void soc5_0_get_rx_link_stats(struct ADAPTER *prAdapter,
-	struct SW_RFB *prRetSwRfb, uint32_t *pu4RxV);
+void soc5_0_get_rx_link_stats(IN struct ADAPTER *prAdapter,
+	IN struct SW_RFB *prRetSwRfb, IN uint32_t u4RxVector0);
 #endif
+
+extern void kalConstructDefaultFirmwarePrio(
+				struct GLUE_INFO	*prGlueInfo,
+				uint8_t **apucNameTable,
+				uint8_t **apucName,
+				uint8_t *pucNameIdx,
+				uint8_t ucMaxNameIdx);
+
+extern uint32_t kalFirmwareOpen(
+				IN struct GLUE_INFO *prGlueInfo,
+				IN uint8_t **apucNameTable);
+
+extern uint32_t kalFirmwareSize(
+				IN struct GLUE_INFO *prGlueInfo,
+				OUT uint32_t *pu4Size);
+
+extern uint32_t kalFirmwareLoad(
+			IN struct GLUE_INFO *prGlueInfo,
+			OUT void *prBuf, IN uint32_t u4Offset,
+			OUT uint32_t *pu4Size);
+
+extern uint32_t kalFirmwareClose(
+			IN struct GLUE_INFO *prGlueInfo);
+
+extern void wlanWakeLockInit(
+	struct GLUE_INFO *prGlueInfo);
+
+extern void wlanWakeLockUninit(
+	struct GLUE_INFO *prGlueInfo);
+
+extern struct wireless_dev *wlanNetCreate(
+		void *pvData,
+		void *pvDriverData);
+
+extern void wlanNetDestroy(
+	struct wireless_dev *prWdev);
 
 /*******************************************************************************
 *                              F U N C T I O N S
 ********************************************************************************
 */
-int soc5_0_Trigger_fw_assert(struct ADAPTER *prAdapter);
-void wlanCoAntVFE28En(struct ADAPTER *prAdapter);
+int hifWmmcuPwrOn(void);
+int hifWmmcuPwrOff(void);
+int soc5_0_Trigger_fw_assert(void);
+void wlanCoAntVFE28En(IN struct ADAPTER *prAdapter);
 void wlanCoAntVFE28Dis(void);
 
 #if (CFG_SUPPORT_CONNINFRA == 1)
-int wlanConnacPccifon(struct ADAPTER *prAdapter);
-int wlanConnacPccifoff(struct ADAPTER *prAdapter);
+int wlanConnacPccifon(void);
+int wlanConnacPccifoff(void);
+extern void update_driver_reset_status(uint8_t fgIsResetting);
+extern int32_t get_wifi_process_status(void);
+extern int32_t get_wifi_powered_status(void);
+extern void update_pre_cal_status(uint8_t fgIsPreCal);
+extern int8_t get_pre_cal_status(void);
+#endif
+
+#if (CFG_POWER_ON_DOWNLOAD_EMI_ROM_PATCH == 1)
+void *soc5_0_kalFirmwareImageMapping(IN struct GLUE_INFO *prGlueInfo,
+	OUT void **ppvMapFileBuf, OUT uint32_t *pu4FileLength,
+	IN enum ENUM_IMG_DL_IDX_T eDlIdx);
+uint32_t soc5_0_wlanImageSectionDownloadStage(
+	IN struct ADAPTER *prAdapter, IN void *pvFwImageMapFile,
+	IN uint32_t u4FwImageFileLength, IN uint8_t ucSectionNumber,
+	IN enum ENUM_IMG_DL_IDX_T eDlIdx);
+uint32_t soc5_0_wlanPowerOnDownload(
+	IN struct ADAPTER *prAdapter,
+	IN uint8_t ucDownloadItem);
+int32_t soc5_0_wlanPowerOnInit(void);
 #endif
 
 void soc5_0_icapRiseVcoreClockRate(void);

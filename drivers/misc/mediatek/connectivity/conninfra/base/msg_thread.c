@@ -262,16 +262,9 @@ int msg_evt_put_op_to_active(struct msg_thread_ctx *ctx, struct msg_op *op)
 		/*pr_info("osal_wait_for_signal_timeout:%d result=[%d]\n",
 							wait_ret, op->result);*/
 
-		if (wait_ret == 0) {
-			pr_warn("opId(%d) completion timeout, curr_op=[%d(%d,%d,%d,%d)]\n",
-				op->op.op_id,
-				ctx->cur_op->op.op_id,
-				ctx->cur_op->op.op_data[0],
-				ctx->cur_op->op.op_data[1],
-				ctx->cur_op->op.op_data[2],
-				ctx->cur_op->op.op_data[3]);
-			osal_op_history_print(&ctx->op_history, ctx->thread.threadName);
-		} else if (op->result)
+		if (wait_ret == 0)
+			pr_warn("opId(%d) completion timeout\n", op->op.op_id);
+		else if (op->result)
 			pr_info("opId(%d) result:%d\n",
 					op->op.op_id, op->result);
 
@@ -306,11 +299,6 @@ int msg_thread_send_2(struct msg_thread_ctx *ctx, int opid,
 	struct msg_op *op = NULL;
 	P_OSAL_SIGNAL signal;
 	int ret;
-
-	if (ctx == NULL) {
-		pr_err("[%s] ctx is NULL", __func__);
-		return -1;
-	}
 
 	op = msg_evt_get_free_op(ctx);
 	if (!op) {
@@ -370,11 +358,6 @@ int msg_thread_send_wait_4(struct msg_thread_ctx *ctx,
 	struct msg_op *op = NULL;
 	P_OSAL_SIGNAL signal;
 	int ret;
-
-	if (ctx == NULL) {
-		pr_err("[%s] msg ctx is NULL", __func__);
-		return -1;
-	}
 
 	op = msg_evt_get_free_op(ctx);
 	if (!op) {

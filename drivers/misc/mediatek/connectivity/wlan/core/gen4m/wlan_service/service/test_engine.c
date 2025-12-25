@@ -123,27 +123,6 @@ static struct test_data_rate_map he_su_mode_map_bw20[] = {
 	{34,	73},	/* MCS1 DCM */
 };
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-static struct test_data_rate_map he_su_mode_map_bw40[] = {
-	/*index, nss1{0.8gi, 1.6gi, 3.2gi}, nss2{0.8gi, 1.6gi, 3.2gi},
-	 *nss3{0.8gi, 1.6gi, 3.2gi}, nss4{0.8gi, 1.6gi, 3.2gi}
-	 */
-	{0,	172},    /* in unit of 100k */
-	{1,	344},
-	{2,	516},
-	{3,	688},
-	{4,	1032},
-	{5,	1376},
-	{6,	1549},
-	{7,	1721},
-	{8,	2065},
-	{9,	2294},
-	{10,	2581},
-	{11,	2868},
-	{33,	86},	/* MCS0 DCM */
-	{34,	172},	/* MCS1 DCM */
-};
-#else
 static struct test_data_rate_map he_su_mode_map_bw40[] = {
 	/*index, nss1{0.8gi, 1.6gi, 3.2gi}, nss2{0.8gi, 1.6gi, 3.2gi},
 	 *nss3{0.8gi, 1.6gi, 3.2gi}, nss4{0.8gi, 1.6gi, 3.2gi}
@@ -163,7 +142,6 @@ static struct test_data_rate_map he_su_mode_map_bw40[] = {
 	{33,	73},	/* MCS0 DCM */
 	{34,	146},	/* MCS1 DCM */
 };
-#endif
 
 
 static struct test_data_rate_map he_su_mode_map_bw80[] = {
@@ -186,46 +164,6 @@ static struct test_data_rate_map he_su_mode_map_bw80[] = {
 	{34,	306},	/* MCS1 DCM */
 };
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-static struct test_data_rate_map he_su_mode_map_bw160[] = {
-	/*index, nss1{0.8gi, 1.6gi, 3.2gi}, nss2{0.8gi, 1.6gi, 3.2gi},
-	 *nss3{0.8gi, 1.6gi, 3.2gi}, nss4{0.8gi, 1.6gi, 3.2gi}
-	 */
-	{0,	721},    /* in unit of 100k */
-	{1,	1441},
-	{2,	2162},
-	{3,	2882},
-	{4,	4324},
-	{5,	5765},
-	{6,	6485},
-	{7,	7206},
-	{8,	8647},
-	{9,	9607},
-	{10,	10809},
-	{11,	12010},
-	{33,	360},	/* MCS0 DCM */
-	{34,	721},	/* MCS1 DCM */
-};
-
-static struct test_datalen_limit_map datalen_limit[] = {
-	{TEST_MODE_CCK,			2304},
-	{TEST_MODE_OFDM,		2304},
-	{TEST_MODE_HTMIX,		7935},
-	{TEST_MODE_HTGREENFIELD,	7935},
-	{TEST_MODE_VHT,			6144},
-	{0},	/* reserved */
-	{0},	/* reserved */
-	{0},	/* reserved */
-	{TEST_MODE_HE_SU,		6144},
-	{TEST_MODE_HE_ER,		6144},
-	{TEST_MODE_HE_MU,		6144},
-	{TEST_MODE_HE_TB,		6144},
-	{TEST_MODE_EHT_MU_DL_SU,		6144},
-	{TEST_MODE_EHT_MU_UL_SU,		6144},
-	{TEST_MODE_EHT_MU_DL_OFDMA,		6144},
-	{TEST_MODE_EHT_TB_UL_OFDMA,		6144},
-};
-#else
 static struct test_data_rate_map he_su_mode_map_bw160[] = {
 	/*index, nss1{0.8gi, 1.6gi, 3.2gi}, nss2{0.8gi, 1.6gi, 3.2gi},
 	 *nss3{0.8gi, 1.6gi, 3.2gi}, nss4{0.8gi, 1.6gi, 3.2gi}
@@ -261,14 +199,13 @@ static struct test_datalen_limit_map datalen_limit[] = {
 	{TEST_MODE_HE_TB,		11454},
 	{TEST_MODE_VHT_MIMO,		11454},
 };
-#endif
 
 static u_int8 test_he_bpscs[] = {
-	1, 2, 2, 4, 4, 6, 6, 6, 8, 8, 10, 10, 12, 12, 1, 1	/* MCS0~15 */
+	1, 2, 2, 4, 4, 6, 6, 6, 8, 8, 10, 10	/* MCS0~11 */
 };
 
 static u_int8 test_he_rate_density[] = {
-	2, 2, 4, 2, 4, 3, 4, 6, 4, 6, 4, 6, 4, 6, 2, 2	/* MCS0~15 */
+	2, 2, 4, 2, 4, 3, 4, 6, 4, 6, 4, 6	/* MCS0~11 */
 };
 
 static u_int8 test_ltf_sym[] = {
@@ -287,27 +224,6 @@ static u_int8 test_he_t_pe_x5[] = {
 	0, 20, 40, 60, 80		/* 0us, 4us, 8us, 12us, 16us */
 };
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-static struct test_he_ru_const test_ru_const[] = {
-
-	{37, 24, 12, 6, 2},
-	{53, 48, 24, 12, 6},
-	{61, 102, 51, 24, 12},
-	{65, 234, 117, 60, 30},
-	{67, 468, 234, 120, 60},
-	{68, 980, 490, 240, 120},
-	{69, 1960, 980, 492, 246},
-	{70, 3920, 1960, 984, 492},
-	{82, 72, 36, 18, 8},
-	{90, 126, 63, 30, 14},
-	{94, 702, 351, 180, 90},
-	{96, 1448, 724, 360, 180},
-	{100, 1682, 841, 420, 210},
-	{104, 2428, 1214, 612, 306},
-	{105, 2940, 1470, 732, 366},
-	{107, 3408, 1704, 852, 426},
-};
-#else
 static struct test_he_ru_const test_ru_const[] = {
 	{37, 24, 12, 6, 2},
 	{53, 48, 24, 12, 6},
@@ -317,7 +233,6 @@ static struct test_he_ru_const test_ru_const[] = {
 	{68, 980, 490, 240, 120},
 	{69, 1960, 980, 492, 246}
 };
-#endif
 
 /*****************************************************************************
  *	Internal functions
@@ -583,46 +498,6 @@ static s_int32 mt_engine_calc_duty_cycle(struct test_configuration *configs)
 	return ret;
 }
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-static s_int32 mt_engine_map_subcarriers(
-	u_int8 ru_index, u_int8 dcm, u_int8 rate)
-{
-	s_int32 subcarriers = 0, idx = 0;
-
-	for (idx = 0 ; idx < SERV_ARRAY_SIZE(test_ru_const) ; idx++) {
-		if (ru_index < test_ru_const[idx].max_index) {
-			if (dcm || (rate > 13))
-				subcarriers = test_ru_const[idx].sd_d;
-			else
-				subcarriers = test_ru_const[idx].sd;
-
-			break;
-		}
-	}
-
-	return subcarriers;
-}
-
-static s_int32 mt_engine_map_subcarriers_short(
-	u_int8 ru_index, u_int8 dcm, u_int8 rate)
-{
-	s_int32 subcarriers_short = 0, idx = 0;
-
-	for (idx = 0 ; idx < SERV_ARRAY_SIZE(test_ru_const) ; idx++) {
-		if (ru_index < test_ru_const[idx].max_index) {
-			if (dcm || (rate > 13))
-				subcarriers_short = test_ru_const[idx].sd_s_d;
-			else
-				subcarriers_short = test_ru_const[idx].sd_s;
-
-			break;
-		}
-	}
-
-	return subcarriers_short;
-}
-
-#else
 static s_int32 mt_engine_map_subcarriers(
 	u_int8 ru_index, u_int8 dcm)
 {
@@ -660,7 +535,6 @@ static s_int32 mt_engine_map_subcarriers_short(
 
 	return subcarriers_short;
 }
-#endif
 
 static s_int32 mt_engine_calc_bytes_by_time(
 	u_char tx_mode, u_char nss, u_char t_pe, u_char ltf,
@@ -905,27 +779,14 @@ static u_int32 mt_engine_calc_txlen(
 
 		ru_info = &configs->ru_info_list[0];
 		mcs = (ru_info->rate & 0xf);
-
-#if (CFG_SUPPORT_CONNAC3X == 1)
-		ds = mt_engine_map_subcarriers(ru_info->ru_index >> 1,
-						(ru_info->rate & BIT(4)),
-						(ru_info->rate & ~BIT(4)));
-#else
 		ds = mt_engine_map_subcarriers(ru_info->ru_index >> 1,
 						(ru_info->rate & BIT(5)));
-#endif
 
 		if (ds) {
-#if (CFG_SUPPORT_CONNAC3X == 1)
-			dss = mt_engine_map_subcarriers_short(
-				ru_info->ru_index >> 1,
-				(ru_info->rate & BIT(4)),
-				(ru_info->rate & ~BIT(4)));
-#else
 			dss = mt_engine_map_subcarriers_short(
 				ru_info->ru_index >> 1,
 				(ru_info->rate & BIT(5)));
-#endif
+
 			nss = ru_info->nss;
 			ru_info->cbps = ds * nss * test_he_bpscs[mcs];
 
@@ -1656,24 +1517,12 @@ static s_int32 mt_engine_calc_symbol_by_bytes(
 	u_int32 rate = 0;
 	s_int32 ds = 0, dss = 0;
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	ds = mt_engine_map_subcarriers(ru_info->ru_index >> 1,
-					(ru_info->rate & BIT(4)),
-					(ru_info->rate & ~BIT(4)));
-#else
 	ds = mt_engine_map_subcarriers(ru_info->ru_index >> 1,
 					(ru_info->rate & BIT(5)));
-#endif
 
 	if (ds)
-#if (CFG_SUPPORT_CONNAC3X == 1)
-		dss = mt_engine_map_subcarriers_short(ru_info->ru_index >> 1,
-						   (ru_info->rate & BIT(4)),
-						   (ru_info->rate & ~BIT(4)));
-#else
 		dss = mt_engine_map_subcarriers_short(ru_info->ru_index >> 1,
 						   (ru_info->rate & BIT(5)));
-#endif
 	else {
 		SERV_LOG(SERV_DBG_CAT_ENGN, SERV_DBG_LVL_ERROR,
 			("%s: unknown RU Index:[%d]!\n",
@@ -1683,11 +1532,7 @@ static s_int32 mt_engine_calc_symbol_by_bytes(
 		goto err_out;
 	}
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	rate = ru_info->rate & (~BIT(4));
-#else
 	rate = ru_info->rate & (~BIT(5));
-#endif
 
 	if (stbc)
 		m_stbc++;
@@ -1880,11 +1725,7 @@ static s_int32 mt_engine_recalc_phy_info(
 	s_int32 shrt = 0;
 	u_int32 cw = 0, l_ldpc = 0;
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	rd = test_he_rate_density[ru_info->rate & ~BIT(4)];
-#else
 	rd = test_he_rate_density[ru_info->rate & ~BIT(5)];
-#endif
 
 	if (ru_info->afactor_init == 3) {
 		u_int32 short_sym = ru_info->afactor_init * ru_info->cbps_s;
@@ -1934,11 +1775,7 @@ s_int32 mt_engine_calc_phy(
 {
 	u_char rate_den = 0;
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-	rate_den = test_he_rate_density[ru_info->rate & ~BIT(4)];
-#else
 	rate_den = test_he_rate_density[ru_info->rate & ~BIT(5)];
-#endif
 	mt_engine_calc_symbol_by_bytes(ru_info, stbc, rate_den, apep_length);
 	mt_engine_calc_afactor(ru_info);
 	mt_engine_calc_pe_disamb(ru_info, ltf_gi, max_tpe);

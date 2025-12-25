@@ -15,41 +15,12 @@
 #include "gps_dl_subsys_reset.h"
 #include "gps_dl_hal_met2_0.h"
 #include "gps_dl_hist_rec2.h"
-#include "gps_dl_linux_plat_drv.h"
-#include "gps_each_device.h"
-#if GPS_DL_HAS_MCUDL
-#include "gps_mcudl_xlink.h"
-#include "gps_mcudl_hal_user_fw_own_ctrl.h"
-#include "gps_mcu_hif_host.h"
-#include "gps_mcudl_data_pkt_payload_struct.h"
-#include "gps_mcudl_data_pkt_host_api.h"
-#include "gps_mcudl_each_link.h"
-#endif
-#include "gps_dl_iomem_dump.h"
 
 int gps_dl_procfs_dummy_op(int y, int z)
 {
-	if (y == 1) {
-		gps_dl_show_major_iomem_info();
-		return 0;
-	}
 	GDL_LOGW("do nothing: y = %d, z = %d", y, z);
 	return 0;
 }
-
-int gps_dl_procfs_read_iomem(int y, int z)
-{
-	gps_dl_iomem_dump((unsigned int)y, (unsigned int)z);
-	return 0;
-}
-
-#if GPS_DL_HAS_MCUDL
-int gps_dl_procfs_read_mcu_reg(int y, int z)
-{
-	gps_mcudl_xlink_test_read_mcu_reg((unsigned int)y, (unsigned int)z);
-	return 0;
-}
-#endif
 
 #ifdef GPS_DL_ENABLE_MET
 int gps_dl_procfs_set_met(int y, int z)
@@ -147,14 +118,6 @@ int gps_dl_procfs_trigger_reset(int y, int z)
 		gps_dl_test_mask_mcub_irq_on_open_set(z, true);
 	else if (y == 7)
 		gps_dl_trigger_gps_print_data_status();
-#if GPS_DL_HAS_MCUDL
-	else if (y == 0x10)
-		(void)gps_mcudl_xlink_test_toggle_reset_by_gps_hif((unsigned int)z);
-	else if (y == 0x11)
-		gps_mcudl_xlink_test_bypass_mcu2ap_data(z != 0);
-	else if (y == 0x12)
-		gps_mcudl_trigger_gps_subsys_reset(true, "GNSS intended for testing");
-#endif
 	return 0;
 }
 
@@ -188,51 +151,11 @@ int gps_dl_procfs_set_opid_duration(int y, int z)
 	}
 	return 0;
 }
-#if GPS_DL_HAS_MCUDL
-/* arrive here if x == 0x10 */
-int gps_mcudl_procfs_dbg(int y, int z)
-{
-	if (y == 0)
-		gps_mcudl_xlink_trigger_print_hw_status();
-	else if (y == 1) {
-		if (z == 0 || z == 1)
-			gps_mcudl_xlink_test_fw_own_ctrl(z != 0);
-		else if (z == 2)
-			gps_mcudl_hal_user_fw_own_status_dump();
-		else if (z == 3)
-			gps_mcudl_hal_set_non_lppm_sleep_flag(true);
-		else if (z == 4)
-			gps_mcudl_hal_set_non_lppm_sleep_flag(false);
-		else if (z == 5)
-			gps_mcu_hif_host_trans_hist_dump();
-		else if (z == 6) {
-			gps_mcu_host_trans_hist_dump(GPS_MCUDL_HIST_REC_HOST_WR);
-			gps_mcu_host_trans_hist_dump(GPS_MCUDL_HIST_REC_MCU_ACK);
-		} else if (z == 7) {
-			gps_mcudl_host_sta_hist_dump(GPS_MDLY_NORMAL);
-			gps_mcudl_host_sta_hist_dump(GPS_MDLY_URGENT);
-		} else if (z == 8) {
-			gps_mcudl_mcu2ap_rec_dump();
-			gps_mcudl_xlink_dump_all_rec();
-		}
-	}
-	else if (y == 2)
-		gps_mcudl_xlink_test_toggle_ccif(z);
-	else if (y == 3)
-		gps_mcudl_xlink_fw_log_ctrl(z != 0);
-	else if (y == 4)
-		gps_mcudl_xlink_test_query_ver();
-	else if (y == 5)
-		gps_mcudl_xlink_test_wakeup_ap_later((unsigned int)z);
-	else if (y == 6)
-		gps_mcudl_xlink_test_send_4byte_mgmt_data((unsigned int)z);
-	return 0;
-}
-#endif
 
 gps_dl_procfs_test_func_type g_gps_dl_proc_test_func_list[] = {
 	[0x00] = gps_dl_procfs_dummy_op,
-	[0x01] = gps_dl_procfs_read_iomem,
+	/* [0x01] = TODO: reg read */
+	[0x01] = NULL,
 	/* [0x02] = TODO: reg write */
 	[0x02] = NULL,
 	[0x03] = gps_dl_procfs_set_opt,
@@ -248,10 +171,6 @@ gps_dl_procfs_test_func_type g_gps_dl_proc_test_func_list[] = {
 	#endif
 	[0x08] = gps_dl_procfs_set_data_routing_status,
 	[0x09] = gps_dl_procfs_set_opid_duration,
-#if GPS_DL_HAS_MCUDL
-	[0x10] = gps_mcudl_procfs_dbg,
-	[0x11] = gps_dl_procfs_read_mcu_reg,
-#endif
 };
 
 #define UNLOCK_MAGIC 0xDB9DB9

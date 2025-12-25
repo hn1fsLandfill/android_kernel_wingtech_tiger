@@ -41,7 +41,6 @@ static int cfm_dt_epaelna_hwid_gpio_parse(struct device_node *np,
 		unsigned int *hwid_out,
 		unsigned int *nbits_out);
 
-#if (CFG_HWID_PMIC_SUPPORT == 1)
 static int cfm_dt_epaelna_hwid_pmic_parse(struct device_node *np,
 		struct platform_device *pdev,
 		unsigned int *hwid_out,
@@ -56,11 +55,9 @@ static int cfm_dt_epaelna_hwid_pmic_match(struct device_node *pmic_node,
 static int cfm_dt_epaelna_hwid_pmic_read(struct platform_device *pdev,
 		const char *channel_name,
 		unsigned int *value_out);
-#endif
 
 static int cfm_dt_epaelna_parts_parse(
 		struct device_node *np,
-		char *prop_name,
 		unsigned int hwid,
 		struct device_node **parts_np);
 
@@ -109,11 +106,6 @@ static int cfm_dt_epaelna_flags_parse(
 
 static void cfm_dt_epaelna_flags_free(
 		struct cfm_dt_epaelna_flags_context *flags);
-
-static int cfm_dt_epaelna_pin_mapping_get(
-		struct device_node *dn,
-		struct cfm_dt_epaelna_pctl_state_context *pstate,
-		struct cfm_epaelna_pin_config *result_out);
 
 /*******************************************************************************
  *			    P U B L I C   D A T A
@@ -270,27 +262,17 @@ static int cfm_dt_epaelna_parse(struct device_node *np,
 	}
 
 	/* Parse parts property */
-	err = cfm_dt_epaelna_parts_parse(np, CFM_DT_PROP_PARTS, dt->hwid,
-			dt->parts_np);
+	err = cfm_dt_epaelna_parts_parse(np, dt->hwid, dt->parts_np);
 	if (err < 0) {
 		err = -EINVAL;
 		goto dt_epaelna_err;
 	}
 
 	/* Populate FEM info */
-	err = cfm_epaelna_feminfo_populate(dt->parts_np, &result->fem_info);
+	err = cfm_epaelna_feminfo_populate(dt, &result->fem_info);
 	if (err < 0) {
 		err = -EINVAL;
 		goto dt_epaelna_err;
-	}
-
-	/* Parse bt_parts property */
-	err = cfm_dt_epaelna_parts_parse(np, CFM_DT_PROP_BT_PARTS, dt->hwid,
-			dt->bt_parts_np);
-	if (err == 0) {
-		/* Populate BT dedicated FEM info */
-		err = cfm_epaelna_feminfo_populate(dt->bt_parts_np,
-				&result->bt_fem_info);
 	}
 
 	/* Set available */
@@ -315,33 +297,9 @@ static int cfm_dt_epaelna_parse(struct device_node *np,
 	err = cfm_dt_epaelna_pctl_state_parse(dn,
 					      &result->fem_info,
 					      &dt->pctl.state);
-	if (err == -ENOENT) {
-		/* For combo chip, it doesn't need to apply PINMUX.
-		 * We should collect pin mapping from corresponding device node
-		 */
-		err = cfm_dt_epaelna_pin_mapping_get(dn,
-						  &dt->pctl.state,
-						  &result->pin_cfg);
-	}
-	if (err < 0) {
+	if (err < 0 && err != -ENOENT) {
 		err = -EINVAL;
 		goto dt_epaelna_err;
-	}
-
-	/* Parse pinctrl state property for BT dedicate FEM */
-	if (result->bt_fem_info.id != 0) {
-		err = cfm_dt_epaelna_pctl_state_parse(dn,
-						      &result->bt_fem_info,
-						      &dt->bt_pctl.state);
-		if (err == -ENOENT) {
-			/* For combo chip, it doesn't need to apply PINMUX.
-			 * We should collect pin mapping from corresponding
-			 * device node
-			 */
-			err = cfm_dt_epaelna_pin_mapping_get(dn,
-							  &dt->bt_pctl.state,
-							  &result->bt_pin_cfg);
-		}
 	}
 
 	/* Walk through all pinctrl nodes to parse and populate */
@@ -352,7 +310,7 @@ static int cfm_dt_epaelna_parse(struct device_node *np,
 			goto dt_epaelna_err;
 		}
 	} else {
-		pr_info("Skip ANTSEL pin info collection from pinctrl");
+		pr_info("Skip ANTSEL pin info collection");
 	}
 
 	/* Apply PINMUX only if device tree successfully parsed */
@@ -365,32 +323,6 @@ static int cfm_dt_epaelna_parse(struct device_node *np,
 	} else {
 		pr_info("Skip applying GPIO PINMUX");
 	}
-
-	/* Walk through all pinctrl nodes to parse and populate
-	 * for BT dedicate FEM
-	 */
-	if (cfm_dt_epaelna_pctl_exists(&dt->bt_pctl)) {
-		err = cfm_dt_epaelna_pctl_walk(&dt->bt_pctl,
-				&result->bt_pin_cfg);
-		if (err < 0) {
-			err = -EINVAL;
-			goto dt_epaelna_err;
-		}
-	} else {
-		pr_info("Skip ANTSEL pin info collection from pinctrl for BT dedicate FEM");
-	}
-
-	/* Apply PINMUX only if device tree successfully parsed */
-	if (cfm_dt_epaelna_pctl_exists(&dt->bt_pctl)) {
-		err = cfm_dt_epaelna_pctl_pinmux_apply(cfm->pdev, &dt->bt_pctl);
-		if (err < 0) {
-			err = -EINVAL;
-			goto dt_epaelna_err;
-		}
-	} else {
-		pr_info("Skip applying GPIO PINMUX for BT dedicate FEM");
-	}
-
 
 	return 0;
 
@@ -442,7 +374,6 @@ static int cfm_dt_epaelna_hwid_parse(struct device_node *np,
 		nbits += bits;
 	}
 
-#if (CFG_HWID_PMIC_SUPPORT == 1)
 	/* Retrieve hwid by pmic */
 	hwid_tmp = 0;
 	bits = 0;
@@ -456,7 +387,6 @@ static int cfm_dt_epaelna_hwid_parse(struct device_node *np,
 		hwid |= (hwid_tmp << nbits);
 		nbits += bits;
 	}
-#endif
 
 	/* Update output parameter */
 	*hwid_out = hwid;
@@ -534,7 +464,6 @@ static int cfm_dt_epaelna_hwid_gpio_parse(struct device_node *np,
 	return 0;
 }
 
-#if (CFG_HWID_PMIC_SUPPORT == 1)
 /**
  * cfm_dt_epaelna_hwid_pmic_parse
  *	Parses hwid value based on PMIC device node.
@@ -798,7 +727,6 @@ static int cfm_dt_epaelna_hwid_pmic_read(
 
 	return ret;
 }
-#endif
 
 /**
  * cfm_dt_epaelna_parts_parse
@@ -806,7 +734,6 @@ static int cfm_dt_epaelna_hwid_pmic_read(
  *
  * Parameters
  *	np	: Pointer to the node containing the 'parts' property.
- *	prop_name: CFM_DT_PROP_PARTS or CFM_DT_PROP_BT_PARTS
  *	hwid	: Indication on which parts group to be parsed
  *		  Each parts group must contain CONNFEM_PORT_NUM of phandle
  *	parts_np: struct device_node *parts_np[CONNFEM_PORT_NUM]
@@ -819,7 +746,6 @@ static int cfm_dt_epaelna_hwid_pmic_read(
  */
 static int cfm_dt_epaelna_parts_parse(
 		struct device_node *np,
-		char *prop_name,
 		unsigned int hwid,
 		struct device_node **parts_np_out)
 {
@@ -828,23 +754,23 @@ static int cfm_dt_epaelna_parts_parse(
 	struct device_node *parts_np[CONNFEM_PORT_NUM];
 
 	/* 'parts' property must exist */
-	cnt = of_property_count_u32_elems(np, prop_name);
+	cnt = of_property_count_u32_elems(np, CFM_DT_PROP_PARTS);
 	if (cnt <= 0) {
-		pr_info("[WARN] Missing '%s' property", prop_name);
+		pr_info("[WARN] Missing '%s' property", CFM_DT_PROP_PARTS);
 		return -EINVAL;
 	}
 
 	/* Ensure 'parts' property is valid */
 	if ((cnt % CONNFEM_PORT_NUM) != 0) {
 		pr_info("[WARN] %s has %d items, must be multiple of %d",
-			prop_name,
+			CFM_DT_PROP_PARTS,
 			cnt, CONNFEM_PORT_NUM);
 		return -EINVAL;
 	}
 
 	if (((hwid + 1) * CONNFEM_PORT_NUM) > cnt) {
 		pr_info("[WARN] %s has %dx%d items, need %dx%d for hwid %d",
-			prop_name,
+			CFM_DT_PROP_PARTS,
 			(cnt / 2), CONNFEM_PORT_NUM,
 			(hwid + 1), CONNFEM_PORT_NUM,
 			hwid);
@@ -856,11 +782,11 @@ static int cfm_dt_epaelna_parts_parse(
 	start = hwid * CONNFEM_PORT_NUM;
 	for (i = 0; i < CONNFEM_PORT_NUM; i++) {
 		parts_np[i] =
-			of_parse_phandle(np, prop_name, start + i);
+			of_parse_phandle(np, CFM_DT_PROP_PARTS, start + i);
 
 		if (!parts_np[i]) {
 			pr_info("[WARN] %s[%d][%d]: Invalid node at index %d",
-				prop_name,
+				CFM_DT_PROP_PARTS,
 				hwid, i,
 				start + i);
 			err = -EINVAL;
@@ -868,7 +794,7 @@ static int cfm_dt_epaelna_parts_parse(
 		}
 
 		pr_info("Found %s[%d][%d]: %s",
-			prop_name,
+			CFM_DT_PROP_PARTS,
 			hwid, i,
 			parts_np[i]->name);
 	}
@@ -1397,70 +1323,3 @@ static int cfm_dt_epaelna_flags_parse(
 
 	return 0;
 }
-
-/**
- * cfm_dt_epaelna_pin_mapping_get
- *	Collect the pin mapping info associated to the FEM info
- *
- * Parameters
- *	dn		: Pointer to the node containing device node associated
- *				to the FEM info
- *	fem_info	: Point to the 'fem_info' containing part name
- *	result_out	: Pointer to the 'pin_config' containing pin mapping
- *
- * Return value
- *	0	: Success, output parameter will be valid
- *	-EINVAL : Error
- *
- */
-static int cfm_dt_epaelna_pin_mapping_get(
-		struct device_node *dn,
-		struct cfm_dt_epaelna_pctl_state_context *pstate,
-		struct cfm_epaelna_pin_config *result_out)
-{
-	int err = 0;
-	unsigned int mappings;
-	struct device_node *parts_np;
-	struct cfm_dt_epaelna_pctl_data_context pctl_data;
-	struct cfm_epaelna_pin_config result;
-
-	memset(&result, 0, sizeof(result));
-	memset(&pctl_data, 0, sizeof(pctl_data));
-
-	parts_np = of_get_child_by_name(dn, pstate->name);
-	if (!parts_np) {
-		pr_info("[WARN] can not get device node from %s", pstate->name);
-		return -EINVAL;
-	}
-
-	err = of_property_count_u32_elems(parts_np, CFM_DT_PROP_MAPPING);
-	if (err <= 0) {
-		pr_info("[WARN] Invalid or missing '%s' property, err %d",
-			CFM_DT_PROP_MAPPING, err);
-		return -EINVAL;
-	}
-	mappings = (unsigned int)err;
-	err = 0;
-
-	/* Validate the number of entries in mapping */
-	if ((mappings % CFM_DT_MAPPING_SIZE) != 0) {
-		pr_info("[WARN] '%s' needs to be multiple of %d, currently %d",
-			CFM_DT_PROP_MAPPING, CFM_DT_MAPPING_SIZE, mappings);
-		return -EINVAL;
-	}
-
-	mappings /= CFM_DT_MAPPING_SIZE;
-
-	pctl_data.np = parts_np;
-	pctl_data.pin_cnt = mappings;
-	err = cfm_epaelna_pincfg_populate(&pctl_data, &result);
-	if (err < 0)
-		return -EINVAL;
-
-	memcpy(result_out, &result, sizeof(result));
-
-	cfm_epaelna_pininfo_dump(&result_out->pin_info);
-
-	return 0;
-}
-

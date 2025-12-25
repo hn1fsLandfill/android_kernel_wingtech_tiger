@@ -75,8 +75,9 @@ ccflags-y += -I$(GPS_SRC_FOLDER)/plat/$(GPS_PLATFORM)/hw/inc
 
 CONNINFRA_SRC_FOLDER := $(srctree)/drivers/misc/mediatek/connectivity/conninfra
 ccflags-y += -I$(CONNINFRA_SRC_FOLDER)/include
-ccflags-y += -I$(CONNINFRA_SRC_FOLDER)/conn_drv/connv2/debug_utility/metlog
+ccflags-y += -I$(CONNINFRA_SRC_FOLDER)/debug_utility/metlog
 ccflags-y += -DGPS_DL_HAS_CONNINFRA_DRV=1
+
 
 ccflags-y += -I$(GPS_SRC_FOLDER)/inc
 ccflags-y += -I$(GPS_SRC_FOLDER)/linux/inc
@@ -137,7 +138,6 @@ $(MODULE_NAME)-objs += linux/gps_dl_osal.o
 $(MODULE_NAME)-objs += plat/$(GPS_PLATFORM)/gps_dl_hw_dep_bgf.o
 $(MODULE_NAME)-objs += plat/$(GPS_PLATFORM)/gps_dl_hw_dep_gps.o
 $(MODULE_NAME)-objs += plat/$(GPS_PLATFORM)/gps_dl_hw_dep_debug.o
-$(MODULE_NAME)-objs += plat/$(GPS_PLATFORM)/gps_dl_hw_dep_dma.o
 $(MODULE_NAME)-objs += plat/$(GPS_PLATFORM)/gps_dl_hw_dep_met2_0.o
 
 ifeq ($(GPS_DL_HAS_MOCK),y)

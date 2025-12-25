@@ -51,8 +51,6 @@ $(MODULE_NAME)-objs += connfem_dt_parser.o
 $(MODULE_NAME)-objs += connfem_epaelna.o
 $(MODULE_NAME)-objs += connfem_subsys_bt.o
 $(MODULE_NAME)-objs += connfem_subsys_wifi.o
-$(MODULE_NAME)-objs += connfem_subsys_common.o
-$(MODULE_NAME)-objs += connfem_cfg.o
 
 ifneq ($(wildcard $(TOP)/vendor/mediatek/internal/connfem_enable),)
     $(info ConnFem: MTK internal load)

@@ -159,7 +159,7 @@ void hs20FillExtCapIE(struct ADAPTER *prAdapter,
 			ELEM_EXT_CAP_WNM_NOTIFICATION_BIT);
 	}
 
-	pr_info("IE_SIZE(prExtCap) = %d, %d %d\n",
+	pr_debug("IE_SIZE(prExtCap) = %d, %d %d\n",
 		IE_SIZE(prExtCap), ELEM_HDR_LEN, ELEM_MAX_LEN_EXT_CAP);
 
 	ASSERT(IE_SIZE(prExtCap) <= (ELEM_HDR_LEN + ELEM_MAX_LEN_EXT_CAP));
@@ -178,7 +178,7 @@ void hs20FillExtCapIE(struct ADAPTER *prAdapter,
  * \return VOID
  */
 /*---------------------------------------------------------------------------*/
-void hs20FillProreqExtCapIE(struct ADAPTER *prAdapter, uint8_t *pucIE)
+void hs20FillProreqExtCapIE(IN struct ADAPTER *prAdapter, OUT uint8_t *pucIE)
 {
 	struct IE_EXT_CAP *prExtCap;
 	struct HS20_INFO *prHS20Info;
@@ -186,7 +186,7 @@ void hs20FillProreqExtCapIE(struct ADAPTER *prAdapter, uint8_t *pucIE)
 	ASSERT(prAdapter);
 
 	prHS20Info = aisGetHS20Info(prAdapter,
-		0);
+		AIS_DEFAULT_INDEX);
 	if (!prHS20Info)
 		return;
 
@@ -230,7 +230,7 @@ void hs20FillProreqExtCapIE(struct ADAPTER *prAdapter, uint8_t *pucIE)
  * \return VOID
  */
 /*---------------------------------------------------------------------------*/
-void hs20FillHS20IE(struct ADAPTER *prAdapter, uint8_t *pucIE)
+void hs20FillHS20IE(IN struct ADAPTER *prAdapter, OUT uint8_t *pucIE)
 {
 	struct IE_HS20_INDICATION *prHS20IndicationIe;
 	/* P_HS20_INFO_T prHS20Info; */
@@ -267,8 +267,8 @@ void hs20FillHS20IE(struct ADAPTER *prAdapter, uint8_t *pucIE)
  * \return the length of composed HS20 IE
  */
 /*---------------------------------------------------------------------------*/
-uint32_t hs20CalculateHS20RelatedIEForProbeReq(struct ADAPTER *prAdapter,
-		uint8_t *pucTargetBSSID)
+uint32_t hs20CalculateHS20RelatedIEForProbeReq(IN struct ADAPTER *prAdapter,
+		IN uint8_t *pucTargetBSSID)
 {
 	uint32_t u4IeLength;
 
@@ -299,8 +299,8 @@ uint32_t hs20CalculateHS20RelatedIEForProbeReq(struct ADAPTER *prAdapter,
  * \return the wlan status
  */
 /*---------------------------------------------------------------------------*/
-uint32_t hs20GenerateHS20RelatedIEForProbeReq(struct ADAPTER *prAdapter,
-		uint8_t *pucTargetBSSID, uint8_t *prIE)
+uint32_t hs20GenerateHS20RelatedIEForProbeReq(IN struct ADAPTER *prAdapter,
+		IN uint8_t *pucTargetBSSID, OUT uint8_t *prIE)
 {
 	if (0)			/* Todo:: Not HS20 STA */
 		return 0;
@@ -334,8 +334,8 @@ uint32_t hs20GenerateHS20RelatedIEForProbeReq(struct ADAPTER *prAdapter,
 	return WLAN_STATUS_SUCCESS;
 }
 
-u_int8_t hs20IsGratuitousArp(struct ADAPTER *prAdapter,
-		struct SW_RFB *prCurrSwRfb)
+u_int8_t hs20IsGratuitousArp(IN struct ADAPTER *prAdapter,
+		IN struct SW_RFB *prCurrSwRfb)
 {
 	uint8_t *pucSenderIP =
 		prCurrSwRfb->pvHeader + ETHER_HEADER_LEN + ARP_SENDER_IP_OFFSET;
@@ -378,8 +378,8 @@ u_int8_t hs20IsGratuitousArp(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t hs20IsUnsolicitedNeighborAdv(struct ADAPTER *prAdapter,
-		struct SW_RFB *prCurrSwRfb)
+u_int8_t hs20IsUnsolicitedNeighborAdv(IN struct ADAPTER *prAdapter,
+		IN struct SW_RFB *prCurrSwRfb)
 {
 	uint8_t *pucIpv6Protocol = ((uint8_t *)
 		prCurrSwRfb->pvHeader +
@@ -425,8 +425,8 @@ u_int8_t hs20IsUnsolicitedNeighborAdv(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t hs20IsUnsecuredFrame(struct ADAPTER *prAdapter,
-		struct BSS_INFO *prBssInfo, struct SW_RFB *prCurrSwRfb)
+u_int8_t hs20IsUnsecuredFrame(IN struct ADAPTER *prAdapter,
+		IN struct BSS_INFO *prBssInfo, IN struct SW_RFB *prCurrSwRfb)
 {
 	uint16_t *pu2PktIpVer = (uint16_t *) ((uint8_t *)
 		prCurrSwRfb->pvHeader + (ETHER_HEADER_LEN - ETHER_TYPE_LEN));
@@ -452,8 +452,8 @@ u_int8_t hs20IsUnsecuredFrame(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t hs20IsFrameFilterEnabled(struct ADAPTER *prAdapter,
-		struct BSS_INFO *prBssInfo)
+u_int8_t hs20IsFrameFilterEnabled(IN struct ADAPTER *prAdapter,
+		IN struct BSS_INFO *prBssInfo)
 {
 #if 1
 	struct HS20_INFO *prHS20Info;

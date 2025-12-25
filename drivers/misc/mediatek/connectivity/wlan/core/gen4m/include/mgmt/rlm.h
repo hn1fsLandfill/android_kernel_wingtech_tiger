@@ -79,11 +79,6 @@ extern uint32_t g_au4Offset[2][2];
 extern uint32_t g_au4IQData[256];
 #endif
 
-#if (CFG_SUPPORT_802_11AX == 1)
-extern uint8_t  g_fgSigmaCMDHt;
-extern uint8_t  g_ucHtSMPSCapValue;
-#endif
-
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************
@@ -115,13 +110,8 @@ extern uint8_t  g_ucHtSMPSCapValue;
 	(HT_CAP_INFO_SUP_CHNL_WIDTH | HT_CAP_INFO_DSSS_CCK_IN_40M \
 		| HT_CAP_INFO_SM_POWER_SAVE)
 
-#if (CFG_SUPPORT_CONNAC3X_SMALL_PKT == 1)
-#define AMPDU_PARAM_DEFAULT_VAL \
-	(AMPDU_PARAM_MAX_AMPDU_LEN_64K | AMPDU_PARAM_MSS_1_US)
-#else
 #define AMPDU_PARAM_DEFAULT_VAL \
 	(AMPDU_PARAM_MAX_AMPDU_LEN_64K | AMPDU_PARAM_MSS_NO_RESTRICIT)
-#endif
 
 #define SUP_MCS_TX_DEFAULT_VAL \
 	SUP_MCS_TX_SET_DEFINED	/* TX defined and TX/RX equal (TBD) */
@@ -181,18 +171,6 @@ extern uint8_t  g_ucHtSMPSCapValue;
 #define RLM_MAX_TX_PWR		20	/* dbm */
 #define RLM_MIN_TX_PWR		8	/* dbm */
 
-#if CFG_SUPPORT_BFER
-#define MODE_HT 2
-#define MODE_VHT 4
-#if (CFG_SUPPORT_802_11AX == 1)
-#define MODE_HE_SU 8
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-#define MODE_EHT_SU 15
-#endif
-
-#endif
-
 #if CFG_SUPPORT_802_11AC
 #if CFG_SUPPORT_BFEE
 #define FIELD_VHT_CAP_INFO_BFEE \
@@ -223,6 +201,32 @@ extern uint8_t  g_ucHtSMPSCapValue;
  *                             D A T A   T Y P E S
  *******************************************************************************
  */
+#if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
+struct RLM_CAL_RESULT_ALL_V2 {
+	/* Used for checking the Cal Data is damaged */
+	uint32_t u4MagicNum1;
+
+	/* Thermal Value when do these Calibration */
+	uint32_t u4ThermalInfo;
+
+	/* Total Rom Data Length Backup in Host Side */
+	uint32_t u4ValidRomCalDataLength;
+
+	/* Total Ram Data Length Backup in Host Side */
+	uint32_t u4ValidRamCalDataLength;
+
+	/* All Rom Cal Data Dumpped by FW */
+	uint32_t au4RomCalData[10000];
+
+	/* All Ram Cal Data Dumpped by FW */
+	uint32_t au4RamCalData[10000];
+
+	/* Used for checking the Cal Data is damaged */
+	uint32_t u4MagicNum2;
+};
+extern struct RLM_CAL_RESULT_ALL_V2 g_rBackupCalDataAllV2;
+#endif
+
 typedef void (*PFN_OPMODE_NOTIFY_DONE_FUNC)(
 	struct ADAPTER *, uint8_t, bool);
 
@@ -251,7 +255,6 @@ struct SUB_ELEMENT_LIST {
 
 #if CFG_SUPPORT_DFS
 struct SWITCH_CH_AND_BAND_PARAMS {
-	enum ENUM_BAND eCsaBand;
 	uint8_t ucCsaNewCh;
 	uint8_t ucCsaCount;
 	uint8_t ucVhtS1;
@@ -350,30 +353,14 @@ void rlmRspGenerateExtCapIE(struct ADAPTER *prAdapter,
 void rlmRspGenerateHtOpIE(struct ADAPTER *prAdapter,
 			  struct MSDU_INFO *prMsduInfo);
 
-void rlmGenerateHtTPEIE(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
-
 void rlmRspGenerateErpIE(struct ADAPTER *prAdapter,
 			 struct MSDU_INFO *prMsduInfo);
 
-uint8_t rlmCheckMtkOuiChipCap(uint8_t *pucIe, uint64_t u8ChipCap);
-
-uint32_t rlmCalculateMTKOuiIELen(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex, struct STA_RECORD *prStaRec);
-
 void rlmGenerateMTKOuiIE(struct ADAPTER *prAdapter,
 			 struct MSDU_INFO *prMsduInfo);
-uint16_t rlmGenerateMTKChipCapIE(uint8_t *pucBuf, uint16_t u2FrameLength,
-	uint8_t fgNeedOui, uint64_t u8ChipCap);
 
-u_int8_t rlmParseCheckMTKOuiIE(struct ADAPTER *prAdapter,
-			       uint8_t *pucBuf,  struct STA_RECORD *prStaRec);
-
-#if CFG_SUPPORT_RXSMM_WHITELIST
-u_int8_t rlmParseCheckRxsmmOuiIE(struct ADAPTER *prAdapter, uint8_t *pucBuf,
-			       u_int8_t *pfgRxsmmEnable);
-#endif
+u_int8_t rlmParseCheckMTKOuiIE(IN struct ADAPTER *prAdapter,
+			       IN uint8_t *pucBuf, IN uint32_t *pu4Cap);
 
 void rlmGenerateCsaIE(struct ADAPTER *prAdapter,
 		      struct MSDU_INFO *prMsduInfo);
@@ -461,18 +448,18 @@ void rlmReqGenerateVhtOpNotificationIE(struct ADAPTER
 
 
 #endif
-#if CFG_SUPPORT_802_11D
+
 void rlmGenerateCountryIE(struct ADAPTER *prAdapter,
 			  struct MSDU_INFO *prMsduInfo);
-#endif
+
 #if CFG_SUPPORT_DFS
 void rlmProcessSpecMgtAction(struct ADAPTER *prAdapter,
 			     struct SW_RFB *prSwRfb);
 
 void rlmResetCSAParams(struct BSS_INFO *prBssInfo);
 
-void rlmCsaTimeout(struct ADAPTER *prAdapter,
-				uintptr_t ulParamPtr);
+void rlmCsaTimeout(IN struct ADAPTER *prAdapter,
+				unsigned long ulParamPtr);
 #endif
 
 uint32_t
@@ -484,14 +471,7 @@ uint32_t
 rlmSendSmPowerSaveFrame(struct ADAPTER *prAdapter,
 			struct STA_RECORD *prStaRec, uint8_t ucNss);
 
-void
-rlmSendChannelSwitchFrame(struct ADAPTER *prAdapter,
-			uint8_t ucBssIndex);
-
-uint16_t
-rlmOpClassToBandwidth(uint8_t ucOpClass);
-
-void rlmSendExChannelSwitchFrame(struct ADAPTER *prAdapter,
+void rlmSendChannelSwitchFrame(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex);
 
 uint32_t
@@ -538,21 +518,19 @@ void
 rlmDummyChangeOpHandler(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex, bool fgIsChangeSuccess);
 
-#if CFG_SUPPORT_BFER
-void
-rlmBfStaRecPfmuUpdate(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec);
 
-void
-rlmETxBfTriggerPeriodicSounding(struct ADAPTER *prAdapter);
+#if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
+uint32_t rlmCalBackup(
+	struct ADAPTER *prAdapter,
+	uint8_t		ucReason,
+	uint8_t		ucAction,
+	uint8_t		ucRomRam
+);
 
-bool
-rlmClientSupportsVhtETxBF(struct STA_RECORD *prStaRec);
-
-uint8_t
-rlmClientSupportsVhtBfeeStsCap(struct STA_RECORD *prStaRec);
-
-bool
-rlmClientSupportsHtETxBF(struct STA_RECORD *prStaRec);
+uint32_t rlmTriggerCalBackup(
+	struct ADAPTER *prAdapter,
+	u_int8_t		fgIsCalDataBackuped
+);
 #endif
 
 void rlmModifyVhtBwPara(uint8_t *pucVhtChannelFrequencyS1,
@@ -561,18 +539,19 @@ void rlmModifyVhtBwPara(uint8_t *pucVhtChannelFrequencyS1,
 			uint8_t *pucVhtChannelWidth);
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
-void rlmTransferHe6gOpInfor(uint8_t ucChannelNum,
-	uint8_t ucChannelWidth,
-	uint8_t *pucChannelWidth,
-	uint8_t *pucCenterFreqS1,
-	uint8_t *pucCenterFreqS2,
-	enum ENUM_CHNL_EXT *peSco);
+void rlmTransferHe6gOpInfor(IN uint8_t ucChannelNum,
+	IN uint8_t ucChannelWidth,
+	OUT uint8_t *pucChannelWidth,
+	OUT uint8_t *pucCenterFreqS1,
+	OUT uint8_t *pucCenterFreqS2,
+	OUT enum ENUM_CHNL_EXT *peSco);
 
 void rlmModifyHE6GBwPara(uint8_t ucHe6gChannelWidth,
 	uint8_t ucHe6gPrimaryChannel,
 	uint8_t *pucHe6gChannelFrequencyS1,
 	uint8_t *pucHe6gChannelFrequencyS2);
 #endif
+
 
 void rlmReviseMaxBw(
 	struct ADAPTER *prAdapter,
@@ -583,42 +562,21 @@ void rlmReviseMaxBw(
 	uint8_t *pucPrimaryCh);
 
 enum ENUM_CHNL_EXT rlmReviseSco(
-	enum ENUM_CHANNEL_WIDTH eChannelWidth,
-	uint8_t ucPrimaryCh,
-	uint8_t ucS1,
-	enum ENUM_CHNL_EXT eScoOrigin,
-	uint8_t ucMaxBandwidth);
+	IN enum ENUM_CHANNEL_WIDTH eChannelWidth,
+	IN uint8_t ucPrimaryCh,
+	IN uint8_t ucS1,
+	IN enum ENUM_CHNL_EXT eScoOrigin,
+	IN uint8_t ucMaxBandwidth);
 
 void rlmRevisePreferBandwidthNss(struct ADAPTER *prAdapter,
 					uint8_t ucBssIndex,
 					struct STA_RECORD *prStaRec);
 
-void rlmSetMaxTxPwrLimit(struct ADAPTER *prAdapter, int8_t cLimit,
+void rlmSetMaxTxPwrLimit(IN struct ADAPTER *prAdapter, int8_t cLimit,
 			 uint8_t ucEnable);
 
 void rlmSyncExtCapIEwithSupplicant(uint8_t *aucCapabilities,
 	const uint8_t *supExtCapIEs, size_t IElen);
-
-int32_t rlmGetOpClassForChannel(
-	int32_t channel,
-	enum ENUM_BAND band);
-
-#if (CFG_SUPPORT_802_11AX == 1)
-void rlmSetSrControl(struct ADAPTER *prAdapter, bool fgIsEnableSr);
-#endif
-
-#if CFG_AP_80211K_SUPPORT
-void rlmMulAPAgentGenerateApRRMEnabledCapIE(
-				struct ADAPTER *prAdapter,
-				struct MSDU_INFO *prMsduInfo);
-void rlmMulAPAgentTxMeasurementRequest(
-				struct ADAPTER *prAdapter,
-				struct STA_RECORD *prStaRec,
-				struct SUB_ELEMENT_LIST *prSubIEs);
-
-void rlmMulAPAgentProcessRadioMeasurementResponse(
-		struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
-#endif /* CFG_AP_80211K_SUPPORT */
 
 /*******************************************************************************
  *                              F U N C T I O N S

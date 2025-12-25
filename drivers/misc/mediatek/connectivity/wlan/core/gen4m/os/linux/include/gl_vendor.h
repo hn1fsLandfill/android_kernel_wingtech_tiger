@@ -89,7 +89,6 @@
 #define OUI_QCA 0x001374
 #define OUI_MTK 0x000CE7
 
-/* QCA-OUI subcmds */
 #define NL80211_VENDOR_SUBCMD_GET_PREFER_FREQ_LIST 103
 #define NL80211_VENDOR_SUBCMD_ACS 54
 #define NL80211_VENDOR_SUBCMD_DFS_OFFLOAD_CAC_STARTED 56
@@ -102,22 +101,19 @@
 #define QCA_NL80211_VENDOR_SUBCMD_ROAMING 9
 #define QCA_NL80211_VENDOR_SUBCMD_ROAM 64
 #define QCA_NL80211_VENDOR_SUBCMD_SETBAND 105
-/* End of QCA-OUI subcmds */
-
+#define NL80211_VENDOR_SUBCMD_NAN 12
 #define NL80211_VENDOR_SUBCMD_GET_APF_CAPABILITIES 14
 #define NL80211_VENDOR_SUBCMD_SET_PACKET_FILTER 15
 #define NL80211_VENDOR_SUBCMD_READ_PACKET_FILTER 16
+#define NL80211_VENDOR_SUBCMD_NDP 81
 #define NL80211_VENDOR_SUBCMD_GET_TRX_STATS 48
 #define MTK_NL80211_OP_MODE_CHANGE 14
 #define MTK_NL80211_TRIGGER_RESET 15
-#define COMB_MATRIX_LEN 6
 
 #define WIFI_VENDOR_ATTR_FEATURE_FLAGS 7
 #define WIFI_VENDOR_DATA_OP_MODE_CHANGE(bssIdx, channelBw, TxNss, RxNss) \
 	(uint32_t)((((bssIdx) << 24) + ((channelBw) << 16) + \
 		((TxNss) << 8) + (RxNss)) & 0xffff)
-
-#define LLS_RADIO_STAT_MAX_TX_LEVELS 256
 
 enum NL80211_VENDOR_FEATURES {
 	VENDOR_FEATURE_KEY_MGMT_OFFLOAD        = 0,
@@ -205,15 +201,8 @@ enum WIFI_OFFLOAD_SUB_COMMAND {
 	WIFI_OFFLOAD_STOP_MKEEP_ALIVE,
 };
 
-/* MTK subcmds should be here */
 enum MTK_WIFI_VENDOR_SUB_COMMAND {
-	MTK_SUBCMD_TRIGGER_RESET = 1,
-	MTK_SUBCMD_GET_RADIO_COMBO_MATRIX = 2,
-	MTK_SUBCMD_NAN = 12,
-	MTK_SUBCMD_CSI = 17,
-	MTK_SUBCMD_NDP = 81,
-
-	MTK_SUBCMD_STRING_CMD = 0x2454,
+	WIFI_SUBCMD_TRIGGER_RESET = 1,
 };
 
 enum WIFI_VENDOR_EVENT {
@@ -238,7 +227,6 @@ enum WIFI_VENDOR_EVENT {
 	WIFI_EVENT_RESET_TRIGGERED,
 	WIFI_EVENT_SUBCMD_NAN,
 	WIFI_EVENT_SUBCMD_NDP,
-	WIFI_EVENT_SUBCMD_CSI,
 	/* Always add at the end.*/
 };
 
@@ -270,35 +258,6 @@ enum WIFI_STATS_ATTRIBUTE {
 	WIFI_ATTRIBUTE_STATS_MAX,
 };
 
-#if (CFG_WFD_SCC_BALANCE_SUPPORT == 1)
-#define TX_LAT_MONTR_INTVL_MIN		10
-#define TX_LAT_MONTR_INTVL_MAX		5000
-#define TX_LAT_MONTR_CRIT_MIN		1
-#define TX_LAT_MONTR_CRIT_MAX		1000
-
-enum WIFI_TX_LAT_MONTR_PARAMS_ATTRIBUTE {
-	WIFI_ATTR_TX_LAT_MONTR_INVALID = 0,
-	WIFI_ATTR_TX_LAT_MONTR_EN,
-	WIFI_ATTR_TX_LAT_MONTR_INTVL,
-	WIFI_ATTR_TX_LAT_MONTR_DRIVER_CRIT,
-	WIFI_ATTR_TX_LAT_MONTR_MAC_CRIT,
-	WIFI_ATTR_TX_LAT_MONTR_IS_AVG,
-	WIFI_ATTR_TX_LAT_MONTR_MAX,
-};
-
-enum WIFI_WFD_TX_BR_MONTR_ATTRIBUTE {
-	WIFI_ATTR_WFD_TX_BR_MONTR_INVALID = 0,
-	WIFI_ATTR_WFD_TX_BR_MONTR_EN,
-	WIFI_ATTR_WFD_TX_BR_MONTR_MAX,
-};
-
-enum WIFI_WFD_ATTRIBUTE {
-	WIFI_ATTR_WFD_CUR_TX_BR    = 0,
-	WIFI_ATTR_WFD_PRED_TX_BR   = 1,
-	WIFI_ATTR_WFD_MAX
-};
-#endif
-
 enum WIFI_RSSI_MONITOR_ATTRIBUTE {
 	WIFI_ATTRIBUTE_RSSI_MONITOR_INVALID	  = 0,
 	WIFI_ATTRIBUTE_RSSI_MONITOR_MAX_RSSI      = 1,
@@ -322,14 +281,10 @@ enum LOGGER_ATTRIBUTE {
 	LOGGER_ATTRIBUTE_MAX	    = 3
 };
 
-enum STRING_ATTRIBUTE {
-	STRING_ATTRIBUTE_INVALID = 0,
-	STRING_ATTRIBUTE_DATA    = 1,
-	STRING_ATTRIBUTE_MAX     = 2
-};
-
 enum RTT_ATTRIBUTE {
-	RTT_ATTRIBUTE_TARGET_CNT = 1,
+	RTT_ATTRIBUTE_CAPABILITIES = 1,
+
+	RTT_ATTRIBUTE_TARGET_CNT = 10,
 	RTT_ATTRIBUTE_TARGET_INFO,
 	RTT_ATTRIBUTE_TARGET_MAC,
 	RTT_ATTRIBUTE_TARGET_TYPE,
@@ -345,13 +300,10 @@ enum RTT_ATTRIBUTE {
 	RTT_ATTRIBUTE_TARGET_BURST_DURATION,
 	RTT_ATTRIBUTE_TARGET_PREAMBLE,
 	RTT_ATTRIBUTE_TARGET_BW,
-	RTT_ATTRIBUTE_RESULTS_COMPLETE			= 30,
-	RTT_ATTRIBUTE_RESULTS_PER_TARGET		= 31,
-	RTT_ATTRIBUTE_RESULT_CNT				= 32,
-	RTT_ATTRIBUTE_RESULT					= 33,
-	RTT_ATTRIBUTE_RESUTL_DETAIL				= 34,
-	/* Add any new RTT_ATTRIBUTE prior to RTT_ATTRIBUTE_MAX */
-	RTT_ATTRIBUTE_MAX
+	RTT_ATTRIBUTE_RESULTS_COMPLETE = 30,
+	RTT_ATTRIBUTE_RESULTS_PER_TARGET,
+	RTT_ATTRIBUTE_RESULT_CNT,
+	RTT_ATTRIBUTE_RESULT
 };
 
 enum LSTATS_ATTRIBUTE {
@@ -527,32 +479,6 @@ enum WIFI_RESET_TRIGGERED_ATTRIBUTE {
 	WIFI_ATTRIBUTE_RESET_REASON = 1,
 };
 
-#if CFG_SUPPORT_CSI
-enum WIFI_VENDOR_CSI {
-	MTK_WLAN_VENDOR_ATTR_CSI = 5,
-};
-
-enum WIFI_CSI_ATTRIBUTE {
-	WIFI_ATTRIBUTE_CSI_INVALID,
-	WIFI_ATTRIBUTE_CSI_CONTROL_MODE,
-	WIFI_ATTRIBUTE_CSI_CONFIG_ITEM,
-	WIFI_ATTRIBUTE_CSI_VALUE_1,
-	WIFI_ATTRIBUTE_CSI_VALUE_2,
-
-	/* keep last */
-	WIFI_ATTRIBUTE_CSI_AFTER_LAST,
-	WIFI_ATTRIBUTE_CSI_MAX =
-		WIFI_ATTRIBUTE_CSI_AFTER_LAST - 1
-};
-#endif
-
-enum wifi_radio_combinations_matrix_attributes {
-	WIFI_ATTRIBUTE_RADIO_COMBINATIONS_MATRIX_INVALID    = 0,
-	WIFI_ATTRIBUTE_RADIO_COMBINATIONS_MATRIX_MATRIX     = 1,
-		/* Add more attribute here */
-	WIFI_ATTRIBUTE_RADIO_COMBINATIONS_MATRIX_MAX
-};
-
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -562,14 +488,6 @@ enum wifi_radio_combinations_matrix_attributes {
  *                            P U B L I C   D A T A
  *******************************************************************************
  */
-#if CFG_SUPPORT_WAPI
-extern uint8_t
-keyStructBuf[1024];	/* add/remove key shared buffer */
-#else
-extern uint8_t
-keyStructBuf[100];	/* add/remove key shared buffer */
-#endif
-
 extern const struct nla_policy mtk_scan_param_policy[
 		WIFI_ATTR_SCAN_MAX + 1];
 extern const struct nla_policy nla_parse_wifi_multista[
@@ -589,9 +507,6 @@ extern const struct nla_policy nla_get_preferred_freq_list_policy[
 extern const struct nla_policy nla_get_acs_policy[
 		WIFI_VENDOR_ATTR_ACS_MAX + 1];
 
-extern const struct nla_policy nla_string_cmd_policy[
-		STRING_ATTRIBUTE_MAX + 1];
-
 #if CFG_SUPPORT_MBO
 extern const struct nla_policy qca_roaming_param_policy[
 	QCA_ATTR_ROAMING_PARAM_MAX + 1];
@@ -599,14 +514,6 @@ extern const struct nla_policy qca_roaming_param_policy[
 
 extern const struct nla_policy nla_get_apf_policy[
 		APF_ATTRIBUTE_MAX + 1];
-
-extern const struct nla_policy nla_set_rtt_config_policy[
-		RTT_ATTRIBUTE_TARGET_BW + 1];
-
-#if CFG_SUPPORT_CSI
-extern const struct nla_policy nla_get_csi_policy[
-		WIFI_ATTRIBUTE_CSI_MAX + 1];
-#endif
 
 /*******************************************************************************
  *                           MACROS
@@ -678,13 +585,6 @@ struct PARAM_AP_THRESHOLD {
 	uint32_t channel;	/* channel hint */
 };
 
-enum WIFI_MULTI_STA_USE_CASE {
-	WIFI_DUAL_STA_TRANSIENT_PREFER_PRIMARY = 0,
-	WIFI_DUAL_STA_NON_TRANSIENT_UNBIASED = 1,
-	WIFI_DUAL_STA_MTK_LEGACY = 15,
-};
-
-#if CFG_SUPPORT_LLS
 #define STATS_LLS_MAX_NSS_NUM    2
 
 #define STATS_LLS_CCK_NUM        4   /* 1M/2M/5.5M/11M */
@@ -692,14 +592,12 @@ enum WIFI_MULTI_STA_USE_CASE {
 #define STATS_LLS_HT_NUM         16  /* MCS0~15 */
 #define STATS_LLS_VHT_NUM        10  /* MCS0~9 */
 #define STATS_LLS_HE_NUM         12  /* MCS0~11 */
-#define STATS_LLS_EHT_NUM        16  /* MCS0~15 */
 
 #define STATS_LLS_MAX_CCK_BW_NUM  1  /* BW20 */
 #define STATS_LLS_MAX_OFDM_BW_NUM 1  /* BW20 */
 #define STATS_LLS_MAX_HT_BW_NUM   2  /* BW20/40 */
 #define STATS_LLS_MAX_VHT_BW_NUM  3  /* BW20/40/80 */
 #define STATS_LLS_MAX_HE_BW_NUM   4  /* BW20/40/80/160 */
-#define STATS_LLS_MAX_EHT_BW_NUM  5  /* BW20/40/80/160/320 */
 
 #define STATS_LLS_MAX_CCK_NUM  (STATS_LLS_CCK_NUM)
 #define STATS_LLS_MAX_OFDM_NUM (STATS_LLS_OFDM_NUM)
@@ -709,14 +607,7 @@ enum WIFI_MULTI_STA_USE_CASE {
 	(STATS_LLS_VHT_NUM * STATS_LLS_MAX_VHT_BW_NUM * STATS_LLS_MAX_NSS_NUM)
 #define STATS_LLS_MAX_HE_NUM   \
 	(STATS_LLS_HE_NUM * STATS_LLS_MAX_HE_BW_NUM * STATS_LLS_MAX_NSS_NUM)
-#if (CFG_SUPPORT_802_11BE == 1)
-#define STATS_LLS_MAX_EHT_NUM   \
-	(STATS_LLS_EHT_NUM * STATS_LLS_MAX_EHT_BW_NUM * STATS_LLS_MAX_NSS_NUM)
-#else
-#define STATS_LLS_MAX_EHT_NUM   0
-#endif
 
-#define TX_POWER_LEVELS 256
 
 #define STATS_LLS_CH_NUM_2G4 14
 #define STATS_LLS_CH_NUM_5G 32
@@ -734,8 +625,7 @@ enum WIFI_MULTI_STA_USE_CASE {
 			    STATS_LLS_MAX_OFDM_NUM +	\
 			    STATS_LLS_MAX_HT_NUM +	\
 			    STATS_LLS_MAX_VHT_NUM +	\
-			    STATS_LLS_MAX_HE_NUM +	\
-			    STATS_LLS_MAX_EHT_NUM)
+			    STATS_LLS_MAX_HE_NUM)
 
 /**
  * channel operating width
@@ -808,7 +698,7 @@ struct STATS_LLS_WIFI_RADIO_STAT {
 	int32_t radio;
 	uint32_t on_time;
 	uint32_t tx_time;
-	uint32_t num_tx_levels; /* TX_POWER_LEVELS */
+	uint32_t num_tx_levels; /* 0 */
 	uint32_t *tx_time_per_levels; /* NULL */
 	uint32_t rx_time;
 	uint32_t on_time_scan;
@@ -828,7 +718,6 @@ enum STATS_LLS_WIFI_RATE_PREAMBLE {
 	LLS_MODE_HT,
 	LLS_MODE_VHT,
 	LLS_MODE_HE,
-	LLS_MODE_EHT,
 	LLS_MODE_RESERVED,
 };
 
@@ -875,6 +764,12 @@ struct STATS_LLS_RATE_STAT {
 	uint32_t retries_long;
 };
 
+enum WIFI_MULTI_STA_USE_CASE {
+	WIFI_DUAL_STA_TRANSIENT_PREFER_PRIMARY = 0,
+	WIFI_DUAL_STA_NON_TRANSIENT_UNBIASED = 1,
+	WIFI_DUAL_STA_MTK_LEGACY = 15,
+};
+
 enum ENUM_WIFI_CONNECTION_STATE {
 	WIFI_DISCONNECTED = 0,
 	WIFI_AUTHENTICATING = 1,
@@ -902,7 +797,7 @@ enum ENUM_WIFI_INTERFACE_MODE {
 };
 
 /**
- * Link layer statistics interface information
+ *
  * @mode: interface mode
  * @mac_addr[6]: interface mac address (self)
  * @state: connection state (valid for STA, CLI only)
@@ -939,6 +834,15 @@ enum ENUM_STATS_LLS_AC {
 	STATS_LLS_WIFI_AC_BE  = 2,
 	STATS_LLS_WIFI_AC_BK  = 3,
 	STATS_LLS_WIFI_AC_MAX = 4,
+};
+
+/* access categories */
+enum WIFI_TRAFFIC_AC {
+	WIFI_AC_VO = 0,
+	WIFI_AC_VI = 1,
+	WIFI_AC_BE = 2,
+	WIFI_AC_BK = 3,
+	WIFI_AC_MAX = 4,
 };
 
 /* wifi peer type */
@@ -1086,44 +990,16 @@ struct WIFI_RADIO_CHANNEL_STAT {
 	struct STATS_LLS_CHANNEL_STAT channel[STATS_LLS_CH_NUM];
 };
 
-/* IFACE_NUM as BSSID_NUM to retrived statistics by interface; or sum up else */
-#if (CFG_SUPPORT_CONNAC3X == 1)
-#define IFACE_NUM BSSID_NUM
-#else
-#define IFACE_NUM 1
-#endif
-
-/* Structure of FW reported data */
-struct HAL_LLS_FW_REPORT {
-	struct STATS_LLS_WIFI_IFACE_STAT iface[IFACE_NUM];
-	struct PEER_INFO_RATE_STAT peer_info[CFG_STA_REC_NUM];
-	struct WIFI_RADIO_CHANNEL_STAT radio[ENUM_BAND_NUM];
-};
-
-/* Buffer to hold collected data from FW reported EMI address */
 struct HAL_LLS_FULL_REPORT {
 	struct STATS_LLS_WIFI_IFACE_STAT iface;
 	struct PEER_INFO_RATE_STAT peer_info[CFG_STA_REC_NUM];
 	struct WIFI_RADIO_CHANNEL_STAT radio[ENUM_BAND_NUM];
-	uint32_t tx_levels[ENUM_BAND_NUM][LLS_RADIO_STAT_MAX_TX_LEVELS];
 };
 
 struct STATS_LLS_PEER_AP_REC {
 	uint16_t sta_count;
 	uint16_t chan_util;
 	uint8_t mac_addr[ETH_ALEN];
-};
-#endif /* CFG_SUPPORT_LLS */
-
-struct ANDROID_T_COMB_UNIT {
-	uint8_t band_0;
-	uint8_t ant_0;
-	uint8_t band_1;
-	uint8_t ant_1;
-};
-
-struct ANDROID_T_COMB_MATRIX {
-	struct ANDROID_T_COMB_UNIT comb_mtx[COMB_MATRIX_LEN];
 };
 
 /* RTT Capabilities */
@@ -1166,9 +1042,9 @@ struct PARAM_RSSI_MONITOR_EVENT {
 
 /* Packet Keep Alive */
 struct PARAM_PACKET_KEEPALIVE_T {
-	uint8_t enable;	/* 1=Start, 0=Stop*/
+	bool enable;	/* 1=Start, 0=Stop*/
 	uint8_t index;
-	uint16_t u2IpPktLen;
+	int16_t u2IpPktLen;
 	uint8_t pIpPkt[256];
 	uint8_t ucSrcMacAddr[PARAM_MAC_ADDR_LEN];
 	uint8_t ucDstMacAddr[PARAM_MAC_ADDR_LEN];
@@ -1180,27 +1056,6 @@ struct PARAM_BSS_MAC_OUI {
 	uint8_t ucBssIndex;
 	uint8_t ucMacOui[MAC_OUI_LEN];
 };
-
-enum PARAM_GENERIC_RESPONSE_ID {
-	GRID_MANAGE_CHANNEL_LIST,			/* 0 */
-	GRID_HANG_INFO,					/* 1 */
-	GRID_SWPIS_BCN_INFO,				/* 2 */
-	GRID_SWPIS_BCN_INFO_ABORT,			/* 3 */
-	GRID_EXTERNAL_AUTH,				/* 4 */
-};
-
-struct PARAM_EXTERNAL_AUTH_INFO {
-	uint8_t id;
-	uint8_t len;
-	uint8_t ssid[ELEM_MAX_LEN_SSID + 1];
-	uint8_t ssid_len;
-	uint8_t bssid[PARAM_MAC_ADDR_LEN];
-	uint32_t key_mgmt_suite;
-	uint32_t action;
-	uint8_t dot11MultiLinkActivated;
-	uint8_t own_ml_addr[PARAM_MAC_ADDR_LEN];
-	uint8_t peer_ml_addr[PARAM_MAC_ADDR_LEN];
-} __KAL_ATTRIB_PACKED__;
 
 /*******************************************************************************
  *                                 M A C R O S
@@ -1261,14 +1116,6 @@ int mtk_cfg80211_vendor_set_country_code(struct wiphy
 		const void *data, int data_len);
 
 int mtk_cfg80211_vendor_get_rtt_capabilities(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-
-int mtk_cfg80211_vendor_set_rtt_config(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-
-int mtk_cfg80211_vendor_cancel_rtt_config(
 	struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int data_len);
 
@@ -1333,8 +1180,8 @@ int mtk_cfg80211_vendor_get_supported_feature_set(
 	const void *data, int data_len);
 
 int mtk_cfg80211_vendor_event_rssi_beyond_range(
-	struct GLUE_INFO *prGlueInfo,
-	uint8_t ucBssIdx, int rssi);
+	struct wiphy *wiphy,
+	struct wireless_dev *wdev, int rssi);
 
 int mtk_cfg80211_vendor_set_tx_power_scenario(
 	struct wiphy *wiphy, struct wireless_dev *wdev,
@@ -1382,9 +1229,6 @@ int mtk_cfg80211_vendor_driver_memory_dump(struct wiphy *wiphy,
 int mtk_cfg80211_vendor_set_scan_param(struct wiphy *wiphy,
 		struct wireless_dev *wdev, const void *data, int data_len);
 
-int mtk_cfg80211_vendor_string_cmd(struct wiphy *wiphy,
-	struct wireless_dev *wdev, const void *data, int data_len);
-
 int mtk_cfg80211_vendor_get_trx_stats(struct wiphy *wiphy,
 					   struct wireless_dev *wdev,
 					   const void *data,
@@ -1394,20 +1238,6 @@ int mtk_cfg80211_vendor_trigger_reset(
 	struct wiphy *wiphy, struct wireless_dev *wdev,
 	const void *data, int data_len);
 
-int mtk_cfg80211_vendor_comb_matrix(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-
 int mtk_cfg80211_vendor_event_reset_triggered(
 	uint32_t data);
-
-#if CFG_SUPPORT_CSI
-int mtk_cfg80211_vendor_csi_control(
-	struct wiphy *wiphy, struct wireless_dev *wdev,
-	const void *data, int data_len);
-
-int mtk_cfg80211_vendor_event_csi_raw_data(
-	struct ADAPTER *prAdapter);
-#endif
-
 #endif /* _GL_VENDOR_H */

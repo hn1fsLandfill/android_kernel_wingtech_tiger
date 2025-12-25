@@ -24,14 +24,6 @@
  *			    D A T A   T Y P E S
  ******************************************************************************/
 
-/*
- * When CONFIG_OF is not set, for_each_property_of_node() is not defined,
- * we need to define it to avoid build break.
- */
-#ifndef CONFIG_OF
-#define for_each_property_of_node(dn, pp) \
-	for (pp = dn->properties; pp != NULL; pp = pp->next)
-#endif
 
 /*******************************************************************************
  *		    F U N C T I O N   D E C L A R A T I O N S
@@ -52,11 +44,16 @@ static int cfm_epaelna_flags_subsys_populate(
 		struct connfem_epaelna_flag_tbl_entry *tbl,
 		struct cfm_container **result_out);
 
+static struct connfem_epaelna_flag_tbl_entry*
+	cfm_epaelna_flags_subsys_find(
+		char *name,
+		struct connfem_epaelna_flag_tbl_entry *tbl);
+
 /*******************************************************************************
  *			    P U B L I C   D A T A
  ******************************************************************************/
 char *cfm_subsys_name[CONNFEM_SUBSYS_NUM] = {
-	/* [CONNFEM_SUBSYS_NONE] */ CFM_DT_NODE_COMMON,
+	/* [CONNFEM_SUBSYS_NONE] */ NULL,
 	/* [CONNFEM_SUBSYS_WIFI] */ CFM_DT_NODE_WIFI,
 	/* [CONNFEM_SUBSYS_BT]   */ CFM_DT_NODE_BT
 };
@@ -87,7 +84,7 @@ static int fem_id_shift[CONNFEM_PORT_NUM][FEMID_ITEMS] = {
 };
 
 static struct connfem_epaelna_subsys_cb *subsys_cb[CONNFEM_SUBSYS_NUM] = {
-	/* [CONNFEM_SUBSYS_NONE] */ &cfm_cm_epaelna_cb,
+	/* [CONNFEM_SUBSYS_NONE] */ NULL,
 	/* [CONNFEM_SUBSYS_WIFI] */ &cfm_wf_epaelna_cb,
 	/* [CONNFEM_SUBSYS_BT]   */ &cfm_bt_epaelna_cb
 };
@@ -122,13 +119,18 @@ void cfm_epaelna_flags_free(struct cfm_epaelna_flags_config *flags)
 	if (!flags)
 		return;
 
-	if (flags->pairs) {
-		cfm_container_free(flags->pairs);
-		flags->pairs = NULL;
+	if (flags->name_entries) {
+		cfm_container_entries_free((void **)flags->name_entries);
+		flags->name_entries = NULL;
+	}
+
+	if (flags->names) {
+		cfm_container_free(flags->names);
+		flags->names = NULL;
 	}
 }
 
-int cfm_epaelna_feminfo_populate(struct device_node **parts_np,
+int cfm_epaelna_feminfo_populate(struct cfm_dt_epaelna_context *dt,
 				  struct connfem_epaelna_fem_info *result_out)
 {
 	struct connfem_epaelna_fem_info result;
@@ -142,7 +144,7 @@ int cfm_epaelna_feminfo_populate(struct device_node **parts_np,
 	 * know if a FEM does exist, and could do some FEM protection logic.
 	 */
 	for (i = 0; i < CONNFEM_PORT_NUM; i++) {
-		np = parts_np[i];
+		np = dt->parts_np[i];
 
 		/* VID, PID */
 		cfm_epaelna_feminfo_part_populate(np, &result.part[i]);
@@ -489,11 +491,20 @@ int cfm_epaelna_flags_populate(
 
 		err = cfm_epaelna_flags_subsys_populate(dt_flags->np[s],
 							tbl,
-							&result[s].pairs);
+							&result[s].names);
 		if (err < 0)
 			break;
 
-		cfm_epaelna_flags_pairs_dump(s, result[s].pairs);
+		result[s].name_entries = (char **)cfm_container_entries(
+							result[s].names);
+
+		if (result[s].names && (result[s].names->cnt > 0) &&
+		    !result[s].name_entries) {
+			err = -ENOMEM;
+			break;
+		}
+
+		cfm_epaelna_flags_names_dump(s, result[s].names);
 
 		result[s].obj = subsys_cb[s]->flags_get();
 		if (!result[s].obj) {
@@ -522,7 +533,7 @@ int cfm_epaelna_flags_populate(
  * cfm_epaelna_flags_subsys_populate
  *	Function traverses through all props in the give subsys' flags node,
  *	and updates subsys' flags structure through mapping table,
- *	and collect flag name/value pairs into the ConnFem container.
+ *	and collect flag names into the ConnFem container.
  *
  *	On success, the container will be allocated, caller needs to release it
  *	via cfm_container_free().
@@ -530,7 +541,7 @@ int cfm_epaelna_flags_populate(
  * Parameters
  *	np	  : Pointer to subsys' flags device tree node
  *	tbl	  : Pointer to subsys' flags mapping table
- *	result_out: Pointer to ConnFem container for storing flags name/value
+ *	result_out: Pointer to ConnFem container for storing flags names
  *
  * Return value
  *	0	: Success, result output will be valid
@@ -546,15 +557,14 @@ static int cfm_epaelna_flags_subsys_populate(
 	struct property *prop = NULL;
 	struct connfem_epaelna_flag_tbl_entry *entry;
 	struct cfm_container *result = NULL;
-	struct connfem_epaelna_flag_pair *pair;
 
-	/* Prepare flags pairs container storage */
+	/* Prepare flags names container storage */
 	i = 0;
 	for_each_property_of_node(np, prop) {
 		i++;
 	}
 
-	result = cfm_container_alloc(i, sizeof(struct connfem_epaelna_flag_pair));
+	result = cfm_container_alloc(i, CONNFEM_FLAG_NAME_SIZE);
 	if (!result)
 		return -ENOMEM;
 
@@ -581,34 +591,22 @@ static int cfm_epaelna_flags_subsys_populate(
 		}
 
 		/* Double check if container is big enough to keep this flag */
-		pair = cfm_container_entry(result, i);
-		if (i >= result->cnt || !pair) {
-			pr_info("[ERR] Drop '%s' prop, too many flags %d > %d",
-				prop->name, i + 1, result->cnt);
-			continue;
-		}
+		if (i + 1 <= result->cnt) {
+			memcpy(cfm_container_entry(result, i),
+			       prop->name,
+			       len);
 
-		/* Update subsys' flags value */
-		if (prop->length == 0) {
-			/* always enable boolean flag */
+			/* Update subsys' flags table only if all else ok.
+			 * No need to check for NULL, as already done at:
+			 * cfm_epaelna_flags_subsys_find.
+			 */
 			*(entry->addr) = true;
 
-		} else if (prop->length == 1 && prop->value) {
-			/* assign the specified 1 byte value */
-			*(entry->addr) = *((unsigned char*)prop->value);
-
+			i++;
 		} else {
-			/* skip property with multi-bytes value */
-			pr_info("[WARN] Drop '%s' prop, multi-bytes(%d) value unsupported",
-				prop->name,
-				prop->length);
-			continue;
+			pr_info("[ERR] Drop '%s' prop, too many flags %d > %d",
+				prop->name, i + 1, result->cnt);
 		}
-
-		/* Update subsys' flags container entry */
-		memcpy(pair->name, prop->name, len);
-		pair->value = *(entry->addr);
-		i++;
 	}
 
 	/* Updates container size, the end result could be smaller,
@@ -625,7 +623,7 @@ static int cfm_epaelna_flags_subsys_populate(
  * connfem_epaelna_flag_tbl_entry
  *	Function traverses through all props in the give subsys' flags node,
  *	and updates subsys' flags structure through mapping table,
- *	and collect flag name/value pairs into the ConnFem container.
+ *	and collect flag names into the ConnFem container.
  *
  *	On success, the container will be allocated, caller needs to release it
  *	via cfm_container_free().
@@ -638,7 +636,7 @@ static int cfm_epaelna_flags_subsys_populate(
  *	Pointer to the subsys' flag table entry, or NULL if can't be found.
  *
  */
-struct connfem_epaelna_flag_tbl_entry*
+static struct connfem_epaelna_flag_tbl_entry*
 	cfm_epaelna_flags_subsys_find(
 		char *name,
 		struct connfem_epaelna_flag_tbl_entry *tbl)
@@ -654,18 +652,6 @@ struct connfem_epaelna_flag_tbl_entry*
 	return NULL;
 }
 
-struct connfem_epaelna_subsys_cb*
-	cfm_epaelna_flags_subsys_cb_get(
-		enum connfem_subsys subsys)
-{
-	if (subsys >= CONNFEM_SUBSYS_NUM) {
-		pr_info("%s, invalid subsys = %d", __func__, subsys);
-		return NULL;
-	}
-
-	return subsys_cb[subsys];
-}
-
 void cfm_epaelna_config_dump(struct cfm_epaelna_config *cfg)
 {
 	int i;
@@ -678,9 +664,7 @@ void cfm_epaelna_config_dump(struct cfm_epaelna_config *cfg)
 	pr_info("ePAeLNA Config, available:%d", cfg->available);
 
 	cfm_epaelna_feminfo_dump(&cfg->fem_info);
-	cfm_epaelna_feminfo_dump(&cfg->bt_fem_info);
 	cfm_epaelna_pininfo_dump(&cfg->pin_cfg.pin_info);
-	cfm_epaelna_pininfo_dump(&cfg->bt_pin_cfg.pin_info);
 	cfm_epaelna_laainfo_dump(&cfg->pin_cfg.laa_pin_info);
 
 	for (i = 0; i < CONNFEM_SUBSYS_NUM; i++)
@@ -814,7 +798,9 @@ void cfm_epaelna_laainfo_dump(struct connfem_epaelna_laa_pin_info *laa)
 void cfm_epaelna_flags_dump(enum connfem_subsys subsys,
 			    struct cfm_epaelna_flags_config *flags)
 {
-	if (subsys >= CONNFEM_SUBSYS_NUM)
+	unsigned int cnt = 0;
+
+	if (subsys <= CONNFEM_SUBSYS_NONE || subsys >= CONNFEM_SUBSYS_NUM)
 		return;
 
 	if (!flags) {
@@ -824,13 +810,16 @@ void cfm_epaelna_flags_dump(enum connfem_subsys subsys,
 
 	cfm_epaelna_flags_obj_dump(subsys, flags->obj);
 
-	cfm_epaelna_flags_pairs_dump(subsys, flags->pairs);
+	cfm_epaelna_flags_names_dump(subsys, flags->names);
+
+	if (flags->names)
+		cnt = flags->names->cnt;
+	cfm_epaelna_flags_name_entries_dump(subsys, cnt, flags->name_entries);
 }
 
 void cfm_epaelna_flags_obj_dump(enum connfem_subsys subsys,
 				void *flags_obj)
 {
-	struct connfem_epaelna_flags_common *cm_flags = NULL;
 	struct connfem_epaelna_flags_wifi *wf_flags = NULL;
 	struct connfem_epaelna_flags_bt *bt_flags = NULL;
 
@@ -840,15 +829,6 @@ void cfm_epaelna_flags_obj_dump(enum connfem_subsys subsys,
 	}
 
 	switch (subsys) {
-	case CONNFEM_SUBSYS_NONE:
-		cm_flags = (struct connfem_epaelna_flags_common *)flags_obj;
-		pr_info("CmFlags.rxmode: 0x%02x", cm_flags->rxmode);
-		pr_info("CmFlags.fe_ant_cnt: 0x%02x", cm_flags->fe_ant_cnt);
-		pr_info("CmFlags.fe_main_bt_share_lp2g: 0x%02x", cm_flags->fe_main_bt_share_lp2g);
-		pr_info("CmFlags.fe_conn_spdt: 0x%02x", cm_flags->fe_conn_spdt);
-		pr_info("CmFlags.fe_reserved: 0x%02x", cm_flags->fe_reserved);
-		break;
-
 	case CONNFEM_SUBSYS_WIFI:
 		wf_flags = (struct connfem_epaelna_flags_wifi *)flags_obj;
 		pr_info("WfFlags.open_loop: %d", wf_flags->open_loop);
@@ -868,33 +848,44 @@ void cfm_epaelna_flags_obj_dump(enum connfem_subsys subsys,
 	}
 }
 
-void cfm_epaelna_flags_pairs_dump(enum connfem_subsys subsys,
-				  struct cfm_container *pairs)
+void cfm_epaelna_flags_names_dump(enum connfem_subsys subsys,
+				  struct cfm_container *names)
 {
 	int i;
-	struct connfem_epaelna_flag_pair *pair;
 
-	if (!pairs) {
-		pr_info("[%s]FlagPairs, (null)", cfm_subsys_name[subsys]);
+	if (!names) {
+		pr_info("[%s]FlagNames, (null)", cfm_subsys_name[subsys]);
 		return;
 	}
 
-	pr_info("[%s]FlagPairs, count:%d, entry_sz:%d",
-		cfm_subsys_name[subsys], pairs->cnt, pairs->entry_sz);
+	pr_info("[%s]FlagNames, count:%d, entry_sz:%d",
+		cfm_subsys_name[subsys], names->cnt, names->entry_sz);
 
-	for (i = 0; i < pairs->cnt; i++) {
-		pair = (struct connfem_epaelna_flag_pair*)
-			cfm_container_entry(pairs, i);
-		if (pair) {
-			pr_info("[%s]FlagPairs, [%d]'%s':0x%02x",
-				cfm_subsys_name[subsys],
-				i,
-				pair->name,
-				pair->value);
-		} else {
-			pr_info("[%s]FlagPairs, [%d]pair = NULL",
-				cfm_subsys_name[subsys],
-				i);
-		}
+	for (i = 0; i < names->cnt; i++) {
+		pr_info("[%s]FlagNames, [%d]'%s'",
+			cfm_subsys_name[subsys],
+			i,
+			(char *)cfm_container_entry(names, i));
+	}
+}
+
+void cfm_epaelna_flags_name_entries_dump(enum connfem_subsys subsys,
+					 unsigned int cnt,
+					 char **name_entries)
+{
+	int i;
+
+	if (!name_entries) {
+		pr_info("[%s]FlagNameEntries, (null)", cfm_subsys_name[subsys]);
+		return;
+	}
+
+	pr_info("[%s]FlagNameEntries, count:%d", cfm_subsys_name[subsys], cnt);
+
+	for (i = 0; i < cnt; i++) {
+		pr_info("[%s]FlagNameEntries, [%d]'%s'",
+			cfm_subsys_name[subsys],
+			i,
+			(char *)name_entries[i]);
 	}
 }

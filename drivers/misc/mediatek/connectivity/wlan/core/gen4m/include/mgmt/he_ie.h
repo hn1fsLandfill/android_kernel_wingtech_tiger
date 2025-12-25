@@ -69,8 +69,6 @@
 #define HE_MAC_CAP0_TWT_REQ_SHFT                       1
 #define HE_MAC_CAP0_TWT_RSP                            BIT(2)
 #define HE_MAC_CAP0_TWT_RSP_SHFT                       2
-#define HE_MAC_CAP0_TWT_SCHEDULE_SUPPORT   BIT(30)
-#define HE_MAC_CAP0_TWT_SCHEDULE_SUPPORT_SHIFT   30
 #define HE_MAC_CAP0_FRAGMENTATION_SHFT                 3
 #define HE_MAC_CAP0_MAX_NUM_OF_FRAGMENTATION_SHFT      5
 
@@ -86,7 +84,6 @@
 #define HE_MAC_CAP2_ALL_ACK_SHFT                       1
 #define HE_MAC_CAP2_TRS_SHFT                           2
 #define HE_MAC_CAP2_BSR_SHFT                           3
-#define HE_MAC_CAP2_BTWT                               BIT(4)
 #define HE_MAC_CAP2_BTWT_SHFT                          4
 #define HE_MAC_CAP2_32BIT_BA_BITMAP_SHFT               5
 #define HE_MAC_CAP2_MU_CASCAD_SHFT                     6
@@ -102,7 +99,6 @@
 #define HE_MAC_CAP3_AMSDU_FRAGMENT_SHFT                5
 #define HE_MAC_CAP3_FLEXIBLE_TWT_SHDL                  BIT(6)
 #define HE_MAC_CAP3_FLEXIBLE_TWT_SHDL_SHFT             6
-#define HE_MAC_CAP3_RX_CTRL_TO_MUTI_BSS                BIT(7)
 #define HE_MAC_CAP3_RX_CTRL_TO_MUTI_BSS_SHFT           7
 
 /* HE MAC Capablilites byte4 */
@@ -122,8 +118,6 @@
 #define HE_MAC_CAP5_SUBCHANNEL_SEL_TX_SHFT             2
 #define HE_MAC_CAP5_UL_2X996TONE_RU_SHFT               3
 #define HE_MAC_CAP5_OM_CNTL_ULMUDATE_DISABLE_RX_SHFT   4
-#define HE_MAC_CAP5_DYNAMIC_SMPS                       BIT(5)
-#define HE_MAC_CAP5_DYNAMIC_SMPS_SHFT                  5
 
 /* HE CAP - HE PHY Capabilities Information field */
 #define HE_PHY_CAP_BYTE_NUM                            11
@@ -140,7 +134,6 @@
 #define HE_PHY_CAP0_CHAN_WIDTH_SET_SHFT                1
 
 /* HE PHY Capablilites byte1 */
-#define HE_PHY_CAP1_PUNCTURED_PREAMBLE_RX_MASK         BITS(0, 3)
 #define HE_PHY_CAP1_PUNCTURED_PREAMBLE_RX_SHFT         0
 #define HE_PHY_CAP1_DEVICE_CALSS_SHFT                  4
 #define HE_PHY_CAP1_LDPC_CODING_IN_PAYLOAD             BIT(5)
@@ -151,7 +144,6 @@
 
 /* HE PHY Capablilites byte2 */
 #define HE_PHY_CAP2_MIDAMBLE_TXRX_MAX_NSTS_SHFT        0
-#define HE_PHY_CAP2_NDP_4X_HE_LTF                      BIT(1)
 #define HE_PHY_CAP2_NDP_4X_HE_LTF_SHFT                 1
 #define HE_PHY_CAP2_STBC_TX_LT_OR_EQ_80M               BIT(2)
 #define HE_PHY_CAP2_STBC_TX_LT_OR_EQ_80M_SHFT          2
@@ -166,13 +158,11 @@
 
 /* HE PHY Capablilites byte3 */
 #define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_TX_SHFT      0
-#define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_TX_MASK      BITS(0, 1)
+#define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_TX_MASK	   BITS(0, 1)
 #define HE_PHY_CAP3_DCM_MAX_NSS_TX_SHFT                2
-#define HE_PHY_CAP3_DCM_MAX_NSS_TX_MASK                BIT(2)
 #define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_RX_SHFT      3
-#define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_RX_MASK      BITS(3, 4)
+#define HE_PHY_CAP3_DCM_MAX_CONSTELLATION_RX_MASK	   BITS(3, 4)
 #define HE_PHY_CAP3_DCM_MAX_NSS_RX_SHFT                5
-#define HE_PHY_CAP3_DCM_MAX_NSS_RX_MASK                BIT(5)
 #define HE_PHY_CAP3_UL_HE_MU_PPDU_SHFT                 6
 #define HE_PHY_CAP3_SU_BFMER                           BIT(7)
 #define HE_PHY_CAP3_SU_BFMER_SHFT                      7
@@ -188,7 +178,6 @@
 #define HE_PHY_CAP4_BFMEE_STS_GT_80M_SHFT              5
 
 /* HE PHY Capablilites byte5 */
-#define HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_MASK   BITS(0, 2)
 #define HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_SHFT   0
 #define HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_MASK   BITS(0, 2)
 #define HE_PHY_CAP5_NUM_OF_SND_DIM_GT_80M_SHFT         3
@@ -207,7 +196,6 @@
 #define HE_PHY_CAP6_TRIG_SU_BF_FB_SHFT                 2
 #define HE_PHY_CAP6_TRIG_MU_BF_PARTIAL_BW_FB           BIT(3)
 #define HE_PHY_CAP6_TRIG_MU_BF_PARTIAL_BW_FB_SHFT      3
-#define HE_PHY_CAP6_TRIG_CQI_FB                        BIT(4)
 #define HE_PHY_CAP6_TRIG_CQI_FB_SHFT                   4
 #define HE_PHY_CAP6_PARTIAL_BW_EXTENDED_RANGE          BIT(5)
 #define HE_PHY_CAP6_PARTIAL_BW_EXTENDED_RANGE_SHFT     5
@@ -237,7 +225,6 @@
 #define HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF_SHFT          4
 #define HE_PHY_CAP8_MIDAMBLE_RX_2X_1X_HE_LTF_SHFT      5
 #define HE_PHY_CAP8_DCM_MAX_BW_SHFT                    6
-#define HE_PHY_CAP8_DCM_MAX_BW_MASK                    BITS(6, 7)
 
 /* HE PHY Capablilites byte9 */
 #define HE_PHY_CAP9_LT_16_SIGB_OFDM_SYMBOL_SHFT        0
@@ -329,10 +316,8 @@
 #define HE_OP_PARAM2_6G_OP_INFOR_PRESENT_SHFT		1
 
 /* HE Operation element - BSS Color Information */
-#define HE_OP_BSSCOLOR_BSS_COLOR_MASK                   BITS(0, 5)
 #define HE_OP_BSSCOLOR_BSS_COLOR_SHFT                   0
 #define HE_OP_BSSCOLOR_PARTIAL_BSS_COLOR_SHFT           6
-#define HE_OP_BSSCOLOR_BSS_COLOR_DISABLE                BIT(7)
 #define HE_OP_BSSCOLOR_BSS_COLOR_DISABLE_SHFT           7
 
 /* Spatial Reuse Parameter Set element - SR Control field */
@@ -383,10 +368,10 @@
 #define HTC_HE_2ND_A_CTRL_ID_SHIFT                     18
 
 /* 11ax_D3.0 9.2.4.6a.5 UPH Control */
-#define HTC_HE_UPH_UL_PWR_HEADROOM                     BITS(22, 26)
+#define HTC_HE_UPH_UL_PWR_HEADROOM                     BITS(22, 27)
 #define HTC_HE_UPH_UL_PWR_HEADROOM_SHIFT               22
-#define HTC_HE_UPH_MIN_TX_PWR_FLAG                     BIT(27)
-#define HTC_HE_UPH_MIN_TX_PWR_FLAG_SHIFT               27
+#define HTC_HE_UPH_MIN_TX_PWR_FLAG                     BIT(28)
+#define HTC_HE_UPH_MIN_TX_PWR_FLAG_SHIFT               28
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
 #define ELEM_MAX_LEN_HE_6G_CAP \
@@ -419,7 +404,6 @@
 #define HE_6G_CAP_INFO_MAX_MPDU_LEN_OFFSET             6
 /* B9-B10: SM Power Save */
 #define HE_6G_CAP_INFO_SM_POWER_SAVE                   BITS(9, 10)
-#define HE_6G_CAP_INFO_SM_POWER_SAVE_OFFSET            9
 /* B11: RD Responder */
 #define HE_6G_CAP_INFO_RD_RESPONDER                    BIT(11)
 /* B12/B13: Rx/TX Antenna Pattern Consistency */
@@ -457,9 +441,6 @@ enum ENUM_HEBA_TYPE {
 #define HE_SET_MAC_CAP_TWT_REQ(_aucHeMacCapInfo) \
 	(_aucHeMacCapInfo[0] |=  HE_MAC_CAP0_TWT_REQ)
 
-#define HE_SET_MAC_CAP_TWT_RSP(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[0] |=  HE_MAC_CAP0_TWT_RSP)
-
 #define HE_IS_MAC_CAP_TWT_RSP(_aucHeMacCapInfo) \
 	(_aucHeMacCapInfo[0] & HE_MAC_CAP0_TWT_RSP)
 
@@ -471,26 +452,12 @@ enum ENUM_HEBA_TYPE {
 			& HE_MAC_CAP1_TRIGGER_PAD_DURATION_MASK); \
 }
 
-#define HE_SET_MAC_CAP_BTWT_SUPT(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[2] |=  HE_MAC_CAP2_BTWT)
-
-#define HE_IS_MAC_CAP_BTWT_SUPT(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[2] &  HE_MAC_CAP2_BTWT)
-
-#define HE_SET_MAC_CAP_RX_CTRL_TO_MUTI_BSS(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[3] |=  HE_MAC_CAP3_RX_CTRL_TO_MUTI_BSS)
-
 #define HE_IS_MAC_CAP_FLEXIBLE_TWT_SHDL(_aucHeMacCapInfo) \
 	(_aucHeMacCapInfo[3] & HE_MAC_CAP3_FLEXIBLE_TWT_SHDL)
 
+
 #define HE_SET_MAC_CAP_OM_CTRL(_aucHeMacCapInfo) \
 	(_aucHeMacCapInfo[3] |=  HE_MAC_CAP3_OM_CTRL)
-
-#define HE_SET_MAC_CAP_DYNAMIC_SMPS(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[5] |=  HE_MAC_CAP5_DYNAMIC_SMPS)
-
-#define HE_UNSET_MAC_CAP_DYNAMIC_SMPS(_aucHeMacCapInfo) \
-	(_aucHeMacCapInfo[5] &=  ~HE_MAC_CAP5_DYNAMIC_SMPS)
 
 #define HE_SET_MAC_CAP_MAX_AMPDU_LEN_EXP(_aucHeMacCapInfo, _val) \
 { \
@@ -503,9 +470,6 @@ enum ENUM_HEBA_TYPE {
 /* should use macro to access field of HE PHY CAP*/
 #define HE_SET_PHY_CAP_CHAN_WIDTH_SET_BW40_2G(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[0] |=  HE_PHY_CAP0_CHAN_WIDTH_SET_BW40_2G)
-
-#define HE_IS_PHY_CAP_CHAN_WIDTH_SET_BW40_2G(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[0] & HE_PHY_CAP0_CHAN_WIDTH_SET_BW40_2G)
 
 #define HE_IS_PHY_CAP_CHAN_WIDTH_SET_BW40_BW80_5G(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[0] & HE_PHY_CAP0_CHAN_WIDTH_SET_BW40_BW80_5G)
@@ -525,22 +489,8 @@ enum ENUM_HEBA_TYPE {
 #define HE_SET_PHY_CAP_CHAN_WIDTH_SET_BW80P80_5G(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[0] |= HE_PHY_CAP0_CHAN_WIDTH_SET_BW80P80_5G)
 
-#define HE_SET_PHY_CAP_PUNCTURED_PREAMBLE_RX(_aucHePhyCapInfo, _ucPpRx) \
-{ \
-	_aucHePhyCapInfo[1] &= ~(HE_PHY_CAP1_PUNCTURED_PREAMBLE_RX_MASK); \
-	_aucHePhyCapInfo[1] |= \
-		((_ucPpRx << HE_PHY_CAP1_PUNCTURED_PREAMBLE_RX_SHFT) \
-			& HE_PHY_CAP1_PUNCTURED_PREAMBLE_RX_MASK); \
-}
-
 #define HE_SET_PHY_CAP_LDPC_CODING_IN_PAYLOAD(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[1] |= HE_PHY_CAP1_LDPC_CODING_IN_PAYLOAD)
-
-#define HE_UNSET_PHY_CAP_LDPC_CODING_IN_PAYLOAD(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[1] &= ~HE_PHY_CAP1_LDPC_CODING_IN_PAYLOAD)
-
-#define HE_SET_PHY_CAP_NDP_4X_HE_LTF(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[2] |= HE_PHY_CAP2_NDP_4X_HE_LTF)
 
 #define HE_SET_PHY_CAP_STBC_TX_LT_OR_EQ_80M(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[2] |= HE_PHY_CAP2_STBC_TX_LT_OR_EQ_80M)
@@ -550,14 +500,6 @@ enum ENUM_HEBA_TYPE {
 
 #define HE_UNSET_PHY_CAP_SU_BFMER(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[3] &= ~HE_PHY_CAP3_SU_BFMER)
-
-#define HE_SET_PHY_CAP_SU_BFMER(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[3] |= HE_PHY_CAP3_SU_BFMER)
-
-#define HE_GET_PHY_CAP_SU_BFMER(_aucHePhyCapInfo) \
-	((_aucHePhyCapInfo[3] &= HE_PHY_CAP3_SU_BFMER) \
-	>> HE_PHY_CAP3_SU_BFMER_SHFT)
-
 
 /* set to 0 if DCM is not supported */
 /* set to 1 for BPSK */
@@ -591,18 +533,8 @@ enum ENUM_HEBA_TYPE {
 	((_aucHePhyCapInfo[3] & HE_PHY_CAP3_DCM_MAX_CONSTELLATION_RX_MASK) \
 	>> HE_PHY_CAP3_DCM_MAX_CONSTELLATION_RX_SHFT)
 
-#define HE_SET_PHY_CAP_DCM_MAX_NSS_TX(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[3] |= HE_PHY_CAP3_DCM_MAX_NSS_TX_MASK)
-
-#define HE_SET_PHY_CAP_DCM_MAX_NSS_RX(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[3] |= HE_PHY_CAP3_DCM_MAX_NSS_RX_MASK)
-
 #define HE_SET_PHY_CAP_SU_BFMEE(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[4] |= HE_PHY_CAP4_SU_BFMEE)
-
-#define HE_GET_PHY_CAP_SU_BFMEE(_aucHePhyCapInfo) \
-	((_aucHePhyCapInfo[4] & HE_PHY_CAP4_SU_BFMEE) \
-	>> HE_PHY_CAP4_SU_BFMEE_SHFT)
 
 #define HE_UNSET_PHY_CAP_MU_BFMER(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[4] &= ~HE_PHY_CAP4_MU_BFMER)
@@ -615,26 +547,6 @@ enum ENUM_HEBA_TYPE {
 			& HE_PHY_CAP4_BFMEE_STS_LT_OR_EQ_80M_MASK); \
 }
 
-#define HE_GET_PHY_CAP_BFMEE_STS_LT_OR_EQ_80M(_aucHePhyCapInfo) \
-	((_aucHePhyCapInfo[4] & HE_PHY_CAP4_BFMEE_STS_LT_OR_EQ_80M_MASK) \
-	>> HE_PHY_CAP4_BFMEE_STS_LT_OR_EQ_80M_SHFT)
-
-#define HE_SET_PHY_CAP_NUM_OF_SND_DIM_LT_OR_EQ_80M(_aucHePhyCapInfo, _ucNum) \
-{ \
-	_aucHePhyCapInfo[5] &= ~(HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_MASK); \
-	_aucHePhyCapInfo[5] |= \
-		((_ucNum << HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_SHFT) \
-			& HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_MASK); \
-}
-
-#define HE_SET_PHY_CAP_NUM_OF_SND_DIM_GT_80M(_aucHePhyCapInfo, _ucNum) \
-{ \
-	_aucHePhyCapInfo[5] &= ~(HE_PHY_CAP5_NUM_OF_SND_DIM_GT_80M_MASK); \
-	_aucHePhyCapInfo[5] |= \
-		((_ucNum << HE_PHY_CAP5_NUM_OF_SND_DIM_GT_80M_SHFT) \
-			& HE_PHY_CAP5_NUM_OF_SND_DIM_GT_80M_MASK); \
-}
-
 #define HE_SET_PHY_CAP_BFMEE_STS_GT_80M(_aucHePhyCapInfo, _ucSts) \
 { \
 	_aucHePhyCapInfo[4] &= ~(HE_PHY_CAP4_BFMEE_STS_GT_80M_MASK); \
@@ -642,10 +554,6 @@ enum ENUM_HEBA_TYPE {
 		((_ucSts << HE_PHY_CAP4_BFMEE_STS_GT_80M_SHFT) \
 			& HE_PHY_CAP4_BFMEE_STS_GT_80M_MASK); \
 }
-
-#define HE_GET_PHY_CAP_BFMEE_STS_GT_80M(_aucHePhyCapInfo) \
-	((_aucHePhyCapInfo[4] & HE_PHY_CAP4_BFMEE_STS_GT_80M_MASK) \
-	>> HE_PHY_CAP4_BFMEE_STS_GT_80M_SHFT)
 
 #define HE_GET_PHY_CAP_NUM_OF_SND_DIM_LT_OR_EQ_80M(_aucHePhyCapInfo) \
 	((_aucHePhyCapInfo[5] & HE_PHY_CAP5_NUM_OF_SND_DIM_LT_OR_EQ_80M_MASK) \
@@ -673,8 +581,8 @@ enum ENUM_HEBA_TYPE {
 #define HE_SET_PHY_CAP_TRIG_MU_BF_PARTIAL_BW_FB(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[6] |= HE_PHY_CAP6_TRIG_MU_BF_PARTIAL_BW_FB)
 
-#define HE_SET_PHY_CAP_TRIG_CQI_FB(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[6] |= HE_PHY_CAP6_TRIG_CQI_FB)
+#define HE_SET_PHY_CAP_HE_PHY_CAP6_TRIG_MU_BF_PARTIAL_BW_FB(_aucHePhyCapInfo) \
+	(_aucHePhyCapInfo[6] |= HE_PHY_CAP6_TRIG_MU_BF_PARTIAL_BW_FB)
 
 #define HE_SET_PHY_CAP_PARTIAL_BW_EXTENDED_RANGE(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[6] |= HE_PHY_CAP6_PARTIAL_BW_EXTENDED_RANGE)
@@ -709,22 +617,12 @@ enum ENUM_HEBA_TYPE {
 	((_aucHePhyCapInfo[8] & HE_PHY_CAP8_ER_SU_4X_HE_LTF) \
 		>> HE_PHY_CAP8_ER_SU_4X_HE_LTF_SHFT)
 
-#define HE_SET_PHY_CAP_ER_SU_1X_HE_LTF(_aucHePhyCapInfo) \
-	(_aucHePhyCapInfo[8] |= HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF)
-
 #define HE_SET_PHY_CAP_ER_SU_PPDU_1X_HE_LTF(_aucHePhyCapInfo) \
 	(_aucHePhyCapInfo[8] |= HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF)
 
 #define HE_GET_PHY_CAP_ER_SU_PPDU_1X_HE_LTF(_aucHePhyCapInfo) \
 	((_aucHePhyCapInfo[8] & HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF) \
 		>> HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF_SHFT)
-
-#define HE_SET_PHY_CAP_DCM_MAX_RU(_aucHePhyCapInfo, _MaxRu) \
-{ \
-	_aucHePhyCapInfo[8] &= ~(HE_PHY_CAP8_DCM_MAX_BW_MASK); \
-	_aucHePhyCapInfo[8] |= (((_MaxRu) << HE_PHY_CAP8_DCM_MAX_BW_SHFT) \
-		& HE_PHY_CAP8_DCM_MAX_BW_MASK);	\
-}
 
 /* should use macro to access field of HE OP*/
 #define HE_IS_VHT_OP_INFO_PRESENT(_aucHeOpParams) \
@@ -859,7 +757,6 @@ enum ENUM_HEBA_TYPE {
 #define HE_IS_ER_SU_DISABLE(_aucHeOpParams) \
 	(_aucHeOpParams[2] & HE_OP_PARAM2_ER_SU_DISABLE_MASK)
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _IE_HE_CAP_T {
 	u_int8_t  ucId;
 	u_int8_t  ucLength;
@@ -869,7 +766,6 @@ struct _IE_HE_CAP_T {
 	u_int8_t  aucVarInfo[0];
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _IE_HE_OP_T {
 	u_int8_t  ucId;
 	u_int8_t  ucLength;
@@ -882,7 +778,6 @@ struct _IE_HE_OP_T {
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
 /* 9.4.2.261 HE 6 GHz Band Capabilities element */
-__KAL_ATTRIB_PACKED_FRONT__
 struct _IE_HE_6G_BAND_CAP_T {
 	u_int8_t  ucId;
 	u_int8_t  ucLength;
@@ -891,37 +786,31 @@ struct _IE_HE_6G_BAND_CAP_T {
 } __KAL_ATTRIB_PACKED__;
 #endif
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _HE_SUPPORTED_MCS_FIELD {
 	u_int16_t u2RxMcsMap;
 	u_int16_t u2TxMcsMap;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _PPE_THRESHOLD_FIELD {
 	/* 128-bit space can support 4 NSS */
 	u_int64_t u8Space0;
 	u_int64_t u8Space1;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _VHT_OP_INFO_T {
 	u_int8_t ucVhtOperation[3];
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _HE_MAX_BSSID_IND_T {
 	u_int8_t ucMaxBSSIDIndicator;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _MU_AC_PARAM_RECORD_T {
 	u_int8_t ucAciAifsn;
 	u_int8_t ucEcw;
 	u_int8_t ucMUEdcaTimer;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _IE_MU_EDCA_PARAM_T {
 	u_int8_t ucId;
 	u_int8_t ucLength;
@@ -930,7 +819,6 @@ struct _IE_MU_EDCA_PARAM_T {
 	struct _MU_AC_PARAM_RECORD_T arMUAcParam[4];
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _SRG_SR_INFO_T {
 	u_int8_t ucObssPdMinOffset;
 	u_int8_t ucObssPdMaxOffset;
@@ -938,12 +826,10 @@ struct _SRG_SR_INFO_T {
 	u_int64_t u8PartialBSSIDBitmap;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _NON_SRG_SR_INFO_T {
 	u_int8_t ucObssPdMaxOffset;
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _IE_SR_PARAM_T {
 	u_int8_t  ucId;
 	u_int8_t  ucLength;
@@ -964,7 +850,6 @@ union _6G_OPER_INFOR_CONTROL_T {
 	u_int8_t   ucRaw;
 };
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _6G_OPER_INFOR_T {
 	u_int8_t ucPrimaryChannel;
 	union _6G_OPER_INFOR_CONTROL_T rControl;

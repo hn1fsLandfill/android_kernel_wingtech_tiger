@@ -10,6 +10,7 @@
 #if CFG_SUPPORT_NAN
 
 extern uint8_t g_u2IndPubId;
+extern uint8_t g_aucNanServiceId[6];
 
 struct NAN_DISCOVERY_EVENT {
 	uint16_t u2SubscribeID;
@@ -83,7 +84,6 @@ struct NAN_SUBSCRIBE_TERMINATE_EVENT {
 	uint8_t ucReasonCode;
 };
 
-__KAL_ATTRIB_PACKED_FRONT__
 /* Publish Msg Structure
  * Message is used to request the DE to publish the Service Name
  * using the parameters passed into the Discovery Window
@@ -225,7 +225,6 @@ struct NanFWPublishRequest {
  * The SubscribeServiceReq message is sent to the Discovery Engine
  * whenever the Upper layers would like to listen for a Service Name
  */
-__KAL_ATTRIB_PACKED_FRONT__
 struct NanFWSubscribeRequest {
 	/* id 0 means new subscribe, non zero is existing subscribe */
 	uint16_t subscribe_id;
@@ -389,7 +388,6 @@ struct NanFWSubscribeRequest {
 	uint8_t service_name_hash[NAN_SERVICE_HASH_LENGTH];
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct NanFWTransmitFollowupRequest {
 	/* Publish or Subscribe Id of an earlier Publish/Subscribe */
 	uint16_t publish_subscribe_id;
@@ -454,14 +452,12 @@ struct _NAN_DISC_ENGINE_T {
 		arServiceSessionList[NAN_NUM_SERVICE_SESSION];
 };
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _NAN_DISC_CMD_ADD_CSID_T {
 	uint8_t ucPubID;
 	uint8_t ucNum;
 	uint8_t aucSupportedCSID[NAN_MAX_CIPHER_SUITE_NUM];
 } __KAL_ATTRIB_PACKED__;
 
-__KAL_ATTRIB_PACKED_FRONT__
 struct _NAN_DISC_CMD_MANAGE_SCID_T {
 	unsigned char fgAddDelete;
 	uint8_t ucPubID;
@@ -486,9 +482,9 @@ uint32_t nanSubscribeRequest(struct ADAPTER *prAdapter,
 uint32_t nanTransmitRequest(struct ADAPTER *prAdapter,
 			   struct NanTransmitFollowupRequest *msg);
 
-void nanCmdManageScid(struct ADAPTER *prAdapter, unsigned char fgAddDelete,
+void nanCmdManageScid(IN struct ADAPTER *prAdapter, unsigned char fgAddDelete,
 		      uint8_t ucPubID, uint8_t *pucScid);
-void nanCmdAddCsid(struct ADAPTER *prAdapter, uint8_t ucPubID,
+void nanCmdAddCsid(IN struct ADAPTER *prAdapter, uint8_t ucPubID,
 		   uint8_t ucNumCsid, uint8_t *pucCsidList);
 
 uint32_t nanDiscUpdateCipherSuiteInfoAttr(struct ADAPTER *prAdapter,

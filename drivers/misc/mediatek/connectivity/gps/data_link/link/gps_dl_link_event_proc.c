@@ -68,8 +68,6 @@ void gps_dl_link_event_proc(enum gps_dl_link_event_id evt,
 	switch (evt) {
 	case GPS_DL_EVT_LINK_OPEN:
 		/* show_log = gps_dl_set_show_reg_rw_log(true); */
-		/* set flag to atf */
-		gps_dl_hal_may_set_link_power_flag(link_id, true);
 		gps_each_dsp_reg_gourp_read_init(link_id);
 		gps_each_link_inc_session_id(link_id);
 		gps_each_link_set_active(link_id, true);
@@ -137,18 +135,7 @@ void gps_dl_link_event_proc(enum gps_dl_link_event_id evt,
 		break;
 	case GPS_DL_EVT_LINK_ENTER_DPSTOP:
 		dsp_state = gps_dsp_state_get(link_id);
-		/*Fix corner case: enter dpstop mode when dsp is wakeup, wait until reset_done or timeout*/
-		if (GPS_DSP_ST_WAKEN_UP == dsp_state) {
-			GDL_LOGXW(link_id, "enter dpstop with dsp state = %s",
-				gps_dl_dsp_state_name(dsp_state));
-			gps_dl_hal_gps_wait_wakeup_done_or_timeout(link_id);
-			dsp_state = gps_dsp_state_get(link_id);
-			GDL_LOGXW(link_id, "enter dpstop with dsp state = %s",
-				gps_dl_dsp_state_name(dsp_state));
-		}
-
-		if ((GPS_DSP_ST_WORKING != dsp_state) && (GPS_DSP_ST_RESET_DONE != dsp_state) &&
-			(GPS_DSP_ST_WAKEN_UP != dsp_state)) {
+		if ((GPS_DSP_ST_WORKING != dsp_state) && (GPS_DSP_ST_RESET_DONE != dsp_state)) {
 			/* TODO: ever working check */
 			GDL_LOGXE(link_id, "not enter dpstop due to dsp state = %s",
 				gps_dl_dsp_state_name(dsp_state));
@@ -205,9 +192,6 @@ void gps_dl_link_event_proc(enum gps_dl_link_event_id evt,
 			gps_each_link_set_active(link_id, false);
 			gps_dl_hal_link_power_ctrl(link_id, GPS_DL_HAL_POWER_OFF);
 			gps_dl_hal_conn_power_ctrl(link_id, 0);
-
-			/* set flag to atf */
-			gps_dl_hal_may_set_link_power_flag(link_id, false);
 			goto _close_or_reset_ack;
 		}
 
@@ -256,8 +240,6 @@ void gps_dl_link_event_proc(enum gps_dl_link_event_id evt,
 		gps_dma_buf_reset(&p_link->tx_dma_buf);
 		gps_dma_buf_reset(&p_link->rx_dma_buf);
 #endif
-		/* set flag to atf */
-		gps_dl_hal_may_set_link_power_flag(link_id, false);
 
 _close_or_reset_ack:
 		if (evt != GPS_DL_EVT_LINK_CLOSE)

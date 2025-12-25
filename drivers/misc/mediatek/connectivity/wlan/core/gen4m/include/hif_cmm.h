@@ -118,14 +118,12 @@ enum MT_INF_TYPE {
 #define IS_EHPI_INF(__GlueInfo)	\
 	((__GlueInfo)->u4InfType == MT_DEV_INF_PCIE)
 
-#define HAL_WRITE_HIF_TXD(_prChipInfo, _pucOutputBuf, _u2InfoBufLen, _ucType) \
+#define HAL_WRITE_HIF_TXD(_prChipInfo, _pucOutputBuf, _u2InfoBufLen) \
 { \
 	uint16_t _u2DataLen = (uint16_t)(_u2InfoBufLen); \
-	uint8_t _ucPacketType = (uint8_t)(_ucType); \
 	uint8_t *_prBuf = (_pucOutputBuf); \
 	if (_prChipInfo->fillHifTxDesc) \
-		_prChipInfo->fillHifTxDesc(&_prBuf, &_u2DataLen, \
-		_ucPacketType); \
+		_prChipInfo->fillHifTxDesc(&_prBuf, &_u2DataLen); \
 }
 
 /*******************************************************************************

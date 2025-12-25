@@ -78,14 +78,8 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
-
-#if IS_ENABLED(CFG_MTK_WIFI_CONNV3_SUPPORT)
-#include "connv3.h"
-#endif
-
 #include "hif_cmm.h"
 #include "gl_os.h"		/* Include "config.h" */
-#include "gl_sys_lock.h"
 #include "gl_cfg80211.h"
 
 #if CFG_ENABLE_WIFI_DIRECT
@@ -112,6 +106,10 @@
 #include "he_ie.h"
 #endif
 
+#if (CFG_SUPPORT_802_11BE == 1)
+#include "eht_ie.h"
+#endif
+
 #if CFG_SUPPORT_SWCR
 #include "swcr.h"
 #endif
@@ -129,9 +127,6 @@
 /* Dependency:  mac.h (MAC_ADDR_LEN) */
 #include "nic_cmd_event.h"
 #include "nic_ext_cmd_event.h"
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-#include "nic_uni_cmd_event.h"
-#endif
 
 /* Dependency:  nic_cmd_event.h (P_EVENT_CONNECTION_STATUS) */
 #include "nic.h"
@@ -142,25 +137,14 @@
 #include "hif_tx.h"
 
 #include "nic_connac2x_tx.h"
-#include "nic_connac3x_tx.h"
 #include "nic_tx.h"
 #include "nic_txd_v1.h"
 #include "nic_txd_v2.h"
-#include "nic_txd_v3.h"
-
-#if (CFG_SUPPORT_CONNAC2X == 1)
-#include "nic_rxd_v2.h"
-#elif (CFG_SUPPORT_CONNAC3X == 1)
-#include "nic_rxd_v3.h"
-#else
 #include "nic_rxd_v1.h"
-#endif
+#include "nic_rxd_v2.h"
 
-#include "hal.h"
 #include "nic_connac2x_rx.h"
-#include "nic_connac3x_rx.h"
 /* Dependency:  hif_rx.h (P_HIF_RX_HEADER_T) */
-/* Dependency:  hal.h (RRO_COUNTER_NUM) */
 #include "nic_rx.h"
 
 #include "nic_umac.h"
@@ -199,15 +183,15 @@
 #include "wlan_p2p.h"
 #endif
 
-#include "gl_emi.h"
+#include "hal.h"
+
 #include "mt66xx_reg.h"
 
 #include "connac_reg.h"
 #include "connac_dmashdl.h"
-#include "cmm_asic_common.h"
 #include "cmm_asic_connac.h"
 #include "cmm_asic_connac2x.h"
-#include "cmm_asic_connac3x.h"
+
 #include "pre_cal.h"
 
 #if (CFG_SUPPORT_802_11AX == 1)
@@ -271,7 +255,6 @@
 #include "p2p_scan.h"
 #include "p2p_dev.h"
 #include "p2p_fsm.h"
-#include "p2p_link.h"
 #endif
 
 #include "privacy.h"
@@ -298,28 +281,11 @@
 #include "roaming_fsm.h"
 #endif /* CFG_SUPPORT_ROAMING */
 
-#if CFG_SUPPORT_PASSPOINT
-#include "hs20.h"
-#endif /* CFG_SUPPORT_PASSPOINT */
-
 #include "ais_fsm.h"
-#include "rtt.h"
-
-#include "gcm.h"
-
-#include "fw_log.h"
 
 #include "mscs.h"
 
 #include "adapter.h"
-#include "ccif.h"
-
-#if (CFG_SUPPORT_802_11BE == 1)
-#include "eht_ie.h"
-#endif
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-#include "mlo.h"
-#endif
 
 #include "que_mgt.h"
 #include "rftest.h"
@@ -331,16 +297,10 @@
 #endif
 
 /* Support AP Selection */
-#if (CFG_SUPPORT_APS == 1)
-#include "aps.h"
-#else
 #include "ap_selection.h"
-#endif
 
+#if (CFG_SUPPORT_POWER_THROTTLING == 1)
 #include "thrm.h"
-
-#if CFG_SUPPORT_MLR
-#include "mlr.h"
 #endif
 
 /*------------------------------------------------------------------------------
@@ -364,7 +324,6 @@
 
 #if CFG_SUPPORT_WIFI_SYSDVT
 #include "dvt_common.h"
-#include "dvt_phtput.h"
 #if (CFG_SUPPORT_DMASHDL_SYSDVT)
 #include "dvt_dmashdl.h"
 #endif
@@ -374,26 +333,7 @@
 #include "ut_lib.h"
 #endif
 
-#include "gl_wext_priv.h"
-
 #include "ie_sort.h"
-/*------------------------------------------------------------------------------
- * Memory Prealloc
- *------------------------------------------------------------------------------
- */
-#ifdef CFG_PREALLOC_MEMORY
-#include "prealloc.h"
-#endif
-
-/*------------------------------------------------------------------------------
- * chip reset
- *------------------------------------------------------------------------------
- */
-#ifdef CFG_CHIP_RESET_KO_SUPPORT
-#include "reset.h"
-#endif
-
-
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************

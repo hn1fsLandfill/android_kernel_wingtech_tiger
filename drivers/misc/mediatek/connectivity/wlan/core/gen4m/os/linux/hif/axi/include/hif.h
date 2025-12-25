@@ -75,13 +75,33 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 0)
+extern int mtk_wcn_consys_hw_wifi_paldo_ctrl(unsigned int enable);
+#else
+struct MTK_WCN_WLAN_CB_INFO;
+extern int mtk_wcn_wlan_reg(
+	struct MTK_WCN_WLAN_CB_INFO *pWlanCbInfo);
+extern int mtk_wcn_wlan_unreg(void);
+#endif /*end of CFG_SUPPORT_CONNINFRA == 0*/
+#endif /*end of CFG_MTK_ANDROID_WMT */
 
+#if (CFG_SUPPORT_CONNINFRA == 1)
+extern wait_queue_head_t g_waitq_rst;
+extern unsigned long g_ulFlag;
+extern KAL_WAKE_LOCK_T *g_IntrWakeLock;
+#endif
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************
  */
+#define AXI_CFG_PREALLOC_MEMORY_BUFFER    1
 #define AXI_ISR_DEBUG_LOG    0
 
+#define AXI_TX_MAX_SIZE_PER_FRAME         (NIC_TX_MAX_SIZE_PER_FRAME +      \
+					   NIC_TX_DESC_AND_PADDING_LENGTH)
+
+#define AXI_TX_CMD_BUFF_SIZE              4096
 #define AXI_WLAN_IRQ_NUMBER               16
 
 #if (CFG_SUPPORT_CONNINFRA == 1)
@@ -97,11 +117,6 @@
 
 struct GL_HIF_INFO;
 
-struct HIF_MEM {
-	phys_addr_t pa;
-	void *va;
-};
-
 struct HIF_MEM_OPS {
 	void (*allocTxDesc)(struct GL_HIF_INFO *prHifInfo,
 			    struct RTMP_DMABUF *prDescRing,
@@ -109,8 +124,6 @@ struct HIF_MEM_OPS {
 	void (*allocRxDesc)(struct GL_HIF_INFO *prHifInfo,
 			    struct RTMP_DMABUF *prDescRing,
 			    uint32_t u4Num);
-	void (*allocExtBuf)(struct GL_HIF_INFO *prHifInfo,
-			    struct RTMP_DMABUF *prDescRing);
 	bool (*allocTxCmdBuf)(struct RTMP_DMABUF *prDmaBuf,
 			      uint32_t u4Num, uint32_t u4Idx);
 	void (*allocTxDataBuf)(struct MSDU_TOKEN_ENTRY *prToken,
@@ -144,12 +157,8 @@ struct HIF_MEM_OPS {
 			   phys_addr_t rDmaAddr, uint32_t u4Len);
 	void (*freeDesc)(struct GL_HIF_INFO *prHifInfo,
 			 struct RTMP_DMABUF *prDescRing);
-	void (*freeExtBuf)(struct GL_HIF_INFO *prHifInfo,
-			   struct RTMP_DMABUF *prDescRing);
 	void (*freeBuf)(void *pucSrc, uint32_t u4Len);
-	void (*freePacket)(struct GL_HIF_INFO *prHifInfo,
-			   void *pvPacket, uint32_t u4Num);
-	struct HIF_MEM *(*getRsvEmi)(struct GL_HIF_INFO *prHifInfo);
+	void (*freePacket)(void *pvPacket);
 	void (*dumpTx)(struct GL_HIF_INFO *prHifInfo,
 		       struct RTMP_TX_RING *prTxRing,
 		       uint32_t u4Idx, uint32_t u4DumpLen);
@@ -185,62 +194,45 @@ struct GL_HIF_INFO {
 	/* Shared memory for RX descriptors */
 	struct RTMP_DMABUF RxDescRing[NUM_OF_RX_RING];
 	struct RTMP_RX_RING RxRing[NUM_OF_RX_RING];
-	uint32_t u4RxDataRingSize;
-	uint32_t u4RxEvtRingSize;
-
-	union WPDMA_GLO_CFG_STRUCT GloCfg;
 
 	u_int8_t fgIntReadClear;
 	u_int8_t fgMbxReadClear;
 
 	uint32_t u4IntStatus;
-#if (CFG_SUPPORT_HOST_OFFLOAD == 1)
-	uint32_t u4OffloadIntStatus;
-#endif
+	uint32_t u4IntStatus1;
 	unsigned long ulIntFlag;
 
 	struct MSDU_TOKEN_INFO rTokenInfo;
 
 	struct ERR_RECOVERY_CTRL_T rErrRecoveryCtl;
 	struct timer_list rSerTimer;
-	unsigned long rSerTimerData;
+	u_int64_t rSerTimerData;
 	struct list_head rTxCmdQ;
-	struct list_head rTxCmdFreeList;
-	spinlock_t rTxCmdQLock;
 	struct list_head rTxDataQ[NUM_OF_TX_RING];
 	uint32_t u4TxDataQLen[NUM_OF_TX_RING];
-	spinlock_t rTxDataQLock[NUM_OF_TX_RING];
-#if (CFG_SUPPORT_TX_DATA_DELAY == 1)
-	struct timer_list rTxDelayTimer;
-	unsigned long rTxDelayTimerData;
-	unsigned long ulTxDataTimeout;
-#endif /* CFG_SUPPORT_TX_DATA_DELAY == 1 */
 
-	bool fgIsPowerOn;
-	bool fgForceReadWriteReg;
+	bool fgIsPowerOff;
+	bool fgIsDumpLog;
 
 	uint32_t u4WakeupIntSta;
 	bool fgIsBackupIntSta;
 
-	unsigned long ulHifIntEnBits;
+	uint32_t u4TxRingPrefetchDefaultVal;
+	u_int8_t fgTxRingPrefetchEn[NUM_OF_TX_RING];
 };
 
 struct BUS_INFO {
 	const uint32_t top_cfg_base;	/* TOP_CFG_BASE address */
 	const struct PCIE_CHIP_CR_MAPPING *bus2chip;
-	const struct PCIE_CHIP_CR_REMAPPING *bus2chip_remap;
 	const uint32_t tx_ring_cmd_idx;
 	const uint32_t tx_ring_wa_cmd_idx;
 	const uint32_t tx_ring_fwdl_idx;
 	const uint32_t tx_ring0_data_idx;
 	const uint32_t tx_ring1_data_idx;
 	const uint32_t tx_ring2_data_idx;
+#if CFG_TRI_TX_RING
 	const uint32_t tx_ring3_data_idx;
-	const uint32_t rx_data_ring_num;
-	const uint32_t rx_evt_ring_num;
-	uint32_t rx_data_ring_size;
-	uint32_t rx_evt_ring_size;
-	uint32_t rx_data_ring_prealloc_size;
+#endif
 	const uint32_t max_static_map_addr;
 	const uint32_t fw_own_clear_addr;
 	const uint32_t fw_own_clear_bit;
@@ -291,6 +283,7 @@ struct BUS_INFO {
 	const uint32_t host_wfdma1_rx_ring_ext_ctrl_base;
 #endif /* CFG_SUPPORT_CONNAC2X == 1 */
 
+	const uint32_t ap2wf_remap_1;
 	struct wfdma_group_info *wfmda_host_tx_group;
 	const uint32_t wfmda_host_tx_group_len;
 	struct wfdma_group_info *wfmda_host_rx_group;
@@ -310,12 +303,9 @@ struct BUS_INFO {
 	void (*pdmaSetup)(struct GLUE_INFO *prGlueInfo, u_int8_t enable,
 		bool fgResetHif);
 	uint32_t (*updateTxRingMaxQuota)(struct ADAPTER *prAdapter,
-		uint8_t ucWmmIndex, uint32_t u4MaxQuota);
+		uint16_t u2Port, uint32_t u4MaxQuota);
 	void (*enableInterrupt)(struct ADAPTER *prAdapter);
 	void (*disableInterrupt)(struct ADAPTER *prAdapter);
-	void (*configWfdmaIntMask)(struct GLUE_INFO *prGlueInfo, u_int8_t fgEn);
-	void (*configWfdmaRxRingTh)(struct ADAPTER *prAdapter, uint32_t u4Num,
-				    u_int8_t fgIsData);
 	void (*disableSwInterrupt)(struct ADAPTER *prAdapter);
 	void (*processTxInterrupt)(struct ADAPTER *prAdapter);
 	void (*processRxInterrupt)(struct ADAPTER *prAdapter);
@@ -335,29 +325,14 @@ struct BUS_INFO {
 	void (*rx_ring_ext_ctrl)(struct GLUE_INFO *prGlueInfo,
 		struct RTMP_RX_RING *rx_ring, uint32_t index);
 	void (*wfdmaManualPrefetch)(struct GLUE_INFO *prGlueInfo);
-	void (*processSoftwareInterrupt)(struct ADAPTER *prAdapter);
-	void (*softwareInterruptMcu)(struct ADAPTER *prAdapter,
+	void (*processSoftwareInterrupt)(IN struct ADAPTER *prAdapter);
+	void (*softwareInterruptMcu)(IN struct ADAPTER *prAdapter,
 		u_int32_t intrBitMask);
 	void (*hifRst)(struct GLUE_INFO *prGlueInfo);
+	void (*initPcieInt)(struct GLUE_INFO *prGlueInfo);
 	void (*devReadIntStatus)(struct ADAPTER *prAdapter,
-		uint32_t *pu4IntStatus);
-	/* Do DMASDHL init when WIFISYS is initialized at probe, L0.5 reset,
-	 * etc.
-	 */
-	void (*DmaShdlInit)(struct ADAPTER *prAdapter);
-	/* Although DMASHDL was init, we need to reinit it again due to falcon
-	 * L1 reset, etc. Take MT7961 as example. The difference between
-	 * mt7961DmashdlInit and mt7961DmashdlReInit is that we don't init CRs
-	 * such as refill, min_quota, max_quota in mt7961DmashdlReInit, which
-	 * are backup and restored in fw. The reason why some DMASHDL CRs are
-	 * reinit by driver and some by fw is
-	 *     1. Some DMASHDL CRs shall be inited before fw releases UMAC reset
-	 *        in L1 procedure. Then, these CRs are backup and restored by fw
-	 *     2. However, the backup and restore of each DMASHDL CR in fw needs
-	 *        wm DLM space. So, we save DLM space by reinit the remaining
-	 *        DMASHDL CRs in driver.
-	 */
-	void (*DmaShdlReInit)(struct ADAPTER *prAdapter);
+		OUT uint32_t *pu4IntStatus);
+	void (*DmaShdlInit)(IN struct ADAPTER *prAdapter);
 	uint8_t (*setRxRingHwAddr)(struct RTMP_RX_RING *prRxRing,
 		struct BUS_INFO *prBusInfo,
 		uint32_t u4SwRingIdx);
@@ -367,29 +342,59 @@ struct BUS_INFO {
 	void (*setDmaIntMask)(struct GLUE_INFO *prGlueInfo,
 		uint8_t ucType, u_int8_t fgEnable);
 	void (*enableFwDlMode)(struct ADAPTER *prAdapter);
-	void (*setupMcuEmiAddr)(struct ADAPTER *prAdapter);
-	void (*showDebugInfo)(struct GLUE_INFO *prGlueInfo);
-	void (*disableDevice)(struct GLUE_INFO *prGlueInfo);
 
-#if (CFG_COALESCING_INTERRUPT == 1)
-	uint32_t (*setWfdmaCoalescingInt)(struct ADAPTER *prAdapter,
-		u_int8_t fgEnable);
-#endif
+	void (*enableTxDataRingPrefetch)(
+		struct GLUE_INFO *prGlueInfo, uint32_t u4Port);
+	void (*resetTxDataRingPrefetch)(struct GLUE_INFO *prGlueInfo);
 
 	struct SW_WFDMA_INFO rSwWfdmaInfo;
-	struct SW_EMI_RING_INFO rSwEmiRingInfo;
-
-#if CFG_SUPPORT_HOST_RX_WM_EVENT_FROM_PSE
-	u_int8_t (*checkPortForRxEventFromPse)(struct ADAPTER *prAdapter,
-		uint8_t u2Port);
-#endif
-	struct timespec64 rHifIntTs;
-	uint32_t u4EnHifIntTs;
-	uint32_t u4HifIntTsCnt;
-
-	u_int8_t fgUpdateWfdmaTh;
-	uint32_t u4WfdmaTh;
 };
+
+struct HIF_MEM {
+	phys_addr_t pa;
+	void *va;
+};
+
+struct HIF_PREALLOC_MEM {
+	struct HIF_MEM rTxDesc[NUM_OF_TX_RING];
+	struct HIF_MEM rRxDesc[NUM_OF_RX_RING];
+	/* Tx Command */
+	struct HIF_MEM rTxCmdBuf[TX_RING_SIZE];
+	/* Rx Data */
+	struct HIF_MEM rRxDataBuf[RX_RING0_SIZE];
+	/* Rx Event */
+	struct HIF_MEM rRxEventBuf[RX_RING1_SIZE];
+
+#if (CFG_SUPPORT_CONNAC2X == 1)
+	/* Connac1.0 = RX Event, Connac2.0 = Rx Data band1 */
+	struct HIF_MEM rRxData1Buf[RX_RING0_SIZE];
+	/* Band 0 TxFreeDoneEvent */
+	struct HIF_MEM rTxFreeDoneEvent0Buf[RX_RING1_SIZE];
+	/* Band 1 TxFreeDoneEvent */
+	struct HIF_MEM rTxFreeDoneEvent1Buf[RX_RING1_SIZE];
+#else
+	/* Connac1.0 = RX Event, Connac2.0 = Rx Data band1 */
+#endif /* CFG_SUPPORT_CONNAC2X == 1 */
+
+#if HIF_TX_PREALLOC_DATA_BUFFER
+	/* Tx Data */
+	struct HIF_MEM rMsduBuf[HIF_TX_MSDU_TOKEN_NUM];
+#endif
+	phys_addr_t pucRsvMemBase;
+	void *pucRsvMemVirBase;
+	uint64_t u4RsvMemSize;
+	uint32_t u4Offset;
+};
+
+#if CFG_MTK_ANDROID_WMT
+#if (CFG_SUPPORT_CONNINFRA == 1)
+struct MTK_WCN_WLAN_CB_INFO {
+	int (*wlan_probe_cb)(void);
+	int (*wlan_remove_cb)(void);
+};
+
+#endif /*end of CFG_SUPPORT_CONNINFRA == 0*/
+#endif /*end of CFG_MTK_ANDROID_WMT */
 
 /*******************************************************************************
  *                            P U B L I C   D A T A
@@ -422,8 +427,6 @@ void glSetHifInfo(struct GLUE_INFO *prGlueInfo, unsigned long ulCookie);
 
 void glClearHifInfo(struct GLUE_INFO *prGlueInfo);
 
-void glResetHifInfo(struct GLUE_INFO *prGlueInfo);
-
 u_int8_t glBusInit(void *pvData);
 
 void glBusRelease(void *pData);
@@ -432,9 +435,9 @@ int32_t glBusSetIrq(void *pvData, void *pfnIsr, void *pvCookie);
 
 void glBusFreeIrq(void *pvData, void *pvCookie);
 
-void glSetPowerState(struct GLUE_INFO *prGlueInfo, uint32_t ePowerMode);
+void glSetPowerState(IN struct GLUE_INFO *prGlueInfo, IN uint32_t ePowerMode);
 
-void glGetDev(void *ctx, void **dev);
+void glGetDev(void *ctx, struct device **dev);
 
 void glGetHifDev(struct GL_HIF_INFO *prHif, struct device **dev);
 
@@ -442,8 +445,9 @@ struct mt66xx_hif_driver_data *get_platform_driver_data(void);
 
 void glGetChipInfo(void **prChipInfo);
 
-int32_t glBusFuncOn(void);
-void glBusFuncOff(void);
+struct mt66xx_chip_info *glGetChipInfoV2(void);
+
+struct mt66xx_hif_driver_data *glGetDriverData(void);
 
 /*******************************************************************************
  *                              F U N C T I O N S

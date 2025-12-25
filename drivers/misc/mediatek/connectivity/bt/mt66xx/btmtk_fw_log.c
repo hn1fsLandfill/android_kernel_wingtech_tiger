@@ -17,6 +17,7 @@
  * - 0x03: Debug
  */
 
+
 #if (FW_LOG_DEFAULT_ON == 0)
 	#define BT_FWLOG_DEFAULT_LEVEL 0x00
 #else
@@ -234,6 +235,9 @@ ssize_t btmtk_fops_readfwlog(struct file *filp, char __user *buf, size_t count, 
 }
 ssize_t btmtk_fops_writefwlog(struct file *filp, const char __user *buf, size_t count, loff_t *f_pos)
 {
+#if (BUILD_QA_DBG == 0)
+	return -ENODEV;
+#else
 	int i = 0, len = 0, ret = -1;
 	int hci_idx = 0;
 	int vlen = 0, index = 3;
@@ -462,6 +466,7 @@ exit:
 	kfree(o_fwlog_buf);
 
 	return ret;	/* If input is correct should return the same length */
+#endif // BUILD_QA_DBG == 0
 }
 
 int btmtk_fops_openfwlog(struct inode *inode, struct file *file)

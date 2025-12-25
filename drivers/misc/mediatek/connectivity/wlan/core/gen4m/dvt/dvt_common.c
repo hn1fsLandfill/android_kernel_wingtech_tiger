@@ -81,89 +81,6 @@
 struct AUTOMATION_DVT automation_dvt;
 struct TXS_FREE_LIST_POOL TxsFreeEntrylist;
 
-#if CFG_SUPPORT_WIFI_SYSDVT
-
-const struct _MDVT_MODULE_T arMdvtModuleTable[] = {
-	{MDVT_MODULE_WFARB,                     "arb"},
-	{MDVT_MODULE_AGG,                       "agg"},
-	{MDVT_MODULE_DMA,                       "dma"},
-	{MDVT_MODULE_WFMIMO,                    "mimo"},
-	{MDVT_MODULE_WFCTRL,                    "ctrl"},
-	{MDVT_MODULE_WFETXBF,                   "etxbf"},
-	{MDVT_MODULE_WFCFG,                     "cfg"},
-	{MDVT_MODULE_WFHIF,                     "hif"},
-	{MDVT_MODULE_WFOFF,                     "off"},
-	{MDVT_MODULE_WFON,                      "on"},
-	{MDVT_MODULE_WFPF,                      "pf"},
-	{MDVT_MODULE_WFRMAC,                    "rmac"},
-	{MDVT_MODULE_WFUMAC_PLE,                "ple"},
-	{MDVT_MODULE_WFUMAC_PSE,                "pse"},
-	{MDVT_MODULE_WFUMAC_PP,                 "pp"},
-	{MDVT_MODULE_WFUMAC_AMSDU,              "amsdu"},
-	{MDVT_MODULE_WFSEC,                     "sec"},
-	{MDVT_MODULE_WFTMAC,                    "tmac"},
-	{MDVT_MODULE_WFTMAC_TXPWR,              "txpwr"},
-	{MDVT_MODULE_WFTXCR,                    "txcr"},
-	{MDVT_MODULE_WFMIB,                     "mib"},
-	{MDVT_MODULE_WFSYSON,                   "syson"},
-	{MDVT_MODULE_WFLPON,                    "lpon"},
-	{MDVT_MODULE_WFINT,                     "int"},
-	{MDVT_MODULE_CONNCFG,                   "conncfg"},
-	{MDVT_MODULE_MUCOP,                     "mucop"},
-	{MDVT_MODULE_WFMDP,                     "mdp"},
-	{MDVT_MODULE_WFRDM_PHYRX,               "rdm_phyrx"},
-	{MDVT_MODULE_WFRDM_PHYDFS,              "rdm_phydfs"},
-	{MDVT_MODULE_WFRDM_PHYRX_COMM,          "rdm_phyrx_comm"},
-	{MDVT_MODULE_WFRDM_WTBLOFF,             "rdm_wtbloff"},
-	{MDVT_MODULE_PHYDFE_CTRL_WF_TSSI,       "phydfe_ctrl_wf_tssi"},
-	{MDVT_MODULE_PHYDFE_RFINTF_WF_CMM,      "phydfe_rfintf_wf_cmm"},
-	{MDVT_MODULE_PHYRX_CTRL_WF_COMM_RDD,    "phyrx_ctrl_wf_comm_rdd"},
-	{MDVT_MODULE_PHYRX_CTRL_WF_COMM_CSI,    "phyrx_ctrl_wf_comm_csi"},
-	{MDVT_MODULE_PHYRX_CTRL_WF_COMM_CMM,    "phyrx_ctrl_wf_comm_cmm"},
-	{MDVT_MODULE_PHYRX_CTRL_WF_COMM_TOAE,   "phyrx_ctrl_wf_comm_toae"},
-	{MDVT_MODULE_PHYRX_CSD_WF_COMM_CMM,     "phyrx_csd_wf_comm_cmm"},
-	{MDVT_MODULE_PHYRX_POST_CMM,            "phyrx_post_cmm"},
-	{MDVT_MODULE_PHYDFS_WF_COMM_RDD,        "phydfs_wf_comm_rdd"},
-	{MDVT_MODULE_PHYRX_CTRL_TOAE,           "phyrx_ctrl_toae"},
-	{MDVT_MODULE_PHYRX_CTRL_MURU,           "phyrx_ctrl_muru"},
-	{MDVT_MODULE_PHYRX_CTRL_RDD,            "phyrx_ctrl_rdd"},
-	{MDVT_MODULE_PHYRX_CTRL_MULQ,           "phyrx_ctrl_mulq"},
-	{MDVT_MODULE_PHYRX_CTRL_CMM,            "phyrx_ctrl_cmm"},
-	{MDVT_MODULE_PHYRX_CTRL_CSI,            "phyrx_ctrl_csi"},
-	{MDVT_MODULE_PHYDFE_CTRL_PWR_REGU,      "phydfe_ctrl_pwr_regu"},
-	{MDVT_MODULE_PHYRX_CTRL_BF,             "phyrx_ctrl_bf"},
-	{MDVT_MODULE_PHYDFE_CTRL_CMM,           "phydfe_ctrl_cmm"},
-	{MDVT_MODULE_WFRBIST,                   "rbist"},
-	{MDVT_MODULE_WTBL,                      "wtbl"},
-	{MDVT_MODULE_RX,                        "rx"},
-	{MDVT_MODULE_LPON,                      "lpon"},
-	{MDVT_MODULE_MDP_RX,                    "mdprx"},
-	{MDVT_MODULE_TXCMD,                     "txcmd"},
-	{MDVT_MODULE_SEC_ECC,                   "sec_ecc"},
-	{MDVT_MODULE_MIB,                       "mib"},
-	{MDVT_MODULE_WFTWT,                     "twt"},
-	{MDVT_MODULE_DRR,                       "drr"},
-	{MDVT_MODULE_RUOFDMA,                   "ruofdma"},
-	{MDVT_MODULE_WFCMDRPTTX,                "cmdrpttx"},
-	{MDVT_MODULE_WFCMDRPT_TRIG,             "cmdrpttrig"},
-	{MDVT_MODULE_MLO,                       "mlo"},
-	{MDVT_MODULE_TXD,                       "txd"},
-	{MDVT_MODULE_PH_TPUT,                   "tput"},
-	{MDVT_MODULE_SER,                       "ser"},
-	{MDVT_MODULE_LIT_WTBL,                  "lit_wtbl"},
-	{MDVT_MODULE_LITMIB,                    "lit_mib"},
-	{MDVT_MODULE_LIT_WFRMAC,                "lit_rmac"},
-	{MDVT_MODULE_PTA_IDC_COEX,              "pta_idc_coex"},
-	{MDVT_MODULE_MUMIMO,                    "mumimo"},
-	{MDVT_MODULE_MAX,                       "all"}
-};
-
-uint32_t u4MdvtTableSize =
-	sizeof(arMdvtModuleTable) / sizeof(struct _MDVT_MODULE_T);
-
-
-#endif /*CFG_SUPPORT_WIFI_SYSDVT*/
-
 /*******************************************************************************
  *                    F U N C T I O N S
  *******************************************************************************
@@ -601,9 +518,9 @@ bool receive_del_txs_queue(
 * Send specific type of packet and check if TXS is back
 */
 int priv_driver_txs_test(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -673,8 +590,8 @@ int priv_driver_txs_test(
 		automation_dvt.txs.format = txs_test_format;
 		/* aisFsmSteps(prAdapter, AIS_STATE_DISCONNECTING); */
 		authSendDeauthFrame(prAdapter,
-			prAdapter->aprBssInfo[0],
-			prAdapter->aprBssInfo[0]->prStaRecOfAP,
+			prAdapter->prAisBssInfo,
+			prAdapter->prAisBssInfo->prStaRecOfAP,
 			(struct SW_RFB *) NULL,
 			REASON_CODE_DEAUTH_LEAVING_BSS,
 			aisDeauthXmitComplete);
@@ -728,9 +645,9 @@ int priv_driver_txs_test(
 * Check TXS test result
 */
 int priv_driver_txs_test_result(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -854,9 +771,9 @@ int is_frame_test(struct ADAPTER *pAd, uint8_t send_received)
 	}
 }
 
-uint32_t AutomationTxDone(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+uint32_t AutomationTxDone(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	DBGLOG(REQ, LOUD, "AutomationTxDone!\n");
 	if (rTxDoneStatus)
@@ -876,9 +793,9 @@ uint32_t AutomationTxDone(struct ADAPTER *prAdapter,
 *        matched with specific rate
 */
 int priv_driver_rxv_test(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -975,9 +892,9 @@ int priv_driver_rxv_test(
 * This routine is used to judge result of RXV DVT.
 */
 int priv_driver_rxv_test_result(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -1020,8 +937,8 @@ int priv_driver_rxv_test_result(
 * Note. This is FALCON RXV format
 */
 void connac2x_rxv_correct_test(
-	struct ADAPTER *prAdapter,
-	struct SW_RFB *prSwRfb)
+	IN struct ADAPTER *prAdapter,
+	IN struct SW_RFB *prSwRfb)
 {
 	uint32_t prxv1, crxv1;
 	uint32_t txmode, rate, frmode, sgi, nsts, ldpc, stbc;
@@ -1093,9 +1010,9 @@ void connac2x_rxv_correct_test(
 * step3. Passed if throughput is normal
 */
 int priv_driver_cso_test(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -1148,8 +1065,8 @@ int priv_driver_cso_test(
 * Set a value to allow how many packets be transmitting
 */
 int priv_driver_set_tx_test(
-			struct net_device *prNetDev, char *pcCommand,
-			int i4TotalLen)
+			IN struct net_device *prNetDev, IN char *pcCommand,
+			IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	int32_t i4BytesWritten = 0;
@@ -1189,8 +1106,8 @@ int priv_driver_set_tx_test(
 * Assign specific AC of Data to verify HW behavior when receive Trigger frame
 */
 int priv_driver_set_tx_test_ac(
-			struct net_device *prNetDev, char *pcCommand,
-			int i4TotalLen)
+			IN struct net_device *prNetDev, IN char *pcCommand,
+			IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	int32_t i4BytesWritten = 0;
@@ -1230,9 +1147,9 @@ int priv_driver_set_tx_test_ac(
 * from RXD. Ignore this error
 */
 int priv_driver_skip_legal_ch_check(
-	struct net_device *prNetDev,
-	char *pcCommand,
-	int i4TotalLen)
+	IN struct net_device *prNetDev,
+	IN char *pcCommand,
+	IN int i4TotalLen)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;

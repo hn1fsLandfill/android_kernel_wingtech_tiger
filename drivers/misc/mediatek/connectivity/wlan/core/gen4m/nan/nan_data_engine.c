@@ -134,7 +134,7 @@ static struct _NAN_NDP_INSTANCE_T *
 nanDataUtilSearchNdpByPeerNDI(
 	struct ADAPTER *prAdapter,
 	struct _NAN_NDL_INSTANCE_T *prNDL,
-	PUINT_8 pucPeerNDIAddr
+	IN PUINT_8 pucPeerNDIAddr
 );
 
 static struct _NAN_NDP_INSTANCE_T *
@@ -152,22 +152,22 @@ static uint8_t nanDataUtilGenerateNdpId(struct ADAPTER *prAdapter,
 				       struct _NAN_NDL_INSTANCE_T *prNDL);
 
 static struct _NAN_NDP_INSTANCE_T *nanDataAllocateNdp(
-	struct ADAPTER *prAdapter, struct _NAN_NDL_INSTANCE_T *prNDL,
-	enum _ENUM_NAN_PROTOCOL_ROLE_T eNDPRole, uint8_t *pucPeerNDIAddr,
-	uint8_t ucNDPID, unsigned char fgSecurityRequired);
+	IN struct ADAPTER *prAdapter, IN struct _NAN_NDL_INSTANCE_T *prNDL,
+	IN enum _ENUM_NAN_PROTOCOL_ROLE_T eNDPRole, IN uint8_t *pucPeerNDIAddr,
+	IN uint8_t ucNDPID, IN unsigned char fgSecurityRequired);
 
 static void nanDataFreeNdp(struct ADAPTER *prAdapter,
 			   struct _NAN_NDP_INSTANCE_T *prNDP);
 
 static struct _NAN_NDL_INSTANCE_T *
-nanDataAllocateNdl(struct ADAPTER *prAdapter, uint8_t *pucMacAddr,
-		   enum _ENUM_NAN_PROTOCOL_ROLE_T eRole);
+nanDataAllocateNdl(IN struct ADAPTER *prAdapter, IN uint8_t *pucMacAddr,
+		   IN enum _ENUM_NAN_PROTOCOL_ROLE_T eRole);
 
 static struct _NAN_NDL_INSTANCE_T *
-nanDataUtilGetNdl(struct ADAPTER *prAdapter,
+nanDataUtilGetNdl(IN struct ADAPTER *prAdapter,
 		  struct _NAN_NDP_INSTANCE_T *prNDP);
 
-static void nanDataFreeNdl(struct ADAPTER *prAdapter,
+static void nanDataFreeNdl(IN struct ADAPTER *prAdapter,
 			   struct _NAN_NDL_INSTANCE_T *prNDL);
 
 /* callback function for NAN scheduler */
@@ -178,21 +178,21 @@ static void nanDataPathScheduleNegoGranted(struct ADAPTER *prAdapter,
 					   void *pvToken);
 
 /* static machine operations */
-static void nanNdlMgmtFsmStep(struct ADAPTER *prAdapter,
-			      enum _ENUM_NDL_MGMT_STATE_T eNextState,
-			      struct _NAN_NDL_INSTANCE_T *prNDL);
+static void nanNdlMgmtFsmStep(IN struct ADAPTER *prAdapter,
+			      IN enum _ENUM_NDL_MGMT_STATE_T eNextState,
+			      IN struct _NAN_NDL_INSTANCE_T *prNDL);
 
 static enum _ENUM_NAN_NDP_STATUS_T
-nanDataPathProtocolFsmStep(struct ADAPTER *prAdapter,
-			   enum _ENUM_NDP_PROTOCOL_STATE_T eNextState,
-			   struct _NAN_NDP_INSTANCE_T *prNDP);
+nanDataPathProtocolFsmStep(IN struct ADAPTER *prAdapter,
+			   IN enum _ENUM_NDP_PROTOCOL_STATE_T eNextState,
+			   IN struct _NAN_NDP_INSTANCE_T *prNDP);
 
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************
  */
 void
-nanDataResponseTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
+nanDataResponseTimeout(struct ADAPTER *prAdapter, unsigned long ulParam) {
 	struct _NAN_NDP_INSTANCE_T *prNDP;
 
 #if (ENABLE_NDP_UT_LOG == 1)
@@ -225,7 +225,7 @@ nanDataResponseTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataProtocolTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
+nanDataProtocolTimeout(struct ADAPTER *prAdapter, unsigned long ulParam) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct _NAN_NDP_INSTANCE_T *prNDP;
 
@@ -256,7 +256,7 @@ nanDataProtocolTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataRetryTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
+nanDataRetryTimeout(struct ADAPTER *prAdapter, unsigned long ulParam) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct _NAN_NDP_INSTANCE_T *prNDP;
 
@@ -285,7 +285,7 @@ nanDataRetryTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataSecurityTimeout(struct ADAPTER *prAdapter, uintptr_t ulParam) {
+nanDataSecurityTimeout(struct ADAPTER *prAdapter, unsigned long ulParam) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct _NAN_NDP_INSTANCE_T *prNDP;
 
@@ -550,7 +550,7 @@ static struct _NAN_NDP_INSTANCE_T *
 nanDataUtilSearchNdpByPeerNDI(
 	struct ADAPTER *prAdapter,
 	struct _NAN_NDL_INSTANCE_T *prNDL,
-	PUINT_8 pucPeerNDIAddr
+	IN PUINT_8 pucPeerNDIAddr
 )
 {
 	UINT_8 ucNdpIndex;
@@ -802,10 +802,10 @@ nanDataUtilGenerateNdpId(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 static struct _NAN_NDP_INSTANCE_T *
 nanDataAllocateNdp(struct ADAPTER *prAdapter,
-		   struct _NAN_NDL_INSTANCE_T *prNDL,
-		   enum _ENUM_NAN_PROTOCOL_ROLE_T eNDPRole,
-		   uint8_t *pucPeerNDIAddr, uint8_t ucNDPID,
-		   unsigned char fgSecurityRequired) {
+		   IN struct _NAN_NDL_INSTANCE_T *prNDL,
+		   IN enum _ENUM_NAN_PROTOCOL_ROLE_T eNDPRole,
+		   IN uint8_t *pucPeerNDIAddr, IN uint8_t ucNDPID,
+		   IN unsigned char fgSecurityRequired) {
 	struct _NAN_DATA_PATH_INFO_T *prDataPathInfo;
 	struct _NAN_NDP_INSTANCE_T *prNDP;
 
@@ -890,7 +890,7 @@ nanDataAllocateNdp(struct ADAPTER *prAdapter,
 
 	cnmTimerInitTimer(prAdapter, &(prNDP->rNDPUserSpaceResponseTimer),
 			  (PFN_MGMT_TIMEOUT_FUNC)nanDataResponseTimeout,
-			  (uintptr_t)prNDP);
+			  (unsigned long)prNDP);
 
 	if (prNDL->ucNDPNum < UINT8_MAX)
 		prNDL->ucNDPNum++;
@@ -908,9 +908,9 @@ nanDataAllocateNdp(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataUpdateNdpPeerNDI(struct ADAPTER *prAdapter,
+nanDataUpdateNdpPeerNDI(IN struct ADAPTER *prAdapter,
 			struct _NAN_NDP_INSTANCE_T *prNDP,
-			uint8_t *pucPeerNDIAddr) {
+			IN uint8_t *pucPeerNDIAddr) {
 
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
@@ -935,7 +935,7 @@ nanDataUpdateNdpPeerNDI(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataUpdateNdpLocalNDI(struct ADAPTER *prAdapter,
+nanDataUpdateNdpLocalNDI(IN struct ADAPTER *prAdapter,
 			 struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct BSS_INFO *prBssInfo;
 
@@ -1005,15 +1005,17 @@ nanDataFreeNdp(struct ADAPTER *prAdapter, struct _NAN_NDP_INSTANCE_T *prNDP) {
 		prDataPathInfo->pucAppInfo = NULL;
 	}
 
+	if (prNDP->pucPeerAppInfo != NULL) {
+		cnmMemFree(prAdapter, prNDP->pucPeerAppInfo);
+		prNDP->u2PeerAppInfoLen = 0;
+		prNDP->pucPeerAppInfo = NULL;
+	}
 
 	if (prNDP->pucAttrList != NULL) {
-		if (prNDP->u2AttrListLength) {
-			/* TODO_CJ: free crash*/
-			cnmMemFree(prAdapter, prNDP->pucAttrList);
-
-			prNDP->u2AttrListLength = 0;
-			prNDP->pucAttrList = NULL;
-		}
+		/* TODO_CJ: free crash*/
+		cnmMemFree(prAdapter, prNDP->pucAttrList);
+		prNDP->u2AttrListLength = 0;
+		prNDP->pucAttrList = NULL;
 	}
 
 	prNDP->fgNDPValid = FALSE;
@@ -1034,8 +1036,8 @@ nanDataFreeNdp(struct ADAPTER *prAdapter, struct _NAN_NDP_INSTANCE_T *prNDP) {
  */
 /*----------------------------------------------------------------------------*/
 static struct _NAN_NDL_INSTANCE_T *
-nanDataAllocateNdl(struct ADAPTER *prAdapter, uint8_t *pucMacAddr,
-		   enum _ENUM_NAN_PROTOCOL_ROLE_T eRole) {
+nanDataAllocateNdl(struct ADAPTER *prAdapter, IN uint8_t *pucMacAddr,
+		   IN enum _ENUM_NAN_PROTOCOL_ROLE_T eRole) {
 	/* UINT_8 ucNdlIndex; */
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_DATA_PATH_INFO_T *prDataPathInfo;
@@ -1082,9 +1084,6 @@ nanDataAllocateNdl(struct ADAPTER *prAdapter, uint8_t *pucMacAddr,
 	prNDL->ucPhyTypeSet = 0;
 	kalMemZero(&(prNDL->rIeHtCap), sizeof(struct IE_HT_CAP));
 	kalMemZero(&(prNDL->rIeVhtCap), sizeof(struct IE_VHT_CAP));
-#if (CFG_SUPPORT_802_11AX == 1)
-	kalMemZero(&(prNDL->aucIeHeCap), sizeof(prNDL->aucIeHeCap));
-#endif
 
 	for (ucNdpCxtIdx = 0; ucNdpCxtIdx < NAN_MAX_SUPPORT_NDP_CXT_NUM;
 	     ucNdpCxtIdx++)
@@ -1096,15 +1095,15 @@ nanDataAllocateNdl(struct ADAPTER *prAdapter, uint8_t *pucMacAddr,
 	/* timer initialization sequence */
 	cnmTimerInitTimer(prAdapter, &(prNDL->rNDPProtocolExpireTimer),
 			  (PFN_MGMT_TIMEOUT_FUNC)nanDataProtocolTimeout,
-			  (uintptr_t)prNDL);
+			  (unsigned long)prNDL);
 
 	cnmTimerInitTimer(prAdapter, &(prNDL->rNDPProtocolRetryTimer),
 			  (PFN_MGMT_TIMEOUT_FUNC)nanDataRetryTimeout,
-			  (uintptr_t)prNDL);
+			  (unsigned long)prNDL);
 
 	cnmTimerInitTimer(prAdapter, &(prNDL->rNDPSecurityExpireTimer),
 			  (PFN_MGMT_TIMEOUT_FUNC)nanDataSecurityTimeout,
-			  (uintptr_t)prNDL);
+			  (unsigned long)prNDL);
 
 	LINK_INITIALIZE(&(prNDL->rPendingReqList));
 
@@ -1222,7 +1221,7 @@ nanDataFreeNdl(struct ADAPTER *prAdapter, struct _NAN_NDL_INSTANCE_T *prNDL) {
  */
 /*----------------------------------------------------------------------------*/
 void
-nanDataEngineInit(struct ADAPTER *prAdapter, uint8_t *pu1NMIAddress) {
+nanDataEngineInit(struct ADAPTER *prAdapter, IN uint8_t *pu1NMIAddress) {
 	uint8_t i, j;
 	struct _NAN_DATA_PATH_INFO_T *prDataPathInfo;
 	enum NAN_BSS_ROLE_INDEX eRole = NAN_BSS_INDEX_BAND0;
@@ -1268,9 +1267,6 @@ nanDataEngineInit(struct ADAPTER *prAdapter, uint8_t *pu1NMIAddress) {
 		   sizeof(prDataPathInfo->aucECAttr));
 	prDataPathInfo->prLocalHtCap = NULL;
 	prDataPathInfo->prLocalVhtCap = NULL;
-#if (CFG_SUPPORT_802_11AX == 1)
-	prDataPathInfo->prLocalHeCap = NULL;
-#endif
 
 	atomic_set(&(prDataPathInfo->NetDevRefCount[eRole]), 0);
 	g_ndpReqNDPE.fgEnNDPE = FALSE;
@@ -1342,7 +1338,7 @@ nanDataEngineUninit(struct ADAPTER *prAdapter) {
 /*----------------------------------------------------------------------------*/
 void
 nanDataPathSetupSuccess(struct ADAPTER *prAdapter,
-			struct _NAN_NDP_INSTANCE_T *prNDP) {
+			IN struct _NAN_NDP_INSTANCE_T *prNDP) {
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
 #endif
@@ -1470,16 +1466,14 @@ nanNdpAutoReplyDataRequest(struct ADAPTER *prAdapter,
 
 			/* Carry App info */
 			if (prDataPathInfo->u2AppInfoLen > 0) {
-				prNDP->u2AppInfoLen =
-					prDataPathInfo->u2AppInfoLen;
-				prNDP->pucAppInfo = cnmMemAlloc(prAdapter,
-					RAM_TYPE_BUF,
-					(uint32_t)prNDP->u2AppInfoLen);
-				kalMemCopy(prNDP->pucAppInfo,
-					prDataPathInfo->pucAppInfo,
-					prNDP->u2AppInfoLen);
-				DBGLOG(NAN, INFO, "[%s] App Info:"IPV6STR"\n",
-					__func__, prNDP->pucAppInfo);
+				nanDataEngineUpdateAppInfo(prAdapter,
+					prNDP,
+					NAN_SERVICE_PROTOCOL_TYPE_GENERIC,
+					prDataPathInfo->u2AppInfoLen,
+					prDataPathInfo->pucAppInfo);
+
+				DBGLOG(NAN, INFO, "[%s] App InfoLen = %d:\n",
+					__func__, prNDP->u2AppInfoLen);
 			}
 
 			/* Carry port number */
@@ -1536,7 +1530,7 @@ nanNdpAutoReplyDataRequest(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpProcessDataRequest(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb) {
+nanNdpProcessDataRequest(struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ATTR_NDP_T *prAttrNDP;
@@ -1677,8 +1671,7 @@ nanNdpProcessDataRequest(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb) {
 				    prAdapter, NAN_ACTION_DATA_PATH_REQUEST,
 				    pucAttrList, u2AttrListLength, prNDL,
 				    prNDP) == WLAN_STATUS_SUCCESS) {
-				if ((prAttrNDPE != NULL && prAttrNDP != NULL) ||
-				    (nanDataEngineNDPECheck(
+				if ((nanDataEngineNDPECheck(
 					     prAdapter, prNDP->fgSupportNDPE) ==
 					     TRUE &&
 				     prAttrNDPE == NULL) ||
@@ -1749,7 +1742,7 @@ nanNdpProcessDataRequest(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb) {
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdpProcessDataResponse(struct ADAPTER *prAdapter,
-			  struct SW_RFB *prSwRfb) {
+			  IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
@@ -1798,6 +1791,7 @@ nanNdpProcessDataResponse(struct ADAPTER *prAdapter,
 	if (prAttrNDP != NULL)
 		prNDP = nanDataUtilSearchNdpByNdpId(prAdapter, prNDL,
 						    prAttrNDP->ucNDPID);
+
 	else if (prAttrNDPE != NULL)
 		prNDP = nanDataUtilSearchNdpByNdpId(prAdapter, prNDL,
 						    prAttrNDPE->ucNDPID);
@@ -1968,7 +1962,7 @@ nanNdpProcessDataResponse(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpProcessDataConfirm(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb) {
+nanNdpProcessDataConfirm(struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
@@ -2136,7 +2130,7 @@ nanNdpProcessDataConfirm(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb) {
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdpProcessDataKeyInstall(struct ADAPTER *prAdapter,
-			    struct SW_RFB *prSwRfb) {
+			    IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
@@ -2265,7 +2259,7 @@ nanNdpProcessDataKeyInstall(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdpProcessDataTermination(struct ADAPTER *prAdapter,
-			     struct SW_RFB *prSwRfb) {
+			     IN struct SW_RFB *prSwRfb) {
 
 	/* enum _ENUM_NDP_PROTOCOL_STATE_T eCurrentState; */
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
@@ -2352,7 +2346,7 @@ nanNdpProcessDataTermination(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdlProcessScheduleRequest(struct ADAPTER *prAdapter,
-			     struct SW_RFB *prSwRfb) {
+			     IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
 	uint8_t *pucAttrList = NULL;
@@ -2427,7 +2421,7 @@ nanNdlProcessScheduleRequest(struct ADAPTER *prAdapter,
 						  prNDL);
 			} else {
 /* insert into queue for later handling */
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 				nanDataEngineInsertRequest(prAdapter,
 						prNDL,
 						NDL_TEARDOWN,
@@ -2493,7 +2487,7 @@ nanNdlProcessScheduleRequest(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdlProcessScheduleResponse(struct ADAPTER *prAdapter,
-			      struct SW_RFB *prSwRfb) {
+			      IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
 	uint8_t *pucAttrList = NULL;
@@ -2580,7 +2574,7 @@ nanNdlProcessScheduleResponse(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdlProcessScheduleConfirm(struct ADAPTER *prAdapter,
-			     struct SW_RFB *prSwRfb) {
+			     IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
 	uint8_t *pucAttrList = NULL;
@@ -2672,7 +2666,7 @@ nanNdlProcessScheduleConfirm(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdlProcessScheduleUpdateNotification(struct ADAPTER *prAdapter,
-					struct SW_RFB *prSwRfb) {
+					IN struct SW_RFB *prSwRfb) {
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	struct _NAN_ACTION_FRAME_T *prNaf = NULL;
 	uint8_t *pucAttrList = NULL;
@@ -2750,10 +2744,10 @@ nanNdlProcessScheduleUpdateNotification(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 static enum _ENUM_NAN_NDP_STATUS_T
-nanDataPathProtocolFsmStep(struct ADAPTER *prAdapter,
-			   enum _ENUM_NDP_PROTOCOL_STATE_T eNextState,
-			   struct _NAN_NDP_INSTANCE_T *prNDP) {
-	struct _NAN_NDL_INSTANCE_T *prNDL;
+nanDataPathProtocolFsmStep(IN struct ADAPTER *prAdapter,
+			   IN enum _ENUM_NDP_PROTOCOL_STATE_T eNextState,
+			   IN struct _NAN_NDP_INSTANCE_T *prNDP) {
+	IN struct _NAN_NDL_INSTANCE_T *prNDL;
 	enum _ENUM_NDP_PROTOCOL_STATE_T eLastState;
 	enum _ENUM_NAN_NDP_STATUS_T eNdpConnectionStatus;
 
@@ -2996,8 +2990,8 @@ nanDataPathProtocolFsmStep(struct ADAPTER *prAdapter,
 }
 
 static enum _ENUM_NDL_MGMT_STATE_T
-nanNdlMgmtFsmNdlScheduleSetup(struct ADAPTER *prAdapter,
-			      struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanNdlMgmtFsmNdlScheduleSetup(IN struct ADAPTER *prAdapter,
+			      IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 	enum _ENUM_NDL_MGMT_STATE_T eNextState = NDL_SCHEDULE_SETUP;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4RejectCode = 0;
@@ -3102,9 +3096,9 @@ nanNdlMgmtFsmNdlScheduleSetup(struct ADAPTER *prAdapter,
 	return eNextState;
 }
 static enum _ENUM_NDL_MGMT_STATE_T
-nanNdlGetNextRequire(struct ADAPTER *prAdapter,
-		     struct _NAN_NDL_INSTANCE_T *prNDL,
-		     enum _ENUM_NDL_MGMT_STATE_T eCurrentState) {
+nanNdlGetNextRequire(IN struct ADAPTER *prAdapter,
+		     IN struct _NAN_NDL_INSTANCE_T *prNDL,
+		     IN enum _ENUM_NDL_MGMT_STATE_T eCurrentState) {
 	enum _ENUM_NDL_MGMT_STATE_T eNextState;
 	struct _NAN_DATA_ENGINE_REQUEST_T *prPendingReq;
 
@@ -3144,9 +3138,9 @@ nanNdlGetNextRequire(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 static void
-nanNdlMgmtFsmStep(struct ADAPTER *prAdapter,
-		  enum _ENUM_NDL_MGMT_STATE_T eNextState,
-		  struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanNdlMgmtFsmStep(IN struct ADAPTER *prAdapter,
+		  IN enum _ENUM_NDL_MGMT_STATE_T eNextState,
+		  IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t u4RejectCode = 0;
@@ -3389,9 +3383,9 @@ nanNdlMgmtFsmStep(struct ADAPTER *prAdapter,
 }
 
 void nanSetNdpPmkid(
-	struct ADAPTER *prAdapter,
-	struct _NAN_CMD_DATA_REQUEST *prNanCmdDataRequest,
-	uint8_t *puServiceName
+	IN struct ADAPTER *prAdapter,
+	IN struct _NAN_CMD_DATA_REQUEST *prNanCmdDataRequest,
+	IN uint8_t *puServiceName
 ){
 	int i = 0;
 	u8 pmkid[32];
@@ -3436,9 +3430,9 @@ void nanSetNdpPmkid(
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanCmdDataRequest(struct ADAPTER *prAdapter,
-		  struct _NAN_CMD_DATA_REQUEST *prNanCmdDataRequest,
-		  uint8_t *pu1NdpId, uint8_t *au1InitiatorDataAddr) {
+nanCmdDataRequest(IN struct ADAPTER *prAdapter,
+		  IN struct _NAN_CMD_DATA_REQUEST *prNanCmdDataRequest,
+		  OUT uint8_t *pu1NdpId, OUT uint8_t *au1InitiatorDataAddr) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
 	unsigned char fgAllocNDL = FALSE;
@@ -3544,33 +3538,30 @@ nanCmdDataRequest(struct ADAPTER *prAdapter,
 	}
 
 	/* R3 capability */
-	prNDP->fgSupportNDPE = prNanCmdDataRequest->fgNDPE;
-	if (prNDP->fgSupportNDPE == TRUE) {
-		DBGLOG(NAN, INFO, "[%s] Support NDPE:%d\n",
-			__func__, prNDP->fgSupportNDPE);
+	/* AppInfo */
+	if (prNanCmdDataRequest->u2SpecificInfoLength > 0)
+		nanDataEngineUpdateAppInfo(prAdapter,
+				prNDP,
+				NAN_SERVICE_PROTOCOL_TYPE_GENERIC,
+				prNanCmdDataRequest->
+				u2SpecificInfoLength,
+				prNanCmdDataRequest->aucSpecificInfo);
+	else
+		prNDP->u2AppInfoLen = 0;
 
-		/* transport protocol and port num */
+	/* Ipv6 */
+	prNDP->fgCarryIPV6 = prNanCmdDataRequest->fgCarryIpv6;
+	if (prNDP->fgCarryIPV6 == TRUE) {
+		prNDP->fgIsInitiator = TRUE;
+		kalMemCopy(prNDP->aucInterfaceId,
+			prNanCmdDataRequest->aucIPv6Addr,
+			IPV6MACLEN);
+	}
+
+	/* transport protocol and port num */
+	if (nanGetFeatureIsSigma(prAdapter) && g_ndpReqNDPE.fgEnNDPE) {
 		prNDP->u2PortNum = 9000;
 		prNDP->ucProtocolType = IP_PRO_TCP;
-		/* Ipv6 */
-		prNDP->fgCarryIPV6 = prNanCmdDataRequest->fgCarryIpv6;
-		if (prNDP->fgCarryIPV6 == TRUE) {
-			prNDP->fgIsInitiator = TRUE;
-			kalMemCopy(prNDP->aucInterfaceId,
-				prNanCmdDataRequest->aucIPv6Addr,
-				IPV6MACLEN);
-		}
-
-		/* AppInfo */
-		if (prNanCmdDataRequest->u2SpecificInfoLength > 0)
-			nanDataEngineUpdateAppInfo(prAdapter,
-					prNDP,
-					NAN_SERVICE_PROTOCOL_TYPE_GENERIC,
-					prNanCmdDataRequest->
-					u2SpecificInfoLength,
-					prNanCmdDataRequest->aucSpecificInfo);
-		else
-			prNDP->u2AppInfoLen = 0;
 	}
 
 	if (prNanCmdDataRequest->ucRequireQOS == TRUE) {
@@ -3588,7 +3579,7 @@ nanCmdDataRequest(struct ADAPTER *prAdapter,
 		nanNdlMgmtFsmStep(prAdapter, NDL_REQUEST_SCHEDULE_NDP, prNDL);
 	} else {
 /* insert into queue for later handling */
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 		nanDataEngineInsertRequest(prAdapter,
 				prNDL,
 				NAN_DATA_ENGINE_REQUEST_NDP_SETUP,
@@ -3691,12 +3682,6 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
 				/* Add Ipv6 in App info */
 				if (prNanCmdDataResponse->fgCarryIpv6 == 1) {
 					prDataPathInfo->fgCarryIPV6 = TRUE;
-					#if 0
-					if (prDataPathInfo->aucIPv6Addr == NULL)
-						DBGLOG(NAN, INFO,
-						"[%s] aucIPv6Addr is NULL",
-						__func__);
-					#endif
 					kalMemCopy(prDataPathInfo->aucIPv6Addr,
 						prNanCmdDataResponse->
 						aucIPv6Addr,
@@ -3723,30 +3708,21 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
 					kalMemCopy(prDataPathInfo->pucAppInfo,
 						prNanCmdDataResponse->
 						aucSpecificInfo,
-						IPV6MACLEN);
+						prDataPathInfo->u2AppInfoLen);
 				}
-				prDataPathInfo->u2PortNum =
-					prNanCmdDataResponse->u2PortNum;
-				prDataPathInfo->ucProtocolType =
-					prNanCmdDataResponse->
-					ucServiceProtocolType;
+				if (nanGetFeatureIsSigma(prAdapter)) {
+					prDataPathInfo->u2PortNum =
+						prNanCmdDataResponse->u2PortNum;
+					prDataPathInfo->ucProtocolType =
+						prNanCmdDataResponse->
+						ucServiceProtocolType;
+				}
 
 				DBGLOG(NAN, INFO,
-					"[%s] NDPE Ipv6/AppInfo: "
-					IPV6STR"/"IPV6STR"\n",
+					"[%s] AppInfoLen %d\n",
 					__func__,
-					IPV6TOSTR(
-						prDataPathInfo->aucIPv6Addr),
-					IPV6TOSTR(
-						prDataPathInfo->pucAppInfo));
-
-				DBGLOG(NAN, INFO,
-					"[%s] PortNum: %d, TransProType: 0x%x\n",
-					__func__,
-					prDataPathInfo->u2PortNum,
-					prDataPathInfo->ucProtocolType);
+					prDataPathInfo->u2AppInfoLen);
 			}
-
 			return WLAN_STATUS_SUCCESS;
 		}
 
@@ -3840,6 +3816,7 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
 				prNanCmdDataResponse->aucSpecificInfo);
 		else
 			prNDP->u2AppInfoLen = 0;
+
 		prNDP->fgCarryIPV6 = prNanCmdDataResponse->fgCarryIpv6;
 		if (prNDP->fgCarryIPV6 == TRUE) {
 			prNDP->fgIsInitiator = FALSE;
@@ -3847,9 +3824,7 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
 				   prNanCmdDataResponse->aucIPv6Addr,
 				   IPV6MACLEN);
 		}
-		prNDP->ucProtocolType =
-			prNanCmdDataResponse->ucServiceProtocolType;
-		prNDP->u2PortNum = prNanCmdDataResponse->u2PortNum;
+
 		if (prNDP->eCurrentNDPProtocolState ==
 		    NDP_RESPONDER_WAIT_DATA_RSP) {
 			/* roll the state machine .. */
@@ -3862,7 +3837,7 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
 						  prNDL);
 			} else {
 /* insert into queue for later handling */
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 				nanDataEngineInsertRequest(prAdapter,
 					prNDL,
 					NAN_DATA_ENGINE_REQUEST_NDP_SETUP,
@@ -3906,7 +3881,7 @@ nanCmdDataResponse(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanCmdDataEnd(struct ADAPTER *prAdapter,
+nanCmdDataEnd(IN struct ADAPTER *prAdapter,
 	      struct _NAN_CMD_DATA_END *prNanCmdDataEnd) {
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
@@ -3942,9 +3917,10 @@ nanCmdDataEnd(struct ADAPTER *prAdapter,
 		/* no matching NDL/NDP - it should have been created when NAF
 		 * - Data Path Request is received
 		 */
+		DBGLOG(NAN, INFO, "[%s] might already terminate\n", __func__);
 
 		/* @TODO: return a unsuccessful indication to host side */
-		rStatus = WLAN_STATUS_FAILURE;
+		rStatus = WLAN_STATUS_SUCCESS;
 	} else {
 		/* Transaction Id */
 		prNDP->u2TransId = prNanCmdDataEnd->u2NdpTransactionId;
@@ -3978,7 +3954,7 @@ nanCmdDataEnd(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanCmdDataUpdtae(struct ADAPTER *prAdapter,
+nanCmdDataUpdtae(IN struct ADAPTER *prAdapter,
 		 struct _NAN_PARAMETER_NDL_SCH *prNanUpdateSchParam) {
 	return nanUpdateNdlSchedule(prAdapter, prNanUpdateSchParam);
 }
@@ -3993,9 +3969,9 @@ nanCmdDataUpdtae(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanUpdateNdlSchedule(struct ADAPTER *prAdapter,
+nanUpdateNdlSchedule(IN struct ADAPTER *prAdapter,
 		     struct _NAN_PARAMETER_NDL_SCH *prNanUpdateSchParam) {
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 	struct _NAN_NDP_INSTANCE_T *prNDP = NULL;
 #endif
 	struct _NAN_NDL_INSTANCE_T *prNDL = NULL;
@@ -4055,7 +4031,7 @@ nanUpdateNdlSchedule(struct ADAPTER *prAdapter,
 
 		} else {
 /* insert into queue for later handling */
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 			nanDataEngineInsertRequest(prAdapter,
 					prNDL,
 					NDL_REQUEST_SCHEDULE_NDL,
@@ -4080,7 +4056,7 @@ nanUpdateNdlSchedule(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-nanNdpSendDataIndicationEvent(struct ADAPTER *prAdapter,
+nanNdpSendDataIndicationEvent(IN struct ADAPTER *prAdapter,
 			      struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct NanDataPathRequestInd rDataReqInd;
@@ -4112,10 +4088,10 @@ nanNdpSendDataIndicationEvent(struct ADAPTER *prAdapter,
 		rDataReqInd.fgSupportNDPE = TRUE;
 		if (prNDP->fgIsInitiator == TRUE)
 			kalMemCopy(rDataReqInd.aucIPv6Addr,
-				   prNDP->aucRspInterfaceId, 8);
+				   prNDP->aucRspInterfaceId, IPV6MACLEN);
 		else
 			kalMemCopy(rDataReqInd.aucIPv6Addr,
-				   prNDP->aucInterfaceId, 8);
+				   prNDP->aucInterfaceId, IPV6MACLEN);
 	}
 	kalMemCopy(rDataReqInd.peer_disc_mac_addr, prNDL->aucPeerMacAddr,
 		   MAC_ADDR_LEN);
@@ -4144,7 +4120,7 @@ nanNdpSendDataIndicationEvent(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-nanNdpSendDataConfirmEvent(struct ADAPTER *prAdapter,
+nanNdpSendDataConfirmEvent(IN struct ADAPTER *prAdapter,
 			   struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct NanDataPathConfirmInd rDataConfirmInd;
@@ -4175,10 +4151,10 @@ nanNdpSendDataConfirmEvent(struct ADAPTER *prAdapter,
 		rDataConfirmInd.fgSupportNDPE = TRUE;
 		if (prNDP->fgIsInitiator == TRUE)
 			kalMemCopy(rDataConfirmInd.aucIPv6Addr,
-				   prNDP->aucRspInterfaceId, 8);
+				   prNDP->aucRspInterfaceId, IPV6MACLEN);
 		else
 			kalMemCopy(rDataConfirmInd.aucIPv6Addr,
-				   prNDP->aucInterfaceId, 8);
+				   prNDP->aucInterfaceId, IPV6MACLEN);
 		rDataConfirmInd.u2Port = prNDP->u2PortNum;
 		rDataConfirmInd.ucProtocol = prNDP->ucProtocolType;
 	}
@@ -4196,7 +4172,7 @@ nanNdpSendDataConfirmEvent(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-nanNdpSendDataTerminationEvent(struct ADAPTER *prAdapter,
+nanNdpSendDataTerminationEvent(IN struct ADAPTER *prAdapter,
 			       struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 	struct NanDataPathEndInd rDataEndInd;
@@ -4229,7 +4205,7 @@ nanNdpSendDataTerminationEvent(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpSendDataPathRequest(struct ADAPTER *prAdapter,
+nanNdpSendDataPathRequest(IN struct ADAPTER *prAdapter,
 			  struct _NAN_NDP_INSTANCE_T *prNDP) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -4334,13 +4310,13 @@ nanNdpSendDataPathRequest(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdpSendDataPathResponse(
-	struct ADAPTER *prAdapter, struct _NAN_NDP_INSTANCE_T *prNDP,
+	IN struct ADAPTER *prAdapter, struct _NAN_NDP_INSTANCE_T *prNDP,
 
 	/* below are optional params, only valid when prNDP == NULL */
-	uint8_t *pucDestMacAddr, struct _NAN_ATTR_NDP_T *prPeerAttrNDP,
-	uint8_t ucNDPReasonCode, struct _NAN_ATTR_NDPE_T *prPeerAttrNDPE,
-	uint8_t ucNDPEReasonCode, struct _NAN_ATTR_NDL_T *prPeerAttrNDL,
-	uint8_t ucNDLReasonCode) {
+	IN uint8_t *pucDestMacAddr, IN struct _NAN_ATTR_NDP_T *prPeerAttrNDP,
+	IN uint8_t ucNDPReasonCode, IN struct _NAN_ATTR_NDPE_T *prPeerAttrNDPE,
+	IN uint8_t ucNDPEReasonCode, IN struct _NAN_ATTR_NDL_T *prPeerAttrNDL,
+	IN uint8_t ucNDLReasonCode) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
 	struct MSDU_INFO *prMsduInfo = NULL;
@@ -4482,7 +4458,7 @@ nanNdpSendDataPathResponse(
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpSendDataPathConfirm(struct ADAPTER *prAdapter,
+nanNdpSendDataPathConfirm(IN struct ADAPTER *prAdapter,
 			  struct _NAN_NDP_INSTANCE_T *prNDP) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -4597,7 +4573,7 @@ nanNdpSendDataPathConfirm(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpSendDataPathKeyInstall(struct ADAPTER *prAdapter,
+nanNdpSendDataPathKeyInstall(IN struct ADAPTER *prAdapter,
 			     struct _NAN_NDP_INSTANCE_T *prNDP) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -4712,7 +4688,7 @@ nanNdpSendDataPathKeyInstall(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpSendDataPathTermination(struct ADAPTER *prAdapter,
+nanNdpSendDataPathTermination(IN struct ADAPTER *prAdapter,
 			      struct _NAN_NDP_INSTANCE_T *prNDP) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -4806,7 +4782,7 @@ nanNdpSendDataPathTermination(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdlSendScheduleRequest(struct ADAPTER *prAdapter,
+nanNdlSendScheduleRequest(IN struct ADAPTER *prAdapter,
 			  struct _NAN_NDL_INSTANCE_T *prNDL) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -4888,11 +4864,11 @@ nanNdlSendScheduleRequest(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanNdlSendScheduleResponse(
-	struct ADAPTER *prAdapter, struct _NAN_NDL_INSTANCE_T *prNDL,
+	IN struct ADAPTER *prAdapter, IN struct _NAN_NDL_INSTANCE_T *prNDL,
 
 	/* below are optional params, only valid when prNDL == NULL */
-	uint8_t *pucDestMacAddr, struct _NAN_ATTR_NDL_T *prPeerAttrNDL,
-	uint8_t ucReasonCode) {
+	IN uint8_t *pucDestMacAddr, IN struct _NAN_ATTR_NDL_T *prPeerAttrNDL,
+	IN uint8_t ucReasonCode) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
 	/* struct _NAN_ACTION_FRAME_T* prNAF; */
@@ -4989,7 +4965,7 @@ nanNdlSendScheduleResponse(
 /*----------------------------------------------------------------------------*/
 
 uint32_t
-nanNdlSendScheduleConfirm(struct ADAPTER *prAdapter,
+nanNdlSendScheduleConfirm(IN struct ADAPTER *prAdapter,
 			  struct _NAN_NDL_INSTANCE_T *prNDL) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -5071,7 +5047,7 @@ nanNdlSendScheduleConfirm(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdlSendScheduleUpdateNotify(struct ADAPTER *prAdapter,
+nanNdlSendScheduleUpdateNotify(IN struct ADAPTER *prAdapter,
 			       struct _NAN_NDL_INSTANCE_T *prNDL) {
 	uint32_t i;
 	uint16_t u2EstimatedFrameLen;
@@ -5149,8 +5125,8 @@ nanNdlSendScheduleUpdateNotify(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDPReqTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
-	       enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDPReqTxDone(IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo,
+	       IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	uint8_t *pucAttrList;
 	uint16_t u2AttrListLength;
@@ -5244,8 +5220,8 @@ nanDPReqTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDPRespTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
-		enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDPRespTxDone(IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo,
+		IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	uint8_t *pucAttrList;
 	uint16_t u2AttrListLength;
@@ -5281,12 +5257,19 @@ nanDPRespTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
 
 	prAttrNDPE = (struct _NAN_ATTR_NDPE_T *)nanRetrieveAttrById(
 		pucAttrList, u2AttrListLength, NAN_ATTR_ID_NDP_EXTENSION);
-	if (prAttrNDP != NULL)
+
+	if (prAttrNDP != NULL) {
 		prNDP = nanDataUtilSearchNdpByNdpId(prAdapter, prNDL,
 						    prAttrNDP->ucNDPID);
-	else if (prAttrNDPE != NULL)
+
+		DBGLOG(NAN, INFO, "[%s] prAttrNDP exist\n", __func__);
+		}
+	else if (prAttrNDPE != NULL) {
 		prNDP = nanDataUtilSearchNdpByNdpId(prAdapter, prNDL,
 						    prAttrNDPE->ucNDPID);
+
+		DBGLOG(NAN, INFO, "[%s] prAttrNDPE exist\n", __func__);
+	}
 	else {
 		DBGLOG(NAN, ERROR, "Not found the NDPID\n");
 		return WLAN_STATUS_SUCCESS;
@@ -5343,8 +5326,6 @@ nanDPRespTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
 		}
 	}
 
-	/* Send rsp event to wifi hal */
-	nanNdpResponderRspEvent(prAdapter, prNDP, rTxDoneStatus);
 	return WLAN_STATUS_SUCCESS;
 }
 
@@ -5358,9 +5339,9 @@ nanDPRespTxDone(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDPConfirmTxDone(struct ADAPTER *prAdapter,
-		   struct MSDU_INFO *prMsduInfo,
-		   enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDPConfirmTxDone(IN struct ADAPTER *prAdapter,
+		   IN struct MSDU_INFO *prMsduInfo,
+		   IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	uint8_t *pucAttrList;
 	uint16_t u2AttrListLength;
@@ -5467,9 +5448,9 @@ nanDPConfirmTxDone(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDPSecurityInstallTxDone(struct ADAPTER *prAdapter,
-			   struct MSDU_INFO *prMsduInfo,
-			   enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDPSecurityInstallTxDone(IN struct ADAPTER *prAdapter,
+			   IN struct MSDU_INFO *prMsduInfo,
+			   IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	uint8_t *pucAttrList;
 	uint16_t u2AttrListLength;
@@ -5572,9 +5553,9 @@ nanDPSecurityInstallTxDone(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDPTerminationTxDone(struct ADAPTER *prAdapter,
-		       struct MSDU_INFO *prMsduInfo,
-		       enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDPTerminationTxDone(IN struct ADAPTER *prAdapter,
+		       IN struct MSDU_INFO *prMsduInfo,
+		       IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	uint8_t *pucAttrList;
 	uint16_t u2AttrListLength;
@@ -5663,9 +5644,9 @@ nanDPTerminationTxDone(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineScheduleReqTxDone(struct ADAPTER *prAdapter,
-			       struct MSDU_INFO *prMsduInfo,
-			       enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDataEngineScheduleReqTxDone(IN struct ADAPTER *prAdapter,
+			       IN struct MSDU_INFO *prMsduInfo,
+			       IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 
@@ -5728,9 +5709,9 @@ nanDataEngineScheduleReqTxDone(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineScheduleRespTxDone(struct ADAPTER *prAdapter,
-				struct MSDU_INFO *prMsduInfo,
-				enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDataEngineScheduleRespTxDone(IN struct ADAPTER *prAdapter,
+				IN struct MSDU_INFO *prMsduInfo,
+				IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 
@@ -5811,9 +5792,9 @@ nanDataEngineScheduleRespTxDone(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineScheduleConfirmTxDone(struct ADAPTER *prAdapter,
-				   struct MSDU_INFO *prMsduInfo,
-				   enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+nanDataEngineScheduleConfirmTxDone(IN struct ADAPTER *prAdapter,
+				   IN struct MSDU_INFO *prMsduInfo,
+				   IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 
@@ -5888,8 +5869,8 @@ nanDataEngineScheduleConfirmTxDone(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanDataEngineScheduleUpdateNotificationTxDone(
-	struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
+	IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo,
+	IN enum ENUM_TX_RESULT_CODE rTxDoneStatus) {
 	struct _NAN_ACTION_FRAME_T *prNAF;
 	struct _NAN_NDL_INSTANCE_T *prNDL;
 
@@ -5935,10 +5916,10 @@ nanDataEngineScheduleUpdateNotificationTxDone(
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineSendNAF(struct ADAPTER *prAdapter,
-		     struct MSDU_INFO *prMsduInfo, uint16_t u2FrameLength,
-		     PFN_TX_DONE_HANDLER pfTxDoneHandler,
-		     struct STA_RECORD *prSelectStaRec) {
+nanDataEngineSendNAF(IN struct ADAPTER *prAdapter,
+		     IN struct MSDU_INFO *prMsduInfo, IN uint16_t u2FrameLength,
+		     IN PFN_TX_DONE_HANDLER pfTxDoneHandler,
+		     IN struct STA_RECORD *prSelectStaRec) {
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
 #endif
@@ -5992,8 +5973,8 @@ nanDataEngineSendNAF(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpUpdateTypeStatus(struct ADAPTER *prAdapter,
-		       struct _NAN_NDP_INSTANCE_T *prNDP) {
+nanNdpUpdateTypeStatus(IN struct ADAPTER *prAdapter,
+		       IN struct _NAN_NDP_INSTANCE_T *prNDP) {
 	uint8_t ucType = 0;
 
 #if (ENABLE_NDP_UT_LOG == 1)
@@ -6051,8 +6032,8 @@ nanNdpUpdateTypeStatus(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdpGenerateDialogToken(struct ADAPTER *prAdapter,
-			  struct _NAN_NDP_INSTANCE_T *prNDP) {
+nanNdpGenerateDialogToken(IN struct ADAPTER *prAdapter,
+			  IN struct _NAN_NDP_INSTANCE_T *prNDP) {
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
 #endif
@@ -6086,8 +6067,8 @@ nanNdpGenerateDialogToken(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdlGenerateDialogToken(struct ADAPTER *prAdapter,
-			  struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanNdlGenerateDialogToken(IN struct ADAPTER *prAdapter,
+			  IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
 #endif
@@ -6120,10 +6101,10 @@ nanNdlGenerateDialogToken(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineUpdateSSI(struct ADAPTER *prAdapter,
-		struct _NAN_NDP_INSTANCE_T *prNDP,
-		uint8_t ucServiceProtocolType, uint16_t u2ContextLen,
-		uint8_t *pucContext) {
+nanDataEngineUpdateSSI(IN struct ADAPTER *prAdapter,
+		IN struct _NAN_NDP_INSTANCE_T *prNDP,
+		IN uint8_t ucServiceProtocolType, IN uint16_t u2ContextLen,
+		IN uint8_t *pucContext) {
 	uint32_t rStatus;
 	uint16_t u2Length = 0;
 #if (ENABLE_NDP_UT_LOG == 1)
@@ -6154,8 +6135,9 @@ nanDataEngineUpdateSSI(struct ADAPTER *prAdapter,
 			prSubNanAttr = (struct _NAN_ATTR_HDR_T *)pucContext;
 			switch (prSubNanAttr->ucAttrId) {
 			case NAN_ATTR_NDPE_SERVINFO_SUB_ATTR_TRANSPORT_PORT: {
-				prNDP->u2PortNum =
-					(uint16_t)prSubNanAttr->aucAttrBody[0];
+				kalMemCopy(&prNDP->u2PortNum,
+					prSubNanAttr->aucAttrBody,
+					sizeof(uint16_t));
 				DBGLOG(NAN, INFO, "PortNum %d\n",
 				       prNDP->u2PortNum);
 				break;
@@ -6220,10 +6202,10 @@ nanDataEngineUpdateSSI(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineUpdateAppInfo(struct ADAPTER *prAdapter,
-			   struct _NAN_NDP_INSTANCE_T *prNDP,
-			   uint8_t ucServiceProtocolType,
-			   uint16_t u2AppInfoLen, uint8_t *pucAppInfo) {
+nanDataEngineUpdateAppInfo(IN struct ADAPTER *prAdapter,
+			   IN struct _NAN_NDP_INSTANCE_T *prNDP,
+			   IN uint8_t ucServiceProtocolType,
+			   IN uint16_t u2AppInfoLen, IN uint8_t *pucAppInfo) {
 	uint32_t rStatus;
 
 #if (ENABLE_NDP_UT_LOG == 1)
@@ -6289,8 +6271,8 @@ nanDataEngineUpdateAppInfo(struct ADAPTER *prAdapter,
 /*----------------------------------------------------------------------------*/
 uint32_t
 nanDataEngineUpdateOtherAppInfo(
-	struct ADAPTER *prAdapter, struct _NAN_NDP_INSTANCE_T *prNDP,
-	struct _NAN_ATTR_NDPE_SVC_INFO_TLV_T *prAppInfoTLV) {
+	IN struct ADAPTER *prAdapter, IN struct _NAN_NDP_INSTANCE_T *prNDP,
+	IN struct _NAN_ATTR_NDPE_SVC_INFO_TLV_T *prAppInfoTLV) {
 	uint16_t u2OtherAppInfoLen;
 
 #if (ENABLE_NDP_UT_LOG == 1)
@@ -6384,11 +6366,8 @@ nanDataEngineGetECAttr(struct ADAPTER *prAdapter, uint8_t **ppucECAttr,
 	}
 
 	prBssInfo = prAdapter->aprBssInfo[nanGetSpecificBssInfo(
-#if (CFG_SUPPORT_DBDC == 1)
-			prAdapter, NAN_BSS_INDEX_BAND1)->ucBssIndex];
-#else
-			prAdapter, NAN_BSS_INDEX_BAND0)->ucBssIndex];
-#endif
+				prAdapter, NAN_BSS_INDEX_BAND0)
+						  ->ucBssIndex];
 
 	return nanDataEngineGetECAttrImpl(prAdapter, ppucECAttr,
 					  pu2ECAttrLength, prBssInfo, NULL);
@@ -6411,9 +6390,6 @@ nanDataEngineGetECAttrImpl(struct ADAPTER *prAdapter,
 	struct _NAN_ATTR_ELEMENT_CONTAINER_T *prAttrEC;
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 	uint16_t u2AttrLength;
-#if (CFG_SUPPORT_802_11AX == 1)
-	uint8_t ucHeCapLen, ucHeOpLen;
-#endif
 
 #if (ENABLE_NDP_UT_LOG == 1)
 	DBGLOG(NAN, INFO, "[%s] Enter\n", __func__);
@@ -6446,6 +6422,9 @@ nanDataEngineGetECAttrImpl(struct ADAPTER *prAdapter,
 				   prAdapter->rDataPathInfo.aucECAttr;
 
 		prAttrEC->ucAttrId = NAN_ATTR_ID_ELEMENT_CONTAINER;
+		prAttrEC->u2Length =
+			u2AttrLength -
+			OFFSET_OF(struct _NAN_ATTR_HDR_T, aucAttrBody);
 		prAttrEC->ucMapID = 0;
 
 		/* HT-CAP IE - leverage RLM */
@@ -6470,42 +6449,6 @@ nanDataEngineGetECAttrImpl(struct ADAPTER *prAdapter,
 		}
 #endif
 
-#if (CFG_SUPPORT_802_11AX == 1)
-		DBGLOG(NAN, INFO, "Bring HE IE\n");
-		ucHeCapLen = heRlmFillNANHECapIE(
-			prAdapter, prBssInfo,
-			&(prAttrEC->aucElements[ELEM_HDR_LEN +
-				ELEM_MAX_LEN_HT_CAP +
-				ELEM_HDR_LEN +
-				ELEM_MAX_LEN_VHT_CAP]));
-			prAdapter->rDataPathInfo.prLocalHeCap =
-				(struct _IE_HE_CAP_T *)&(prAttrEC->aucElements
-				[ELEM_HDR_LEN +
-				ELEM_MAX_LEN_HT_CAP +
-				ELEM_HDR_LEN +
-				ELEM_MAX_LEN_VHT_CAP]);
-
-		u2AttrLength += ucHeCapLen;
-		DBGLOG(NAN, INFO, "Len HE Cap IE (%d)\n", ucHeCapLen);
-
-		ucHeOpLen = heRlmFillNANHeOpIE(
-			prAdapter, prBssInfo,
-			&(prAttrEC->aucElements[ELEM_HDR_LEN +
-				ELEM_MAX_LEN_HT_CAP +
-				ELEM_HDR_LEN +
-				ELEM_MAX_LEN_VHT_CAP +
-				ucHeCapLen]));
-
-		u2AttrLength += ucHeOpLen;
-		DBGLOG(NAN, INFO, "Len HE OP IE (%d)\n", ucHeOpLen);
-#endif
-
-		prAttrEC->u2Length =
-				u2AttrLength -
-				OFFSET_OF(struct _NAN_ATTR_HDR_T,
-				aucAttrBody);
-		DBGLOG(NAN, INFO, "Len EC (%d)\n", prAttrEC->u2Length);
-
 		prAdapter->rDataPathInfo.fgIsECSet = TRUE;
 	}
 
@@ -6525,8 +6468,8 @@ nanDataEngineGetECAttrImpl(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanNdlDeactivateTimers(struct ADAPTER *prAdapter,
-		       struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanNdlDeactivateTimers(IN struct ADAPTER *prAdapter,
+		       IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 
 	if (!prAdapter) {
 		DBGLOG(NAN, ERROR, "[%s] prAdapter error\n", __func__);
@@ -6556,11 +6499,11 @@ nanNdlDeactivateTimers(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineInsertRequest(struct ADAPTER *prAdapter,
-			   struct _NAN_NDL_INSTANCE_T *prNDL,
-			   enum _NAN_DATA_ENGINE_REQUEST_TYPE_T eRequestType,
-			   enum _ENUM_NAN_PROTOCOL_ROLE_T eNDLRole,
-			   struct _NAN_NDP_INSTANCE_T *prNDP) {
+nanDataEngineInsertRequest(IN struct ADAPTER *prAdapter,
+			   IN struct _NAN_NDL_INSTANCE_T *prNDL,
+			   IN enum _NAN_DATA_ENGINE_REQUEST_TYPE_T eRequestType,
+			   IN enum _ENUM_NAN_PROTOCOL_ROLE_T eNDLRole,
+			   IN struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct _NAN_DATA_ENGINE_REQUEST_T *prReq;
 
 	if (!prAdapter) {
@@ -6585,7 +6528,7 @@ nanDataEngineInsertRequest(struct ADAPTER *prAdapter,
 
 	prReq->eRequestType = eRequestType;
 	prReq->prNDP = prNDP;
-#if 0 /* whsu: skip for skip the calling parameter enum error !!! */
+#if 0 /* skip for skip the calling parameter enum error !!! */
 	prReq->eRequestType = eNDLRole;
 #endif
 	LINK_INSERT_TAIL(&(prNDL->rPendingReqList), &(prReq->rLinkEntry));
@@ -6603,8 +6546,8 @@ nanDataEngineInsertRequest(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-nanDataEngineFlushRequest(struct ADAPTER *prAdapter,
-			  struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanDataEngineFlushRequest(IN struct ADAPTER *prAdapter,
+			  IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 	struct _NAN_DATA_ENGINE_REQUEST_T *prReq;
 
 	if (!prAdapter) {
@@ -6633,8 +6576,8 @@ nanDataEngineFlushRequest(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 struct _NAN_DATA_ENGINE_REQUEST_T *
-nanDataEngineGetNextRequest(struct ADAPTER *prAdapter,
-			    struct _NAN_NDL_INSTANCE_T *prNDL) {
+nanDataEngineGetNextRequest(IN struct ADAPTER *prAdapter,
+			    IN struct _NAN_NDL_INSTANCE_T *prNDL) {
 	struct _NAN_DATA_ENGINE_REQUEST_T *prPendingReq;
 
 	if (!prAdapter) {
@@ -6665,9 +6608,9 @@ nanDataEngineGetNextRequest(struct ADAPTER *prAdapter,
 
 uint32_t
 nanDataEngineRemovePendingRequests(
-	struct ADAPTER *prAdapter, struct _NAN_NDL_INSTANCE_T *prNDL,
-	enum _NAN_DATA_ENGINE_REQUEST_TYPE_T eRequestType,
-	struct _NAN_NDP_INSTANCE_T *prNDP) {
+	IN struct ADAPTER *prAdapter, IN struct _NAN_NDL_INSTANCE_T *prNDL,
+	IN enum _NAN_DATA_ENGINE_REQUEST_TYPE_T eRequestType,
+	IN struct _NAN_NDP_INSTANCE_T *prNDP) {
 	struct _NAN_DATA_ENGINE_REQUEST_T *prPendingReq, *prPendingReqNext;
 
 	if (!prAdapter) {
@@ -6697,7 +6640,7 @@ nanDataEngineRemovePendingRequests(
 }
 
 void
-nanDataEngineDisconnectByStaIdx(struct ADAPTER *prAdapter,
+nanDataEngineDisconnectByStaIdx(IN struct ADAPTER *prAdapter,
 		uint8_t ucStaIdx) {
 	struct STA_RECORD *prStaRec = NULL;
 	struct _NAN_NDL_INSTANCE_T *prNDL;
@@ -6725,8 +6668,8 @@ nanDataEngineDisconnectByStaIdx(struct ADAPTER *prAdapter,
 }
 
 void
-nanDataEngingDisconnectEvt(struct ADAPTER *prAdapter,
-		uint8_t *pcuEvtBuf) {
+nanDataEngingDisconnectEvt(IN struct ADAPTER *prAdapter,
+		IN uint8_t *pcuEvtBuf) {
 	struct _NAN_SCHED_EVENT_NDL_DISCONN_T *prNDLDisconn;
 
 	prNDLDisconn = (struct _NAN_SCHED_EVENT_NDL_DISCONN_T *)pcuEvtBuf;

@@ -45,7 +45,7 @@ struct COMMAND {
 	uint8_t ucCmdSeqNum;
 };
 
-struct DATA_FRAME {
+struct SECURITY_FRAME {
 	uint16_t u2EthType;
 	uint16_t u2Reserved;
 };
@@ -67,7 +67,7 @@ struct CMD_TRACE_ENTRY {
 	enum COMMAND_TYPE eCmdType;
 	union {
 		struct COMMAND rCmd;
-		struct DATA_FRAME rDataFrame;
+		struct SECURITY_FRAME rSecFrame;
 		struct MGMT_FRAME rMgmtFrame;
 	} u;
 };
@@ -113,7 +113,7 @@ void wlanTraceTxCmd(struct CMD_INFO *prCmd)
 	struct CMD_TRACE_ENTRY *prCurCmd =
 			&gprCmdTraceEntry[u2CurEntry];
 
-	prCurCmd->u8TxTime = kalGetTimeTickNs();
+	prCurCmd->u8TxTime = sched_clock();
 	prCurCmd->eCmdType = prCmd->eCmdType;
 	if (prCmd->eCmdType == COMMAND_TYPE_MANAGEMENT_FRAME) {
 		struct WLAN_MAC_MGMT_HEADER *prMgmt = (struct
@@ -121,9 +121,14 @@ void wlanTraceTxCmd(struct CMD_INFO *prCmd)
 
 		prCurCmd->u.rMgmtFrame.u2FrameCtl = prMgmt->u2FrameCtrl;
 		prCurCmd->u.rMgmtFrame.u2DurationID = prMgmt->u2Duration;
-	} else if (prCmd->eCmdType == COMMAND_TYPE_DATA_FRAME) {
-		prCurCmd->u.rDataFrame.u2EthType =
-				kalQueryPacketEtherType(prCmd->prPacket);
+	} else if (prCmd->eCmdType == COMMAND_TYPE_SECURITY_FRAME ||
+			prCmd->eCmdType == COMMAND_TYPE_DATA_FRAME) {
+		uint8_t *pucPkt = (uint8_t *)((struct sk_buff *)
+					      prCmd->prPacket)->data;
+
+		prCurCmd->u.rSecFrame.u2EthType =
+			(pucPkt[ETH_TYPE_LEN_OFFSET] << 8) |
+			(pucPkt[ETH_TYPE_LEN_OFFSET + 1]);
 	} else {
 		prCurCmd->u.rCmd.ucCID = prCmd->ucCID;
 		prCurCmd->u.rCmd.ucCmdSeqNum = prCmd->ucCmdSeqNum;
@@ -142,7 +147,7 @@ void wlanTraceReleaseTcRes(struct ADAPTER *prAdapter,
 	struct TC_RES_RELEASE_ENTRY *prCurBuf =
 			&gprTcReleaseTraceBuffer[u2CurEntry];
 
-	prCurBuf->u8RelaseTime = kalGetTimeTickNs();
+	prCurBuf->u8RelaseTime = sched_clock();
 	prCurBuf->u4Tc4RelCnt =  u4TxRlsCnt;
 	prCurBuf->u4AvailableTc4 = u4Available;
 	u2CurEntry++;
@@ -559,7 +564,7 @@ uint32_t wlanWakeDumpRes(void)
 
 #endif
 
-uint32_t wlanSetDriverDbgLevel(uint32_t u4DbgIdx, uint32_t u4DbgMask)
+uint32_t wlanSetDriverDbgLevel(IN uint32_t u4DbgIdx, IN uint32_t u4DbgMask)
 {
 	uint32_t u4Idx;
 	uint32_t fgStatus = WLAN_STATUS_SUCCESS;
@@ -583,7 +588,7 @@ uint32_t wlanSetDriverDbgLevel(uint32_t u4DbgIdx, uint32_t u4DbgMask)
 	return fgStatus;
 }
 
-uint32_t wlanGetDriverDbgLevel(uint32_t u4DbgIdx, uint32_t *pu4DbgMask)
+uint32_t wlanGetDriverDbgLevel(IN uint32_t u4DbgIdx, OUT uint32_t *pu4DbgMask)
 {
 	if (u4DbgIdx < DBG_MODULE_NUM) {
 		*pu4DbgMask = aucDebugModule[u4DbgIdx];
@@ -593,7 +598,7 @@ uint32_t wlanGetDriverDbgLevel(uint32_t u4DbgIdx, uint32_t *pu4DbgMask)
 	return WLAN_STATUS_FAILURE;
 }
 
-uint32_t wlanDbgLevelUiSupport(struct ADAPTER *prAdapter, uint32_t u4Version,
+uint32_t wlanDbgLevelUiSupport(IN struct ADAPTER *prAdapter, uint32_t u4Version,
 		uint32_t ucModule)
 {
 	uint32_t u4Enable = ENUM_WIFI_LOG_LEVEL_SUPPORT_DISABLE;
@@ -616,7 +621,7 @@ uint32_t wlanDbgLevelUiSupport(struct ADAPTER *prAdapter, uint32_t u4Version,
 	return u4Enable;
 }
 
-uint32_t wlanDbgGetLogLevelImpl(struct ADAPTER *prAdapter,
+uint32_t wlanDbgGetLogLevelImpl(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t ucModule)
 {
 	uint32_t u4Level = ENUM_WIFI_LOG_LEVEL_DEFAULT;
@@ -632,13 +637,13 @@ uint32_t wlanDbgGetLogLevelImpl(struct ADAPTER *prAdapter,
 	return u4Level;
 }
 
-void wlanDbgSetLogLevelImpl(struct ADAPTER *prAdapter,
+void wlanDbgSetLogLevelImpl(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t u4Module, uint32_t u4level)
 {
 	wlanDbgSetLogLevel(prAdapter, u4Version, u4Module, u4level, FALSE);
 }
 
-void wlanDbgSetLogLevel(struct ADAPTER *prAdapter,
+void wlanDbgSetLogLevel(IN struct ADAPTER *prAdapter,
 		uint32_t u4Version, uint32_t u4Module,
 		uint32_t u4level, u_int8_t fgEarlySet)
 {
@@ -716,7 +721,26 @@ void wlanDbgSetLogLevel(struct ADAPTER *prAdapter,
 
 	wlanDbgGetGlobalLogLevel(ENUM_WIFI_LOG_MODULE_DRIVER, &u4DriverLevel);
 	wlanDbgGetGlobalLogLevel(ENUM_WIFI_LOG_MODULE_FW, &u4FwLevel);
-	kalSetLogTooMuch(u4DriverLevel, u4FwLevel);
+#if KERNEL_VERSION(4, 14, 0) >= LINUX_VERSION_CODE
+#if (CFG_BUILT_IN_DRIVER == 0) && (CFG_MTK_ANDROID_WMT == 1)
+	/*
+	 * The function definition of get_logtoomuch_enable() and
+	 * set_logtoomuch_enable of Android O0 or lower version are different
+	 * from that of Android O1 or higher version. Wlan driver supports .ko
+	 * module from Android O1. Use CFG_BUILT_IN_DRIVER to distinguish
+	 * Android version higher than O1 instead.
+	 */
+	if ((u4DriverLevel > ENUM_WIFI_LOG_LEVEL_DEFAULT ||
+			u4FwLevel > ENUM_WIFI_LOG_LEVEL_DEFAULT) &&
+			get_logtoomuch_enable()) {
+		DBGLOG(OID, TRACE,
+			"Disable printk to much. driver: %d, fw: %d\n",
+			u4DriverLevel,
+			u4FwLevel);
+		set_logtoomuch_enable(0);
+	}
+#endif
+#endif /* KERNEL_VERSION(4, 14, 0) >= LINUX_VERSION_CODE */
 }
 
 u_int8_t wlanDbgGetGlobalLogLevel(uint32_t u4Module, uint32_t *pu4Level)
@@ -777,22 +801,24 @@ firmwareHexDump(const uint8_t *pucPreFix,
 		i4RowSize = 16;
 
 	for (i = 0; i < len; i += i4RowSize) {
-		i4LineLen = KAL_MIN(i4Remaining, i4RowSize);
+		i4LineLen = min(i4Remaining, i4RowSize);
 		i4Remaining -= i4RowSize;
 
-		KAL_HEX_DUMP_TO_BUFFER(pucPtr + i, i4LineLen, i4RowSize,
-			i4GroupSize, ucLineBuf, sizeof(ucLineBuf), fgAscii);
+		/* use kernel API */
+		hex_dump_to_buffer(pucPtr + i, i4LineLen, i4RowSize,
+				   i4GroupSize,
+				   ucLineBuf, sizeof(ucLineBuf), fgAscii);
 
 		switch (i4PreFixType) {
 		case DUMP_PREFIX_ADDRESS:
-			pr_info("%s%p: %s\n",
+			pr_debug("%s%p: %s\n",
 				pucPreFix, pucPtr + i, ucLineBuf);
 			break;
 		case DUMP_PREFIX_OFFSET:
-			pr_info("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
+			pr_debug("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
 			break;
 		default:
-			pr_info("%s%s\n", pucPreFix, ucLineBuf);
+			pr_debug("%s%s\n", pucPreFix, ucLineBuf);
 			break;
 		}
 	}
@@ -809,7 +835,7 @@ void wlanPrintFwLog(uint8_t *pucLogContent,
 #undef KBUILD_MODNAME
 #undef LOG_FUNC
 #define KBUILD_MODNAME "wlan_mt6632_fw"
-#define LOG_FUNC pr_info
+#define LOG_FUNC pr_debug
 #define DBG_LOG_BUF_SIZE 128
 
 	int8_t aucLogBuffer[DBG_LOG_BUF_SIZE];
@@ -877,57 +903,38 @@ static void wlanSetBE32(uint32_t u4Val, uint8_t *pucBuf)
 void wlanFillTimestamp(struct ADAPTER *prAdapter, void *pvPacket,
 		       uint8_t ucPhase)
 {
-	uint16_t u2EtherType = 0, u2Offset = 0;
-	struct REAL_TIME rTm = {0};
-	uint32_t u4Timestamp[2] = {0};
-	uint32_t u4Length = 0;
+	struct sk_buff *skb = (struct sk_buff *)pvPacket;
 	uint8_t *pucEth = NULL;
+	uint32_t u4Length = 0;
 	uint8_t *pucUdp = NULL;
+	struct timespec64 tval;
 
-	if (!prAdapter || !prAdapter->rDebugInfo.fgVoE5_7Test
-			|| !pvPacket)
+	if (!prAdapter || !prAdapter->rDebugInfo.fgVoE5_7Test || !skb)
 		return;
-
-	kalGetPacketBuf(pvPacket, &pucEth);
-	u4Length = kalQueryPacketLength(pvPacket);
-	u2EtherType =
-		(pucEth[ETH_TYPE_LEN_OFFSET] << 8) |
-	     (pucEth[ETH_TYPE_LEN_OFFSET + 1]);
-
-	if (u4Length < 200 || u2EtherType != ETH_P_IPV4)
+	pucEth = skb->data;
+	u4Length = skb->len;
+	if (u4Length < 200 ||
+	    ((pucEth[ETH_TYPE_LEN_OFFSET] << 8) |
+	     (pucEth[ETH_TYPE_LEN_OFFSET + 1])) != ETH_P_IPV4)
 		return;
-	if (pucEth[ETH_HLEN+9]  != IP_PRO_UDP)
+	if (pucEth[ETH_HLEN+9] != IP_PRO_UDP)
 		return;
-
 	pucUdp = &pucEth[ETH_HLEN+28];
 	if (kalStrnCmp(pucUdp, "1345678", 7))
 		return;
-
-	kalGetRealTime(&rTm);
-
+	ktime_get_ts64(&tval);
 	switch (ucPhase) {
 	case PHASE_XMIT_RCV: /* xmit */
-		u2Offset = 20;
+		pucUdp += 20;
 		break;
 	case PHASE_ENQ_QM: /* enq */
-		u2Offset = 28;
+		pucUdp += 28;
 		break;
 	case PHASE_HIF_TX: /* tx */
-		u2Offset = 36;
+		pucUdp += 36;
 		break;
 	}
-
-	u4Timestamp[0] = rTm.u4TvValSec;
-	u4Timestamp[1] = rTm.u4TvValUsec;
-
-
-	kalUpdatePacketIPv4UDPPayload(pvPacket,
-			u2Offset,
-			&(u4Timestamp[0]),
-			sizeof(uint32_t));
-	kalUpdatePacketIPv4UDPPayload(pvPacket,
-			u2Offset + 4,
-			&(u4Timestamp[1]),
-			sizeof(uint32_t));
+	wlanSetBE32(tval.tv_sec, pucUdp);
+	wlanSetBE32(NSEC_TO_USEC(tval.tv_nsec), pucUdp+4);
 }
 /* End: Functions used to breakdown packet jitter, for test case VoE 5.7 */

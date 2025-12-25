@@ -142,15 +142,14 @@ const struct BOW_CMD arBowCmdTable[] = {
 */
 /*----------------------------------------------------------------------------*/
 uint32_t
-wlanoidSendSetQueryBowCmd(struct ADAPTER *prAdapter,
-			  uint8_t ucCID,
-			  uint8_t ucBssIdx,
-			  u_int8_t fgSetQuery,
-			  u_int8_t fgNeedResp,
-			  PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
-			  PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler,
-			  uint32_t u4SetQueryInfoLen, uint8_t *pucInfoBuffer,
-			  uint8_t ucSeqNumber)
+wlanoidSendSetQueryBowCmd(IN struct ADAPTER *prAdapter,
+			  IN uint8_t ucCID,
+			  IN uint8_t ucBssIdx,
+			  IN u_int8_t fgSetQuery,
+			  IN u_int8_t fgNeedResp,
+			  IN PFN_CMD_DONE_HANDLER pfCmdDoneHandler,
+			  IN PFN_CMD_TIMEOUT_HANDLER pfCmdTimeoutHandler,
+			  IN uint32_t u4SetQueryInfoLen, IN uint8_t *pucInfoBuffer, IN uint8_t ucSeqNumber)
 {
 	struct GLUE_INFO *prGlueInfo;
 	struct CMD_INFO *prCmdInfo;
@@ -197,7 +196,7 @@ wlanoidSendSetQueryBowCmd(struct ADAPTER *prAdapter,
 		&prCmdInfo->ucCmdSeqNum,
 		prCmdInfo->fgSetQuery,
 		&pWifiCmdBufAddr, FALSE, 0, S2D_INDEX_CMD_H2N);
-	prCmdInfo->pucSetInfoBuffer = pWifiCmdBufAddr;
+
 	if (u4SetQueryInfoLen > 0 && pucInfoBuffer != NULL)
 		kalMemCopy(pWifiCmdBufAddr, pucInfoBuffer, u4SetQueryInfoLen);
 	/* insert into prCmdQueue */
@@ -221,8 +220,7 @@ wlanoidSendSetQueryBowCmd(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t wlanbowHandleCommand(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t wlanbowHandleCommand(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	uint32_t retval = WLAN_STATUS_FAILURE;
@@ -256,8 +254,7 @@ uint32_t wlanbowHandleCommand(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdGetMacStatus(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdGetMacStatus(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BT_OVER_WIFI_EVENT *prEvent;
@@ -406,8 +403,7 @@ uint32_t bowCmdGetMacStatus(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdSetupConnection(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdSetupConnection(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_SETUP_CONNECTION *prBowSetupConnection;
@@ -526,13 +522,11 @@ uint32_t bowCmdSetupConnection(struct ADAPTER *prAdapter,
 
 		cnmTimerInitTimer(prAdapter,
 				  &prBowFsmInfo->rStartingBeaconTimer,
-				  (PFN_MGMT_TIMEOUT_FUNC) bowSendBeacon,
-				  (uintptr_t) NULL);
+				  (PFN_MGMT_TIMEOUT_FUNC) bowSendBeacon, (unsigned long) NULL);
 
 		cnmTimerInitTimer(prAdapter,
 				  &prBowFsmInfo->rChGrantedTimer,
-				  (PFN_MGMT_TIMEOUT_FUNC) bowChGrantedTimeout,
-				  (uintptr_t) NULL);
+				  (PFN_MGMT_TIMEOUT_FUNC) bowChGrantedTimeout, (unsigned long) NULL);
 
 		/* Reset Global Variable */
 		g_u4Beaconing = 0;
@@ -545,6 +539,7 @@ uint32_t bowCmdSetupConnection(struct ADAPTER *prAdapter,
 #endif
 
 		/*Active BoW Network */
+		SET_NET_ACTIVE(prAdapter, prBowFsmInfo->ucBssIndex);
 		SET_NET_PWR_STATE_ACTIVE(prAdapter, prBowFsmInfo->ucBssIndex);
 		nicActivateNetwork(prAdapter, prBowFsmInfo->ucBssIndex);
 
@@ -580,8 +575,7 @@ uint32_t bowCmdSetupConnection(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdDestroyConnection(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdDestroyConnection(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_DESTROY_CONNECTION *prBowDestroyConnection;
@@ -666,8 +660,7 @@ uint32_t bowCmdDestroyConnection(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdSetPTK(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdSetPTK(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_SET_PTK *prBowSetPTK;
@@ -766,8 +759,7 @@ uint32_t bowCmdSetPTK(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdReadRSSI(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdReadRSSI(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_READ_RSSI *prBowReadRSSI;
@@ -811,8 +803,7 @@ uint32_t bowCmdReadRSSI(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdReadLinkQuality(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdReadLinkQuality(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_READ_LINK_QUALITY *prBowReadLinkQuality;
@@ -856,8 +847,7 @@ uint32_t bowCmdReadLinkQuality(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdShortRangeMode(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdShortRangeMode(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 #if 1				/* Marked for MT6630 */
 	struct BOW_SHORT_RANGE_MODE *prBowShortRangeMode;
@@ -959,8 +949,7 @@ uint32_t bowCmdShortRangeMode(struct ADAPTER *prAdapter,
 * \retval WLAN_STATUS_INVALID_LENGTH
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowCmdGetChannelList(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd)
+uint32_t bowCmdGetChannelList(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd)
 {
 	ASSERT(prAdapter);
 
@@ -981,8 +970,7 @@ uint32_t bowCmdGetChannelList(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventSetStatus(struct ADAPTER *prAdapter,
-		struct BT_OVER_WIFI_COMMAND *prCmd, uint8_t ucEventBuf)
+void wlanbowCmdEventSetStatus(IN struct ADAPTER *prAdapter, IN struct BT_OVER_WIFI_COMMAND *prCmd, IN uint8_t ucEventBuf)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_COMMAND_STATUS *prBowCmdStatus;
@@ -1017,8 +1005,7 @@ void wlanbowCmdEventSetStatus(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventSetCommon(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventSetCommon(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_COMMAND_STATUS *prBowCmdStatus;
@@ -1053,8 +1040,7 @@ void wlanbowCmdEventSetCommon(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventLinkConnected(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventLinkConnected(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_LINK_CONNECTED *prBowLinkConnected;
@@ -1127,8 +1113,7 @@ void wlanbowCmdEventLinkConnected(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventLinkDisconnected(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventLinkDisconnected(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_LINK_DISCONNECTED *prBowLinkDisconnected;
@@ -1219,6 +1204,18 @@ void wlanbowCmdEventLinkDisconnected(struct ADAPTER *prAdapter,
 	}
 #endif
 
+#if 0
+	/* 3 <3>Stop this link; flush Tx;
+	 * send deAuthentication -> abort. SAA, AAA. need to check BOW table state == Connected.
+	 */
+	if (prAdapter->prGlueInfo->i4TxPendingFrameNum > 0)
+		kalFlushPendingTxPackets(prAdapter->prGlueInfo);
+
+	/* flush pending security frames */
+	if (prAdapter->prGlueInfo->i4TxPendingSecurityFrameNum > 0)
+		kalClearSecurityFrames(prAdapter->prGlueInfo);
+#endif
+
 	/*Update BoW table */
 	bowGetBowTableEntryByPeerAddress(prAdapter, prBowLinkDisconnected->aucPeerAddress, &ucBowTableIdx);
 	rBowTable.fgIsValid = FALSE;
@@ -1250,8 +1247,7 @@ void wlanbowCmdEventLinkDisconnected(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventSetSetupConnection(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventSetSetupConnection(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_COMMAND_STATUS *prBowCmdStatus;
@@ -1297,8 +1293,7 @@ void wlanbowCmdEventSetSetupConnection(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventReadLinkQuality(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventReadLinkQuality(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct LINK_QUALITY *prLinkQuality;
 	struct BT_OVER_WIFI_EVENT *prEvent;
@@ -1335,8 +1330,7 @@ void wlanbowCmdEventReadLinkQuality(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdEventReadRssi(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo, uint8_t *pucEventBuf)
+void wlanbowCmdEventReadRssi(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo, IN uint8_t *pucEventBuf)
 {
 	struct LINK_QUALITY *prLinkQuality;
 	struct BT_OVER_WIFI_EVENT *prEvent;
@@ -1373,8 +1367,7 @@ void wlanbowCmdEventReadRssi(struct ADAPTER *prAdapter,
 * \retval none
 */
 /*----------------------------------------------------------------------------*/
-void wlanbowCmdTimeoutHandler(struct ADAPTER *prAdapter,
-		struct CMD_INFO *prCmdInfo)
+void wlanbowCmdTimeoutHandler(IN struct ADAPTER *prAdapter, IN struct CMD_INFO *prCmdInfo)
 {
 	struct BT_OVER_WIFI_EVENT *prEvent;
 	struct BOW_COMMAND_STATUS *prBowCmdStatus;
@@ -1400,15 +1393,14 @@ void wlanbowCmdTimeoutHandler(struct ADAPTER *prAdapter,
 }
 
 /* Bruce, 20140224 */
-uint8_t bowInit(struct ADAPTER *prAdapter)
+uint8_t bowInit(IN struct ADAPTER *prAdapter)
 {
 	struct BSS_INFO *prBowBssInfo;
 	struct BOW_FSM_INFO *prBowFsmInfo;
 
 	ASSERT(prAdapter);
 
-	prBowBssInfo = cnmGetBssInfoAndInit(prAdapter,
-		NETWORK_TYPE_BOW, TRUE, FALSE);
+	prBowBssInfo = cnmGetBssInfoAndInit(prAdapter, NETWORK_TYPE_BOW, TRUE);
 
 	/*Initiate BSS_INFO_T - common part -move from bowstarting */
 	BSS_INFO_INIT(prAdapter, prBowBssInfo);
@@ -1426,7 +1418,7 @@ uint8_t bowInit(struct ADAPTER *prAdapter)
 }
 
 /* Bruce, 20140224 */
-void bowUninit(struct ADAPTER *prAdapter)
+void bowUninit(IN struct ADAPTER *prAdapter)
 {
 	struct BSS_INFO *prBowBssInfo;
 	struct BOW_FSM_INFO *prBowFsmInfo;
@@ -1437,7 +1429,7 @@ void bowUninit(struct ADAPTER *prAdapter)
 	cnmFreeBssInfo(prAdapter, prBowBssInfo);
 }
 
-void bowStopping(struct ADAPTER *prAdapter)
+void bowStopping(IN struct ADAPTER *prAdapter)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct BSS_INFO *prBowBssInfo;
@@ -1485,11 +1477,13 @@ void bowStopping(struct ADAPTER *prAdapter)
 		/*temp solution for FW hal_pwr_mgt.c#3037 ASSERT */
 		nicDeactivateNetwork(prAdapter, prBowBssInfo->ucBssIndex);
 		SET_NET_PWR_STATE_IDLE(prAdapter, prBowBssInfo->ucBssIndex);
+		UNSET_NET_ACTIVE(prAdapter, prBowBssInfo->ucBssIndex);
+
 	}
 
 }
 
-void bowStarting(struct ADAPTER *prAdapter)
+void bowStarting(IN struct ADAPTER *prAdapter)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct BSS_INFO *prBssInfo = (struct BSS_INFO *) NULL;
@@ -1677,7 +1671,7 @@ void bowStarting(struct ADAPTER *prAdapter)
 
 }
 
-void bowAssignSsid(uint8_t *pucSsid, uint8_t *puOwnMacAddr)
+void bowAssignSsid(IN uint8_t *pucSsid, IN uint8_t *puOwnMacAddr)
 {
 	uint8_t i;
 	uint8_t aucSSID[] = BOW_WILDCARD_SSID;
@@ -1715,8 +1709,7 @@ void bowAssignSsid(uint8_t *pucSsid, uint8_t *puOwnMacAddr)
 * @retval FALSE     Don't reply the Probe Response
 */
 /*----------------------------------------------------------------------------*/
-u_int8_t bowValidateProbeReq(struct ADAPTER *prAdapter,
-		struct SW_RFB *prSwRfb, uint32_t *pu4ControlFlags)
+u_int8_t bowValidateProbeReq(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb, OUT uint32_t *pu4ControlFlags)
 {
 #if 1				/* Marked for MT6630 */
 
@@ -1743,8 +1736,7 @@ u_int8_t bowValidateProbeReq(struct ADAPTER *prAdapter,
 	prMgtHdr = (struct WLAN_MAC_MGMT_HEADER *) prSwRfb->pvHeader;
 
 	u2IELength = prSwRfb->u2PacketLen - prSwRfb->u2HeaderLen;
-	pucIE = (uint8_t *) (((uintptr_t) prSwRfb->pvHeader) +
-		prSwRfb->u2HeaderLen);
+	pucIE = (uint8_t *) (((unsigned long) prSwRfb->pvHeader) + prSwRfb->u2HeaderLen);
 
 	IE_FOR_EACH(pucIE, u2IELength, u2Offset) {
 		if (IE_ID(pucIE) == ELEM_ID_SSID) {
@@ -1794,7 +1786,7 @@ u_int8_t bowValidateProbeReq(struct ADAPTER *prAdapter,
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowSendBeacon(struct ADAPTER *prAdapter, uintptr_t ulParamPtr)
+void bowSendBeacon(IN struct ADAPTER *prAdapter, IN unsigned long ulParamPtr)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 
@@ -1819,7 +1811,7 @@ void bowSendBeacon(struct ADAPTER *prAdapter, uintptr_t ulParamPtr)
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowResponderScan(struct ADAPTER *prAdapter)
+void bowResponderScan(IN struct ADAPTER *prAdapter)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct MSG_SCN_SCAN_REQ *prScanReqMsg;
@@ -1882,7 +1874,7 @@ void bowResponderScan(struct ADAPTER *prAdapter)
 * \return none
 */
 /*----------------------------------------------------------------------------*/
-void bowResponderScanDone(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
+void bowResponderScanDone(IN struct ADAPTER *prAdapter, IN struct MSG_HDR *prMsgHdr)
 {
 #if 1				/* Marked for MT6630 */
 	struct MSG_SCN_SCAN_DONE *prScanDoneMsg;
@@ -1976,8 +1968,7 @@ void bowResponderScanDone(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowResponderCancelScan(struct ADAPTER *prAdapter,
-		u_int8_t fgIsChannelExtention)
+void bowResponderCancelScan(IN struct ADAPTER *prAdapter, IN u_int8_t fgIsChannelExtention)
 {
 
 	struct MSG_SCN_SCAN_CANCEL *prScanCancel = (struct MSG_SCN_SCAN_CANCEL *) NULL;
@@ -2029,7 +2020,7 @@ void bowResponderCancelScan(struct ADAPTER *prAdapter,
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowResponderJoin(struct ADAPTER *prAdapter, struct BSS_DESC *prBssDesc)
+void bowResponderJoin(IN struct ADAPTER *prAdapter, IN struct BSS_DESC *prBssDesc)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct BSS_INFO *prBssInfo;
@@ -2113,8 +2104,7 @@ void bowResponderJoin(struct ADAPTER *prAdapter, struct BSS_DESC *prBssDesc)
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowFsmRunEventJoinComplete(struct ADAPTER *prAdapter,
-		struct MSG_HDR *prMsgHdr)
+void bowFsmRunEventJoinComplete(IN struct ADAPTER *prAdapter, IN struct MSG_HDR *prMsgHdr)
 {
 #if 1				/* Marked for MT6630 */
 
@@ -2244,9 +2234,8 @@ void bowFsmRunEventJoinComplete(struct ADAPTER *prAdapter,
 */
 /*----------------------------------------------------------------------------*/
 void
-bowIndicationOfMediaStateToHost(struct ADAPTER *prAdapter,
-				enum ENUM_PARAM_MEDIA_STATE eConnectionState,
-				u_int8_t fgDelayIndication)
+bowIndicationOfMediaStateToHost(IN struct ADAPTER *prAdapter,
+				IN enum ENUM_PARAM_MEDIA_STATE eConnectionState, IN u_int8_t fgDelayIndication)
 {
 	struct EVENT_CONNECTION_STATUS rEventConnStatus;
 	struct CONNECTION_SETTINGS *prConnSettings;
@@ -2353,8 +2342,7 @@ bowIndicationOfMediaStateToHost(struct ADAPTER *prAdapter,
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowRunEventAAATxFail(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec)
+void bowRunEventAAATxFail(IN struct ADAPTER *prAdapter, IN struct STA_RECORD *prStaRec)
 {
 #if 1				/* Marked for MT6630 */
 	struct BSS_INFO *prBssInfo;
@@ -2384,8 +2372,7 @@ void bowRunEventAAATxFail(struct ADAPTER *prAdapter,
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-uint32_t bowRunEventAAAComplete(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec)
+uint32_t bowRunEventAAAComplete(IN struct ADAPTER *prAdapter, IN struct STA_RECORD *prStaRec)
 {
 #if 1				/* Marked for MT6630 */
 	struct BSS_INFO *prBssInfo;
@@ -2430,8 +2417,7 @@ uint32_t bowRunEventAAAComplete(struct ADAPTER *prAdapter,
 */
 /*----------------------------------------------------------------------------*/
 
-uint32_t bowRunEventRxDeAuth(struct ADAPTER *prAdapter,
-		struct STA_RECORD *prStaRec, struct SW_RFB *prSwRfb)
+uint32_t bowRunEventRxDeAuth(IN struct ADAPTER *prAdapter, IN struct STA_RECORD *prStaRec, IN struct SW_RFB *prSwRfb)
 {
 #if 1				/* Marked for MT6630 */
 	struct BSS_INFO *prBowBssInfo;
@@ -2497,8 +2483,7 @@ uint32_t bowRunEventRxDeAuth(struct ADAPTER *prAdapter,
 * \note after receive deauth frame, callback function call this
 */
 /*----------------------------------------------------------------------------*/
-void bowDisconnectLink(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
-		enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+void bowDisconnectLink(IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo, IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct STA_RECORD *prStaRec;
@@ -2554,8 +2539,7 @@ void bowDisconnectLink(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo,
 * @retval FALSE     Don't reply the Assoc Resp
 */
 /*----------------------------------------------------------------------------*/
-u_int8_t bowValidateAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
-		uint16_t *pu2StatusCode)
+u_int8_t bowValidateAssocReq(IN struct ADAPTER *prAdapter, IN struct SW_RFB *prSwRfb, OUT uint16_t *pu2StatusCode)
 {
 #if 1				/* Marked for MT6630 */
 
@@ -2657,9 +2641,8 @@ u_int8_t bowValidateAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 */
 /*----------------------------------------------------------------------------*/
 u_int8_t
-bowValidateAuth(struct ADAPTER *prAdapter,
-		struct SW_RFB *prSwRfb, struct STA_RECORD **pprStaRec,
-		uint16_t *pu2StatusCode)
+bowValidateAuth(IN struct ADAPTER *prAdapter,
+		IN struct SW_RFB *prSwRfb, IN struct STA_RECORD **pprStaRec, OUT uint16_t *pu2StatusCode)
 {
 #if 1				/* Marked for MT6630 */
 	u_int8_t fgReplyAuth = FALSE;
@@ -2755,7 +2738,7 @@ bowValidateAuth(struct ADAPTER *prAdapter,
 * \return none
 */
 /*----------------------------------------------------------------------------*/
-void bowRunEventChGrant(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
+void bowRunEventChGrant(IN struct ADAPTER *prAdapter, IN struct MSG_HDR *prMsgHdr)
 {
 #if 1				/* Marked for MT6630 */
 	struct BSS_INFO *prBowBssInfo;
@@ -2836,7 +2819,7 @@ void bowRunEventChGrant(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr)
 * \return none
 */
 /*----------------------------------------------------------------------------*/
-void bowRequestCh(struct ADAPTER *prAdapter)
+void bowRequestCh(IN struct ADAPTER *prAdapter)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct MSG_CH_REQ *prMsgChReq;
@@ -2859,7 +2842,7 @@ void bowRequestCh(struct ADAPTER *prAdapter)
 
 		prMsgChReq->rMsgHdr.eMsgId = MID_MNY_CNM_CH_REQ;
 		prMsgChReq->ucBssIndex = prBowFsmInfo->ucBssIndex;
-		prMsgChReq->ucTokenID = prBowFsmInfo->ucSeqNumOfChReq = cnmIncreaseTokenId(prAdapter);
+		prMsgChReq->ucTokenID = ++prBowFsmInfo->ucSeqNumOfChReq;
 		prMsgChReq->eReqType = CH_REQ_TYPE_JOIN;
 #if 0
 		prMsgChReq->u4MaxInterval = BOW_JOIN_CH_REQUEST_INTERVAL;
@@ -2898,7 +2881,7 @@ void bowRequestCh(struct ADAPTER *prAdapter)
 * \return none
 */
 /*----------------------------------------------------------------------------*/
-void bowReleaseCh(struct ADAPTER *prAdapter)
+void bowReleaseCh(IN struct ADAPTER *prAdapter)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	struct MSG_CH_ABORT *prMsgChAbort;
@@ -2944,7 +2927,7 @@ void bowReleaseCh(struct ADAPTER *prAdapter)
 * @return (none)
 */
 /*----------------------------------------------------------------------------*/
-void bowChGrantedTimeout(struct ADAPTER *prAdapter, uintptr_t ulParamPtr)
+void bowChGrantedTimeout(IN struct ADAPTER *prAdapter, IN unsigned long ulParamPtr)
 {
 	struct BOW_FSM_INFO *prBowFsmInfo;
 	enum ENUM_BOW_DEVICE_STATE eFsmState;
@@ -2967,7 +2950,7 @@ void bowChGrantedTimeout(struct ADAPTER *prAdapter, uintptr_t ulParamPtr)
 
 #endif /* Marked for MT6630 */
 
-u_int8_t bowNotifyAllLinkDisconnected(struct ADAPTER *prAdapter)
+u_int8_t bowNotifyAllLinkDisconnected(IN struct ADAPTER *prAdapter)
 {
 #if 1				/* Marked for MT6630 */
 
@@ -3033,8 +3016,7 @@ u_int8_t bowNotifyAllLinkDisconnected(struct ADAPTER *prAdapter)
 */
 /*----------------------------------------------------------------------------*/
 
-u_int8_t bowCheckBowTableIfVaild(struct ADAPTER *prAdapter,
-		uint8_t aucPeerAddress[6])
+u_int8_t bowCheckBowTableIfVaild(IN struct ADAPTER *prAdapter, IN uint8_t aucPeerAddress[6])
 {
 	uint8_t idx;
 
@@ -3070,8 +3052,7 @@ u_int8_t bowCheckBowTableIfVaild(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t bowGetBowTableContent(struct ADAPTER *prAdapter, uint8_t ucBowTableIdx,
-		struct BOW_TABLE *prBowTable)
+u_int8_t bowGetBowTableContent(IN struct ADAPTER *prAdapter, IN uint8_t ucBowTableIdx, OUT struct BOW_TABLE *prBowTable)
 {
 	KAL_SPIN_LOCK_DECLARATION();
 	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_BOW_TABLE);
@@ -3093,8 +3074,7 @@ u_int8_t bowGetBowTableContent(struct ADAPTER *prAdapter, uint8_t ucBowTableIdx,
 	return FALSE;
 }
 
-u_int8_t bowSetBowTableContent(struct ADAPTER *prAdapter, uint8_t ucBowTableIdx,
-		struct BOW_TABLE *prBowTable)
+u_int8_t bowSetBowTableContent(IN struct ADAPTER *prAdapter, IN uint8_t ucBowTableIdx, IN struct BOW_TABLE *prBowTable)
 {
 	KAL_SPIN_LOCK_DECLARATION();
 	KAL_ACQUIRE_SPIN_LOCK(prAdapter, SPIN_LOCK_BOW_TABLE);
@@ -3119,8 +3099,7 @@ u_int8_t bowSetBowTableContent(struct ADAPTER *prAdapter, uint8_t ucBowTableIdx,
 }
 
 u_int8_t
-bowGetBowTableEntryByPeerAddress(struct ADAPTER *prAdapter,
-		uint8_t aucPeerAddress[6], uint8_t *pucBowTableIdx)
+bowGetBowTableEntryByPeerAddress(IN struct ADAPTER *prAdapter, IN uint8_t aucPeerAddress[6], OUT uint8_t *pucBowTableIdx)
 {
 	uint8_t idx;
 
@@ -3157,8 +3136,7 @@ bowGetBowTableEntryByPeerAddress(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-u_int8_t bowGetBowTableFreeEntry(struct ADAPTER *prAdapter,
-		uint8_t *pucBowTableIdx)
+u_int8_t bowGetBowTableFreeEntry(IN struct ADAPTER *prAdapter, OUT uint8_t *pucBowTableIdx)
 {
 	uint8_t idx;
 
@@ -3184,8 +3162,7 @@ u_int8_t bowGetBowTableFreeEntry(struct ADAPTER *prAdapter,
 	return FALSE;
 }
 
-enum ENUM_BOW_DEVICE_STATE bowGetBowTableState(struct ADAPTER *prAdapter,
-		uint8_t aucPeerAddress[6])
+enum ENUM_BOW_DEVICE_STATE bowGetBowTableState(IN struct ADAPTER *prAdapter, IN uint8_t aucPeerAddress[6])
 {
 	uint8_t idx;
 
@@ -3222,8 +3199,7 @@ enum ENUM_BOW_DEVICE_STATE bowGetBowTableState(struct ADAPTER *prAdapter,
 	return BOW_DEVICE_STATE_DISCONNECTED;
 }
 
-u_int8_t bowSetBowTableState(struct ADAPTER *prAdapter,
-		uint8_t aucPeerAddress[6], enum ENUM_BOW_DEVICE_STATE eState)
+u_int8_t bowSetBowTableState(IN struct ADAPTER *prAdapter, IN uint8_t aucPeerAddress[6], IN enum ENUM_BOW_DEVICE_STATE eState)
 {
 	uint8_t ucBowTableIdx;
 

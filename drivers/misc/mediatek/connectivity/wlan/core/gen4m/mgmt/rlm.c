@@ -68,9 +68,6 @@
  *******************************************************************************
  */
 #include "precomp.h"
-#if (CFG_SUPPORT_BTWT == 1)
-#include "twt_planner.h"
-#endif
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -96,19 +93,13 @@ enum ENUM_OP_NOTIFY_STATE_T {
  *                            P U B L I C   D A T A
  *******************************************************************************
  */
-#if (CFG_SUPPORT_802_11AX == 1)
-uint8_t  g_fgHTSMPSEnabled = 0xFF;
-#endif
 
 /*******************************************************************************
  *                           P R I V A T E   D A T A
  *******************************************************************************
  */
-#if CFG_SUPPORT_RXSMM_WHITELIST
-uint8_t Rxsmm_Iot_Whitelist[VENDOR_OUI_RXSMM_LIST_NUM]
-	[VENDOR_OUI_RXSMM_OUI_IE_NUM] = {
-/*	{0x00, 0x0C, 0xE7}, */
-};
+#if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
+struct RLM_CAL_RESULT_ALL_V2 g_rBackupCalDataAllV2;
 #endif
 
 /*******************************************************************************
@@ -204,9 +195,6 @@ uint8_t rlmMaxBwToVhtBw(uint8_t ucMaxBw)
 	case MAX_BW_80_80_MHZ:
 		ucVhtBw = VHT_OP_CHANNEL_WIDTH_80P80;
 		break;
-	case MAX_BW_320MHZ:
-		ucVhtBw = VHT_OP_CHANNEL_WIDTH_320;
-		break;
 	default:
 		break;
 	}
@@ -284,8 +272,7 @@ void rlmReqGeneratePowerCapIE(struct ADAPTER *prAdapter,
 	ASSERT(prMsduInfo);
 
 	pucBuffer =
-		(uint8_t *)((uintptr_t)prMsduInfo->prPacket +
-			prMsduInfo->u2FrameLength);
+		(uint8_t *)(prMsduInfo->prPacket + prMsduInfo->u2FrameLength);
 
 	POWER_CAP_IE(pucBuffer)->ucId = ELEM_ID_PWR_CAP;
 	POWER_CAP_IE(pucBuffer)->ucLength = ELEM_MAX_LEN_POWER_CAP;
@@ -330,8 +317,7 @@ void rlmReqGenerateSupportedChIE(struct ADAPTER *prAdapter,
 		return;
 
 	pucBuffer =
-		(uint8_t *)((uintptr_t)prMsduInfo->prPacket +
-			prMsduInfo->u2FrameLength);
+		(uint8_t *)(prMsduInfo->prPacket + prMsduInfo->u2FrameLength);
 
 	rlmDomainGetChnlList(prAdapter, BAND_2G4, TRUE, MAX_2G_BAND_CHN_NUM,
 			     &ucNumOf2gChannel, auc2gChannelList);
@@ -635,93 +621,7 @@ void rlmRspGenerateErpIE(struct ADAPTER *prAdapter,
 	}
 }
 
-uint8_t rlmCheckMtkOuiChipCap(uint8_t *pucIe, uint64_t u8ChipCap)
-{
-	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
-
-	if (IE_ID(pucIe) == ELEM_ID_VENDOR && IE_LEN(pucIe) > 7 &&
-	    !kalMemCmp(MTK_OUI_IE(pucIe)->aucOui, aucMtkOui, 3) &&
-	    (MTK_OUI_IE(pucIe)->aucCapability[0] &
-			MTK_SYNERGY_CAP_SUPPORT_TLV)) {
-		uint8_t *sub;
-		uint16_t len, offset;
-
-		sub = MTK_OUI_IE(pucIe)->aucInfoElem;
-		len = IE_LEN(pucIe) - 7;
-
-		IE_FOR_EACH(sub, len, offset) {
-			if (IE_ID(sub) == MTK_OUI_ID_CHIP_CAP &&
-			    IE_LEN(sub) == 8) {
-				struct IE_MTK_CHIP_CAP *prCapIe =
-					(struct IE_MTK_CHIP_CAP *)sub;
-
-				DBGLOG(RLM, TRACE, "MTK_OUI_CHIP_CAP");
-				DBGLOG_MEM8(RLM, TRACE, sub, IE_SIZE(sub));
-				return prCapIe->u8ChipCap & u8ChipCap;
-			}
-		}
-	}
-	return 0;
-}
-
 #if CFG_SUPPORT_MTK_SYNERGY
-uint32_t rlmCalculateMTKOuiIELen(
-	struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex,
-	struct STA_RECORD *prStaRec)
-{
-	uint8_t len = 0;
-
-	len += ELEM_MIN_LEN_MTK_OUI;
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	len += sizeof(struct IE_MTK_CHIP_CAP);
-#ifdef CFG_AAD_NONCE_NO_REPLACE
-	len += sizeof(struct IE_MTK_PRE_WIFI7);
-	len += ehtRlmCalculateCapIELen(prAdapter, ucBssIndex, prStaRec);
-	len += ehtRlmCalculateOpIELen(prAdapter, ucBssIndex, prStaRec);
-	len += mldCalculateMlIELen(prAdapter, ucBssIndex, prStaRec);
-#endif
-#endif
-	return len;
-}
-
-uint16_t rlmGenerateMTKChipCapIE(uint8_t *pucBuf, uint16_t u2FrameLength,
-	uint8_t fgNeedOui, uint64_t u8ChipCap)
-{
-	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
-	struct IE_MTK_CHIP_CAP *prChipCap;
-	uint8_t *pos = pucBuf;
-	uint16_t len = 0;
-
-	if (fgNeedOui && ELEM_MIN_LEN_MTK_OUI + 2 < u2FrameLength) {
-		kalMemSet(pucBuf, 0, ELEM_MIN_LEN_MTK_OUI + 2);
-		MTK_OUI_IE(pucBuf)->ucId = ELEM_ID_VENDOR;
-		MTK_OUI_IE(pucBuf)->ucLength =
-			ELEM_MIN_LEN_MTK_OUI + sizeof(struct IE_MTK_CHIP_CAP);
-		kalMemCopy(MTK_OUI_IE(pucBuf)->aucOui, aucMtkOui, 3);
-		/* add icv sub ie for mlo device */
-		MTK_OUI_IE(pucBuf)->aucCapability[0] |=
-			MTK_SYNERGY_CAP_SUPPORT_TLV;
-		pos = MTK_OUI_IE(pucBuf)->aucInfoElem;
-		len += pos - pucBuf;
-	}
-
-	if (len + sizeof(struct IE_MTK_CHIP_CAP) < u2FrameLength) {
-		kalMemSet(pos, 0, sizeof(struct IE_MTK_CHIP_CAP));
-		prChipCap = (struct IE_MTK_CHIP_CAP *) pos;
-		prChipCap->ucId = MTK_OUI_ID_CHIP_CAP;
-		prChipCap->ucLength = sizeof(struct IE_MTK_CHIP_CAP) - 2;
-		prChipCap->u8ChipCap = u8ChipCap;
-		len += sizeof(struct IE_MTK_CHIP_CAP);
-	}
-
-	DBGLOG(RLM, TRACE, "MTK_OUI_CHIP_CAP");
-	DBGLOG_MEM8(RLM, TRACE, pucBuf, len);
-
-	return len;
-}
-
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief This function is used to generate MTK Vendor Specific OUI
@@ -732,14 +632,11 @@ uint16_t rlmGenerateMTKChipCapIE(uint8_t *pucBuf, uint16_t u2FrameLength,
  */
 /*----------------------------------------------------------------------------*/
 void rlmGenerateMTKOuiIE(struct ADAPTER *prAdapter,
-	 struct MSDU_INFO *prMsduInfo)
+			 struct MSDU_INFO *prMsduInfo)
 {
-	struct WLAN_MAC_MGMT_HEADER *mgmt;
-	uint16_t frame_ctrl;
 	struct BSS_INFO *prBssInfo;
 	uint8_t *pucBuffer;
 	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
-	uint16_t len;
 
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
@@ -751,10 +648,8 @@ void rlmGenerateMTKOuiIE(struct ADAPTER *prAdapter,
 	if (!prBssInfo)
 		return;
 
-	mgmt = (struct WLAN_MAC_MGMT_HEADER *)(prMsduInfo->prPacket);
-	frame_ctrl = mgmt->u2FrameCtrl & MASK_FRAME_TYPE;
-	pucBuffer = (uint8_t *)((uintptr_t)prMsduInfo->prPacket +
-				(uintptr_t)prMsduInfo->u2FrameLength);
+	pucBuffer = (uint8_t *)((unsigned long)prMsduInfo->prPacket +
+				(unsigned long)prMsduInfo->u2FrameLength);
 
 	MTK_OUI_IE(pucBuffer)->ucId = ELEM_ID_VENDOR;
 	MTK_OUI_IE(pucBuffer)->ucLength = ELEM_MIN_LEN_MTK_OUI;
@@ -778,64 +673,8 @@ void rlmGenerateMTKOuiIE(struct ADAPTER *prAdapter,
 		       "Disable 2.4G 256QAM support if N only chip\n");
 	}
 
-#if (CFG_SUPPORT_TWT_HOTSPOT_AC == 1)
-	if (IS_FEATURE_ENABLED(
-		prAdapter->rWifiVar.ucTWTHotSpotSupport)) {
-		MTK_OUI_IE(pucBuffer)->aucCapability[0] |=
-			MTK_SYNERGY_CAP_SUPPORT_TWT_HOTSPOT_AC;
-
-		DBGLOG(INIT, WARN, "TWT hotspot supported\n");
-	}
-#endif
-
-	if (IS_BSS_APGO(prBssInfo) &&
-		IS_FEATURE_ENABLED(prAdapter->rWifiVar.fgP2pGcCsa)) {
-		MTK_OUI_IE(pucBuffer)->aucCapability[1] |=
-			MTK_SYNERGY_CAP_SUPPORT_GC_CSA;
-		DBGLOG(P2P, TRACE, "Add gc csa capa\n");
-	}
-
-	len = IE_SIZE(pucBuffer);
-	prMsduInfo->u2FrameLength += len;
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	/* add icv sub ie for mlo device */
-	MTK_OUI_IE(pucBuffer)->aucCapability[0] |=
-		MTK_SYNERGY_CAP_SUPPORT_TLV;
-	len = rlmGenerateMTKChipCapIE(MTK_OUI_IE(pucBuffer)->aucInfoElem,
-		255, FALSE, MTK_OUI_CHIP_CAP);
-	MTK_OUI_IE(pucBuffer)->ucLength += len;
-	prMsduInfo->u2FrameLength += len;
-
-	/* hide eht & ml ie in vendor ie */
-	if (prMsduInfo->ucControlFlag & MSDU_CONTROL_FLAG_HIDE_INFO &&
-	   (frame_ctrl == MAC_FRAME_PROBE_RSP ||
-	    frame_ctrl == MAC_FRAME_BEACON)) {
-		struct IE_MTK_PRE_WIFI7 *prPreWifi7;
-
-		prPreWifi7 = (struct IE_MTK_PRE_WIFI7 *)
-			(pucBuffer + IE_SIZE(pucBuffer));
-		len = prMsduInfo->u2FrameLength;
-
-		prPreWifi7->ucId = MTK_OUI_ID_PRE_WIFI7;
-		prPreWifi7->ucLength = 0;
-		prPreWifi7->ucVersion0 = 0;
-		prPreWifi7->ucVersion1 = 2;
-
-		prMsduInfo->u2FrameLength += sizeof(struct IE_MTK_PRE_WIFI7);
-		mldGenerateMlIEImpl(prAdapter, prMsduInfo);
-		ehtRlmRspGenerateCapIEImpl(prAdapter, prMsduInfo);
-		ehtRlmRspGenerateOpIEImpl(prAdapter, prMsduInfo);
-
-		prPreWifi7->ucLength = (prMsduInfo->u2FrameLength - len - 2);
-		MTK_OUI_IE(pucBuffer)->ucLength += IE_SIZE(prPreWifi7);
-
-		DBGLOG(RLM, TRACE, "MTK_OUI_PRE_WIFI7");
-		DBGLOG_MEM8(RLM, TRACE, pucBuffer, IE_SIZE(pucBuffer));
-	}
-#endif
-
-
+	prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
+	pucBuffer += IE_SIZE(pucBuffer);
 } /* rlmGenerateMTKOuiIE */
 
 /*----------------------------------------------------------------------------*/
@@ -847,8 +686,8 @@ void rlmGenerateMTKOuiIE(struct ADAPTER *prAdapter,
  *             false: incorrect MTK OUI
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t rlmParseCheckMTKOuiIE(struct ADAPTER *prAdapter, uint8_t *pucBuf,
-			      struct STA_RECORD *prStaRec)
+u_int8_t rlmParseCheckMTKOuiIE(IN struct ADAPTER *prAdapter, IN uint8_t *pucBuf,
+			       IN uint32_t *pu4Cap)
 {
 	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
 	struct IE_MTK_OUI *prMtkOuiIE = (struct IE_MTK_OUI *)NULL;
@@ -890,8 +729,7 @@ u_int8_t rlmParseCheckMTKOuiIE(struct ADAPTER *prAdapter, uint8_t *pucBuf,
 			       "Disable 2.4G 256QAM support if N only chip\n");
 		}
 
-		kalMemCopy(&prStaRec->u4Flags, prMtkOuiIE->aucCapability,
-			sizeof(prStaRec->u4Flags));
+		kalMemCopy(pu4Cap, prMtkOuiIE->aucCapability, sizeof(uint32_t));
 
 		return TRUE;
 	} while (FALSE);
@@ -899,55 +737,6 @@ u_int8_t rlmParseCheckMTKOuiIE(struct ADAPTER *prAdapter, uint8_t *pucBuf,
 	return FALSE;
 } /* rlmParseCheckMTKOuiIE */
 
-#endif
-
-#if CFG_SUPPORT_RXSMM_WHITELIST
-/*----------------------------------------------------------------------------*/
-/*!
- * @brief This function is used to check MTK Vendor Specific OUI
- *
- *
- * @return true:  correct MTK OUI
- *             false: incorrect MTK OUI
- */
-/*----------------------------------------------------------------------------*/
-u_int8_t rlmParseCheckRxsmmOuiIE(struct ADAPTER *prAdapter, uint8_t *pucBuf,
-			       u_int8_t *pfgRxsmmEnable)
-{
-	uint8_t u1RxsmmListIdx = 0;
-	struct IE_MTK_OUI *prMtkOuiIE = (struct IE_MTK_OUI *)NULL;
-
-	if ((prAdapter == NULL) || (pucBuf == NULL))
-		return FALSE;
-
-	*pfgRxsmmEnable = FALSE;
-
-	for (u1RxsmmListIdx = 0;
-		u1RxsmmListIdx < VENDOR_OUI_RXSMM_LIST_NUM;
-		u1RxsmmListIdx++) {
-
-		prMtkOuiIE = (struct IE_MTK_OUI *)pucBuf;
-
-		if (prAdapter->rWifiVar.ucMtkOui == FEATURE_DISABLED)
-			continue;
-		else if (IE_LEN(pucBuf) < ELEM_MIN_LEN_MTK_OUI)
-			continue;
-		else if (prMtkOuiIE->aucOui[0] !=
-			Rxsmm_Iot_Whitelist[u1RxsmmListIdx][0] ||
-			 prMtkOuiIE->aucOui[1] !=
-			 Rxsmm_Iot_Whitelist[u1RxsmmListIdx][1] ||
-			 prMtkOuiIE->aucOui[2] !=
-			 Rxsmm_Iot_Whitelist[u1RxsmmListIdx][2])
-			continue;
-
-		*pfgRxsmmEnable = TRUE;
-
-	}
-
-	DBGLOG(QM, INFO, "RxSMM: RxSMM enable = %d\n", *pfgRxsmmEnable);
-
-	return TRUE;
-} /* rlmParseCheckRxsmmOuiIE */
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -972,8 +761,8 @@ void rlmGenerateCsaIE(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo)
 			return;
 
 		pucBuffer =
-			(uint8_t *)((uintptr_t)prMsduInfo->prPacket +
-				    (uintptr_t)prMsduInfo->u2FrameLength);
+			(uint8_t *)((unsigned long)prMsduInfo->prPacket +
+				    (unsigned long)prMsduInfo->u2FrameLength);
 
 		/* Fill Channel Switch Announcement IE */
 		CSA_IE(pucBuffer)->ucId = ELEM_ID_CH_SW_ANNOUNCEMENT;
@@ -1008,22 +797,6 @@ void rlmGenerateCsaIE(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo)
 			prAdapter->rWifiVar.ucNewChannelS1;
 		WIDE_BW_IE(pucBuffer)->ucChannelS2 =
 			prAdapter->rWifiVar.ucNewChannelS2;
-
-		prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
-
-		/* Fill Extended Channel Switch Announcement IE */
-		pucBuffer += IE_SIZE(pucBuffer);
-
-		EX_CSA_IE(pucBuffer)->ucId = ELEM_ID_EX_CH_SW_ANNOUNCEMENT;
-		EX_CSA_IE(pucBuffer)->ucLength = 4;
-		EX_CSA_IE(pucBuffer)->ucChannelSwitchMode =
-			prAdapter->rWifiVar.ucChannelSwitchMode;
-		EX_CSA_IE(pucBuffer)->ucNewOperatingClass =
-			prAdapter->rWifiVar.ucNewOperatingClass;
-		EX_CSA_IE(pucBuffer)->ucNewChannelNum =
-			prAdapter->rWifiVar.ucNewChannelNumber;
-		EX_CSA_IE(pucBuffer)->ucChannelSwitchCount =
-			prAdapter->rWifiVar.ucChannelSwitchCount;
 
 		prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
 	}
@@ -1121,24 +894,6 @@ static void rlmFillHtCapIE(struct ADAPTER *prAdapter,
 		prHtCap->u2HtCapInfo &=
 			~HT_CAP_INFO_SM_POWER_SAVE; /*Set as static power save*/
 
-#if (CFG_SUPPORT_802_11AX == 1)
-	if ((g_ucHtSMPSCapValue == 5) && (g_fgHTSMPSEnabled == 0xFF)) {
-		prHtCap->u2HtCapInfo |= HT_CAP_INFO_SM_POWER_SAVE;
-	} else if ((g_ucHtSMPSCapValue == 5) && (g_fgHTSMPSEnabled == 1)) {
-		prHtCap->u2HtCapInfo &=
-			(~HT_CAP_INFO_SM_POWER_SAVE);
-		(prHtCap->u2HtCapInfo) |=
-				(1 << HT_CAP_INFO_SM_POWER_SAVE_OFFSET);
-	} else if ((g_ucHtSMPSCapValue == 3) && (g_fgSigmaCMDHt == 1)) {
-		prHtCap->u2HtCapInfo |= HT_CAP_INFO_SM_POWER_SAVE;
-	} else if ((g_ucHtSMPSCapValue == 1) && (g_fgSigmaCMDHt == 1)) {
-		prHtCap->u2HtCapInfo &=
-			(~HT_CAP_INFO_SM_POWER_SAVE);
-		(prHtCap->u2HtCapInfo) |=
-				(1 << HT_CAP_INFO_SM_POWER_SAVE_OFFSET);
-	}
-#endif
-
 	prHtCap->ucAmpduParam = AMPDU_PARAM_DEFAULT_VAL;
 
 	prSupMcsSet = &prHtCap->rSupMcsSet;
@@ -1170,10 +925,7 @@ static void rlmFillHtCapIE(struct ADAPTER *prAdapter,
 		|| (prBssInfo->eBand == BAND_6G)
 #endif
 	) {
-		/* HT BFee has IOT issue
-		 * only support HT BFee when force mode for testing
-		 */
-		if (IS_FEATURE_FORCE_ENABLED(prAdapter->rWifiVar.ucStaHtBfee))
+		if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHtBfee))
 			prHtCap->u4TxBeamformingCap = TX_BEAMFORMING_CAP_BFEE;
 		if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHtBfer))
 			prHtCap->u4TxBeamformingCap |= TX_BEAMFORMING_CAP_BFER;
@@ -1202,26 +954,26 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 	struct IE_EXT_CAP *prExtCap;
 	u_int8_t fg40mAllowed, fgAppendVhtCap;
 	struct STA_RECORD *prStaRec;
-	struct CONNECTION_SETTINGS *prConnSettings = NULL;
-	const uint8_t *extCapConn = NULL;
+	struct CONNECTION_SETTINGS *prConnSettings;
+	const uint8_t *extCapConn;
 	uint32_t extCapIeLen = 0;
+#if CFG_SUPPORT_PASSPOINT
+	struct HS20_INFO *prHS20Info = aisGetHS20Info(
+			prAdapter, prBssInfo->ucBssIndex);
+#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
 
 	fg40mAllowed = prBssInfo->fgAssoc40mBwAllowed;
-	if (IS_BSS_AIS(prBssInfo)) {
-		prConnSettings =
-			aisGetConnSettings(prAdapter, prBssInfo->ucBssIndex);
-		extCapConn = kalFindIeMatchMask(ELEM_ID_EXTENDED_CAP,
-					       prConnSettings->pucAssocIEs,
-					       prConnSettings->assocIeLen,
-					       NULL, 0, 0, NULL);
-		if (extCapConn) {
-			extCapIeLen =
-				ELEM_HDR_LEN + RSN_IE(extCapConn)->ucLength;
-			DBGLOG_MEM8(SAA, INFO, extCapConn, extCapIeLen);
-		}
+	prConnSettings = aisGetConnSettings(prAdapter, prBssInfo->ucBssIndex);
+	extCapConn = kalFindIeMatchMask(ELEM_ID_EXTENDED_CAP,
+				       prConnSettings->pucAssocIEs,
+				       prConnSettings->assocIeLen,
+				       NULL, 0, 0, NULL);
+	if (extCapConn && IS_BSS_AIS(prBssInfo)) {
+		extCapIeLen = ELEM_HDR_LEN + RSN_IE(extCapConn)->ucLength;
+		DBGLOG_MEM8(SAA, INFO, extCapConn, extCapIeLen);
 	}
 
 	/* Add Extended Capabilities IE */
@@ -1266,18 +1018,21 @@ static void rlmFillExtCapIE(struct ADAPTER *prAdapter,
 #endif
 
 #if (CFG_SUPPORT_TWT == 1)
-#if (CFG_SUPPORT_802_11AX == 1)
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucTWTRequester) &&
-		IS_BSS_AIS(prBssInfo))
-		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
+	SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
 			    ELEM_EXT_CAP_TWT_REQUESTER_BIT);
-#endif
 #endif
 
 #if CFG_SUPPORT_PASSPOINT
-	if (prAdapter->rWifiVar.u4SwTestMode == ENUM_SW_TEST_MODE_SIGMA_HS20_R2)
+	if (prHS20Info && prHS20Info->fgConnectHS20AP == TRUE) {
+		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
+			    ELEM_EXT_CAP_INTERWORKING_BIT);
 		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
 			    ELEM_EXT_CAP_QOSMAPSET_BIT);
+		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
+			    ELEM_EXT_CAP_BSS_TRANSITION_BIT);
+		SET_EXT_CAP(prExtCap->aucCapabilities, ELEM_MAX_LEN_EXT_CAP,
+			    ELEM_EXT_CAP_WNM_NOTIFICATION_BIT);
+	}
 #endif
 
 #if CFG_SUPPORT_802_11V_BSS_TRANSITION_MGT
@@ -1395,56 +1150,6 @@ static void rlmFillHtOpIE(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
 	prMsduInfo->u2FrameLength += IE_SIZE(prHtOp);
 }
 
-
-void rlmGenerateHtTPEIE(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo)
-{
-	struct BSS_INFO *prBssInfo;
-	struct STA_RECORD *prStaRec;
-	uint8_t ucPhyTypeSet;
-
-	if (!prAdapter || !prMsduInfo)
-		return;
-
-	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
-
-	prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
-	if (!prBssInfo || !IS_BSS_APGO(prBssInfo))
-		return;
-
-	if (!IS_BSS_ACTIVE(prBssInfo))
-		return;
-
-	if (IS_FEATURE_DISABLED(prAdapter->rWifiVar.fgSapAddTPEIE))
-		return;
-
-	/* Decide PHY type set source */
-	if (prStaRec) {
-		/* Get PHY type set from target STA */
-		ucPhyTypeSet = prStaRec->ucPhyTypeSet;
-	} else {
-		/* Get PHY type set from current BSS */
-		ucPhyTypeSet = prBssInfo->ucPhyTypeSet;
-	}
-
-	if (RLM_NET_IS_11N(prBssInfo) &&
-		(ucPhyTypeSet & PHY_TYPE_SET_802_11N)) {
-		struct IE_HT_TPE *prHtTpe;
-
-		prHtTpe = (struct IE_HT_TPE *)
-			(((uint8_t *)prMsduInfo->prPacket) +
-			prMsduInfo->u2FrameLength);
-
-		prHtTpe->ucId = ELEM_ID_PWR_CONSTRAINT;
-		prHtTpe->ucLength =
-			sizeof(struct IE_HT_TPE) - ELEM_HDR_LEN;
-		prHtTpe->u8TxPowerInfo = 3;
-
-		prMsduInfo->u2FrameLength += IE_SIZE(prHtTpe);
-	}
-}
-
 #if CFG_SUPPORT_802_11AC
 
 /*----------------------------------------------------------------------------*/
@@ -1461,54 +1166,56 @@ void rlmReqGenerateVhtCapIE(struct ADAPTER *prAdapter,
 {
 	struct BSS_INFO *prBssInfo;
 	struct STA_RECORD *prStaRec;
+#if CFG_SUPPORT_VHT_IE_IN_2G
 	struct BSS_DESC *prBssDesc = NULL;
+	u_int8_t fgIsVHTPresent = FALSE;
+#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prMsduInfo);
 
-	prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
+	if (prAdapter) {
+		prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
+#if CFG_SUPPORT_VHT_IE_IN_2G
+		prBssDesc = aisGetTargetBssDesc(prAdapter,
+			prMsduInfo->ucBssIndex);
+		if (prBssDesc) {
+			fgIsVHTPresent = prBssDesc->fgIsVHTPresent;
+			DBGLOG(RLM, TRACE,
+				"fgIsVHTPresent=%d", fgIsVHTPresent);
+		}
+#endif
+	} else {
+		DBGLOG(RLM, ERROR, "prAdapter is NULL, return!");
+		return;
+	}
+
+	if (!prBssInfo) {
+		DBGLOG(RLM, ERROR, "prBssInfo is NULL, return!");
+		return;
+	}
+
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 
-	if (!prBssInfo || !prStaRec) {
-		DBGLOG(RLM, ERROR, "prBssInfo=%p, prStaRec=%p, return!!\n",
-			prBssInfo, prStaRec);
+	if (!prStaRec) {
+		DBGLOG(RLM, ERROR, "prStaRec is NULL, return!");
 		return;
 	}
 
-	if (IS_BSS_AIS(prBssInfo))
-		prBssDesc =
-			aisGetTargetBssDesc(prAdapter, prMsduInfo->ucBssIndex);
-#if CFG_ENABLE_WIFI_DIRECT
-	else if (IS_BSS_P2P(prBssInfo))
-		prBssDesc =
-			p2pGetTargetBssDesc(prAdapter, prMsduInfo->ucBssIndex);
-#endif
-
-	if (!prBssDesc) {
-		DBGLOG(RLM, ERROR, "prBssDesc is NULL, return!\n");
-		return;
-	}
-
-	DBGLOG(RLM, TRACE,
-		"eBand=%d,PhyType=0x%02x, AvailPhyType=0x%02x, VHTPresent=%d\n",
-		prBssDesc->eBand,
-		prStaRec->ucPhyTypeSet,
-		prAdapter->rWifiVar.ucAvailablePhyTypeSet,
-		prBssDesc->fgIsVHTPresent);
-
-	if ((prBssDesc->eBand == BAND_5G) &&
-		(prAdapter->rWifiVar.ucAvailablePhyTypeSet &
-		PHY_TYPE_SET_802_11AC)
+	if ((prAdapter->rWifiVar.ucAvailablePhyTypeSet & PHY_TYPE_SET_802_11AC)
 		&& (prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11AC))
 		rlmFillVhtCapIE(prAdapter, prBssInfo, prMsduInfo);
 #if CFG_SUPPORT_VHT_IE_IN_2G
-	else if ((prBssDesc->eBand == BAND_2G4) &&
+	else if ((prBssInfo->eBand == BAND_2G4) &&
 			(prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11N) &&
 			((prAdapter->rWifiVar.ucVhtIeIn2g
 				==  FEATURE_FORCE_ENABLED) ||
-			((prAdapter->rWifiVar.ucVhtIeIn2g == FEATURE_ENABLED) &&
-				(prBssDesc->fgIsVHTPresent)))) {
-		DBGLOG(RLM, TRACE, "Add VHT IE in 2.4G\n");
+			((prAdapter->rWifiVar.ucVhtIeIn2g
+				== FEATURE_ENABLED) && fgIsVHTPresent))) {
+		DBGLOG(RLM, TRACE,
+			"Add VHT IE in 2.4G, ucPhyTypeSet=%02x, ucVhtIeIn2g=%02x",
+			prStaRec->ucPhyTypeSet,
+			prAdapter->rWifiVar.ucVhtIeIn2g);
 		rlmFillVhtCapIE(prAdapter, prBssInfo, prMsduInfo);
 	}
 #endif
@@ -1634,14 +1341,8 @@ void rlmReqGenerateVhtOpNotificationIE(struct ADAPTER *prAdapter,
 	 * frames without STBC
 	 * Enable the Operating Notification IE only for DBDC enable case.
 	 */
-#if (CFG_SUPPORT_DBDC_DOWNGRADE_BW == 1)
 	if (!prAdapter->rWifiVar.fgDbDcModeEn)
 		return;
-#else
-	if (prBssInfo->ucOpRxNss ==
-		wlanGetSupportNss(prAdapter, prMsduInfo->ucBssIndex))
-		return;
-#endif
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 
@@ -1658,7 +1359,7 @@ void rlmReqGenerateVhtOpNotificationIE(struct ADAPTER *prAdapter,
 		 * current state
 		 */
 		rlmFillVhtOpNotificationIE(prAdapter, prBssInfo, prMsduInfo,
-					   FALSE);
+					   TRUE);
 	}
 }
 
@@ -1690,14 +1391,8 @@ void rlmRspGenerateVhtOpNotificationIE(struct ADAPTER *prAdapter,
 	if (!IS_BSS_ACTIVE(prBssInfo))
 		return;
 
-#if (CFG_SUPPORT_DBDC_DOWNGRADE_BW == 1)
 	if (!prAdapter->rWifiVar.fgDbDcModeEn)
 		return;
-#else
-	if (prBssInfo->ucOpRxNss ==
-		wlanGetSupportNss(prAdapter, prMsduInfo->ucBssIndex))
-		return;
-#endif
 
 	/* Decide PHY type set source */
 	if (prStaRec) {
@@ -1756,13 +1451,9 @@ static void rlmFillVhtOpNotificationIE(struct ADAPTER *prAdapter,
 	       prBssInfo->ucBssIndex, fgIsOwnCap, prBssInfo->ucOpRxNss);
 
 	if (fgIsOwnCap) {
-#if CFG_SUPPORT_DBDC
 		ucOpModeBw = cnmGetDbdcBwCapability(prAdapter,
 						    prBssInfo->ucBssIndex);
-#else
-		ucOpModeBw = cnmGetBssMaxBw(prAdapter,
-						    prBssInfo->ucBssIndex);
-#endif
+
 		/*handle 80P80 case*/
 		if (ucOpModeBw >= MAX_BW_160MHZ) {
 			ucOpModeBw = VHT_OP_MODE_CHANNEL_WIDTH_80;
@@ -1811,9 +1502,7 @@ static void rlmFillVhtCapIE(struct ADAPTER *prAdapter,
 	struct VHT_SUPPORTED_MCS_FIELD *prVhtSupportedMcsSet;
 	uint8_t i;
 	uint8_t ucMaxBw;
-#if CFG_SUPPORT_BFEE
 	struct STA_RECORD *prStaRec;
-#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prBssInfo);
@@ -2056,8 +1745,8 @@ void rlmGenerateVhtTPEIE(
 	struct STA_RECORD *prStaRec;
 	uint8_t ucPhyTypeSet;
 
-	if (!prAdapter || !prMsduInfo)
-		return;
+	ASSERT(prAdapter);
+	ASSERT(prMsduInfo);
 
 	prStaRec = cnmGetStaRecByIndex(prAdapter, prMsduInfo->ucStaRecIndex);
 
@@ -2093,7 +1782,7 @@ void rlmGenerateVhtTPEIE(
 			(((uint8_t *)prMsduInfo->prPacket) +
 			prMsduInfo->u2FrameLength);
 
-		prVhtTpe->ucId = ELEM_ID_TX_PWR_ENVELOPE;
+		prVhtTpe->ucId = ELEM_ID_TPE;
 
 		if (ucChannelWidth > VHT_OP_CHANNEL_WIDTH_80)
 			ucPower = 3;
@@ -2132,53 +1821,51 @@ rlmGetSupportRxNssInVhtCap(struct IE_VHT_CAP *prVhtCap)
 {
 	uint8_t ucRxNss = 1;
 
-	if (!prVhtCap) {
-		DBGLOG(RLM, TRACE, "null prVhtCap, assume RxNss=1\n");
-		return ucRxNss;
-	}
-
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_2SS_MASK) >>
-		VHT_CAP_INFO_MCS_2SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 2;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_3SS_MASK)
-		>> VHT_CAP_INFO_MCS_3SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 3;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_4SS_MASK)
-		>> VHT_CAP_INFO_MCS_4SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 4;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_5SS_MASK)
-		>> VHT_CAP_INFO_MCS_5SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 5;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_6SS_MASK)
-		>> VHT_CAP_INFO_MCS_6SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 6;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_7SS_MASK)
-		>> VHT_CAP_INFO_MCS_7SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 7;
-	if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
-		VHT_CAP_INFO_MCS_8SS_MASK)
-		>> VHT_CAP_INFO_MCS_8SS_OFFSET)
-		!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
-		ucRxNss = 8;
+	if (prVhtCap) {
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_2SS_MASK) >>
+			VHT_CAP_INFO_MCS_2SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 2;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_3SS_MASK)
+			>> VHT_CAP_INFO_MCS_3SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 3;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_4SS_MASK)
+			>> VHT_CAP_INFO_MCS_4SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 4;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_5SS_MASK)
+			>> VHT_CAP_INFO_MCS_5SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 5;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_6SS_MASK)
+			>> VHT_CAP_INFO_MCS_6SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 6;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_7SS_MASK)
+			>> VHT_CAP_INFO_MCS_7SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 7;
+		if (((prVhtCap->rVhtSupportedMcsSet.u2RxMcsMap &
+			VHT_CAP_INFO_MCS_8SS_MASK)
+			>> VHT_CAP_INFO_MCS_8SS_OFFSET)
+			!= VHT_CAP_INFO_MCS_NOT_SUPPORTED)
+			ucRxNss = 8;
+		} else
+			DBGLOG(RLM, WARN, "null prVhtCap, assume RxNss=1\n");
 
 	return ucRxNss;
 }
 
 #endif
 
-#if CFG_SUPPORT_802_11D
+
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief
@@ -2210,6 +1897,236 @@ void rlmGenerateCountryIE(struct ADAPTER *prAdapter,
 		prBssInfo->ucCountryIELen - 3);
 
 	prMsduInfo->u2FrameLength += IE_SIZE(pucBuf);
+}
+
+#if CFG_SUPPORT_CAL_RESULT_BACKUP_TO_HOST
+uint32_t rlmCalBackup(struct ADAPTER *prAdapter, uint8_t ucReason,
+		      uint8_t ucAction, uint8_t ucRomRam)
+{
+	uint32_t rStatus = WLAN_STATUS_FAILURE;
+	struct GLUE_INFO *prGlueInfo = NULL;
+	struct PARAM_CAL_BACKUP_STRUCT_V2 rCalBackupDataV2;
+	uint32_t u4BufLen = 0;
+
+	ASSERT(prAdapter);
+	ASSERT(prAdapter->prGlueInfo);
+
+	prGlueInfo = prAdapter->prGlueInfo;
+
+	rCalBackupDataV2.ucReason = ucReason;
+	rCalBackupDataV2.ucAction = ucAction;
+	rCalBackupDataV2.ucNeedResp = 1;
+	rCalBackupDataV2.ucFragNum = 0;
+	rCalBackupDataV2.ucRomRam = ucRomRam;
+	rCalBackupDataV2.u4ThermalValue = 0;
+	rCalBackupDataV2.u4Address = 0;
+	rCalBackupDataV2.u4Length = 0;
+	rCalBackupDataV2.u4RemainLength = 0;
+
+	if (ucReason == 0 && ucAction == 0) {
+		DBGLOG(RFTEST, INFO, "RLM CMD : Get Thermal Temp from FW.\n");
+		/* Step 1 : Get Thermal Temp from FW */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidQueryCalBackupV2,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   TRUE, TRUE, TRUE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Get Thermal Temp from FW Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Get Thermal Temp (%d) from FW. Finish!!!!!!!!!!!\n",
+		       rCalBackupDataV2.u4ThermalValue);
+	} else if (ucReason == 1 && ucAction == 2) {
+		DBGLOG(RFTEST, INFO, "RLM CMD : Trigger FW Do All Cal.\n");
+		/* Step 2 : Trigger All Cal Function */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidSetCalBackup,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   FALSE, FALSE, TRUE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Trigger FW Do All Cal Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Trigger FW Do All Cal. Finish!!!!!!!!!!!\n");
+	} else if (ucReason == 0 && ucAction == 1) {
+		DBGLOG(RFTEST, INFO,
+		       "RLM CMD : Get Cal Data (%s) Size from FW.\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+		/* Step 3 : Get Cal Data Size from FW */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidQueryCalBackupV2,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   TRUE, TRUE, TRUE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Get Cal Data (%s) Size from FW Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       ucRomRam == 0 ? "ROM" : "RAM", rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Get Cal Data (%s) Size from FW. Finish!!!!!!!!!!!\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+	} else if (ucReason == 2 && ucAction == 4) {
+		DBGLOG(RFTEST, INFO,
+		       "RLM CMD : Get Cal Data from FW (%s). Start!!!!!!!!!!!!!!!!\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+		DBGLOG(RFTEST, INFO, "Thermal Temp = %d\n",
+		       g_rBackupCalDataAllV2.u4ThermalInfo);
+		/* Step 4 : Get Cal Data from FW */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidQueryCalBackupV2,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   TRUE, TRUE, TRUE, &u4BufLen);
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Get Cal Data (%s) Size from FW Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       ucRomRam == 0 ? "ROM" : "RAM", rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Get Cal Data from FW (%s). Finish!!!!!!!!!!!\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+
+		if (ucRomRam == 0) {
+			DBGLOG(RFTEST, INFO,
+			       "Check some of elements (0x%08x), (0x%08x), (0x%08x), (0x%08x), (0x%08x)\n",
+			       g_rBackupCalDataAllV2.au4RomCalData[670],
+			       g_rBackupCalDataAllV2.au4RomCalData[671],
+			       g_rBackupCalDataAllV2.au4RomCalData[672],
+			       g_rBackupCalDataAllV2.au4RomCalData[673],
+			       g_rBackupCalDataAllV2.au4RomCalData[674]);
+			DBGLOG(RFTEST, INFO,
+			       "Check some of elements (0x%08x), (0x%08x), (0x%08x), (0x%08x), (0x%08x)\n",
+			       g_rBackupCalDataAllV2.au4RomCalData[675],
+			       g_rBackupCalDataAllV2.au4RomCalData[676],
+			       g_rBackupCalDataAllV2.au4RomCalData[677],
+			       g_rBackupCalDataAllV2.au4RomCalData[678],
+			       g_rBackupCalDataAllV2.au4RomCalData[679]);
+		}
+	} else if (ucReason == 4 && ucAction == 6) {
+		DBGLOG(RFTEST, INFO, "RLM CMD : Print Cal Data in FW (%s).\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+		/* Debug Use : Print Cal Data in FW */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidSetCalBackup,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   TRUE, TRUE, TRUE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Print Cal Data in FW (%s) Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       ucRomRam == 0 ? "ROM" : "RAM", rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Print Cal Data in FW (%s). Finish!!!!!!!!!!!\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+	} else if (ucReason == 3 && ucAction == 5) {
+		DBGLOG(RFTEST, INFO, "RLM CMD : Send Cal Data to FW (%s).\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+		/* Send Cal Data to FW */
+
+		rStatus = kalIoctl(prGlueInfo, wlanoidSetCalBackup,
+				   &rCalBackupDataV2,
+				   sizeof(struct PARAM_CAL_BACKUP_STRUCT_V2),
+				   TRUE, TRUE, TRUE, &u4BufLen);
+
+		if (rStatus != WLAN_STATUS_SUCCESS) {
+			DBGLOG(RFTEST, INFO,
+			       "RLM CMD : Send Cal Data to FW (%s) Return Fail (0x%08x)!!!!!!!!!!!\n",
+			       ucRomRam == 0 ? "ROM" : "RAM", rStatus);
+			return rStatus;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Send Cal Data to FW (%s). Finish!!!!!!!!!!!\n",
+		       ucRomRam == 0 ? "ROM" : "RAM");
+	} else {
+		DBGLOG(RFTEST, INFO,
+		       "CMD : Undefined Reason (%d) and Action (%d) for Cal Backup in Host Side!\n",
+		       ucReason, ucAction);
+
+		return rStatus;
+	}
+
+	return rStatus;
+}
+
+uint32_t rlmTriggerCalBackup(struct ADAPTER *prAdapter,
+			     u_int8_t fgIsCalDataBackuped)
+{
+	uint32_t rStatus = WLAN_STATUS_SUCCESS;
+
+	if (!fgIsCalDataBackuped) {
+		DBGLOG(RFTEST, INFO,
+		       "======== Boot Time Wi-Fi Enable........\n");
+		DBGLOG(RFTEST, INFO,
+		       "Step 0 : Reset All Cal Data in Driver.\n");
+		memset(&g_rBackupCalDataAllV2, 1,
+		       sizeof(struct RLM_CAL_RESULT_ALL_V2));
+		g_rBackupCalDataAllV2.u4MagicNum1 = 6632;
+		g_rBackupCalDataAllV2.u4MagicNum2 = 6632;
+
+		DBGLOG(RFTEST, INFO, "Step 1 : Get Thermal Temp from FW.\n");
+		if (rlmCalBackup(prAdapter, 0, 0, 0) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 1 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "Step 2 : Get Rom Cal Data Size from FW.\n");
+		if (rlmCalBackup(prAdapter, 0, 1, 0) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 2 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+
+		DBGLOG(RFTEST, INFO,
+		       "Step 3 : Get Ram Cal Data Size from FW.\n");
+		if (rlmCalBackup(prAdapter, 0, 1, 1) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 3 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+
+		DBGLOG(RFTEST, INFO, "Step 4 : Trigger FW Do Full Cal.\n");
+		if (rlmCalBackup(prAdapter, 1, 2, 0) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 4 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+	} else {
+		DBGLOG(RFTEST, INFO, "======== Normal Wi-Fi Enable........\n");
+		DBGLOG(RFTEST, INFO, "Step 0 : Sent Rom Cal data to FW.\n");
+		if (rlmCalBackup(prAdapter, 3, 5, 0) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 0 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+
+		DBGLOG(RFTEST, INFO, "Step 1 : Sent Ram Cal data to FW.\n");
+		if (rlmCalBackup(prAdapter, 3, 5, 1) == WLAN_STATUS_FAILURE) {
+			DBGLOG(RFTEST, INFO, "Step 1 : Return Failure.\n");
+			return WLAN_STATUS_FAILURE;
+		}
+	}
+
+	return rStatus;
 }
 #endif
 
@@ -2280,12 +2197,12 @@ void rlmModifyVhtBwPara(uint8_t *pucVhtChannelFrequencyS1,
 }
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
-void rlmTransferHe6gOpInfor(uint8_t ucChannelNum,
-	uint8_t ucChannelWidth,
-	uint8_t *pucChannelWidth,
-	uint8_t *pucCenterFreqS1,
-	uint8_t *pucCenterFreqS2,
-	enum ENUM_CHNL_EXT *peSco)
+void rlmTransferHe6gOpInfor(IN uint8_t ucChannelNum,
+	IN uint8_t ucChannelWidth,
+	OUT uint8_t *pucChannelWidth,
+	OUT uint8_t *pucCenterFreqS1,
+	OUT uint8_t *pucCenterFreqS2,
+	OUT enum ENUM_CHNL_EXT *peSco)
 {
 	switch (ucChannelWidth) {
 	case HE_OP_CHANNEL_WIDTH_20:
@@ -2388,7 +2305,7 @@ void rlmModifyHE6GBwPara(uint8_t ucHe6gChannelWidth,
 		}
 	}
 }
-#endif /* CFG_SUPPORT_WIFI_6G */
+#endif
 
 void rlmRevisePreferBandwidthNss(struct ADAPTER *prAdapter,
 					uint8_t ucBssIndex,
@@ -2407,10 +2324,6 @@ void rlmRevisePreferBandwidthNss(struct ADAPTER *prAdapter,
 #define AR_IS_STA_2SS_AC(prStaRec) ((AR_STA_2AC_MCS(prStaRec) != BITS(0, 1)))
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(RLM, ERROR, "prBssInfo is null\n");
-		return;
-	}
 
 	eChannelWidth = prBssInfo->ucVhtChannelWidth;
 
@@ -2459,12 +2372,8 @@ void rlmReviseMaxBw(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 	enum ENUM_CHNL_EXT eScoModify;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-
-#if CFG_SUPPORT_DBDC
 	ucMaxBandwidth = cnmGetDbdcBwCapability(prAdapter, ucBssIndex);
-#else
-	ucMaxBandwidth = cnmGetBssMaxBw(prAdapter, ucBssIndex);
-#endif
+
 	if (*peChannelWidth > CW_20_40MHZ) {
 		/*case BW > 80 , 160 80P80 */
 		ucCurrentBandwidth = (uint8_t)*peChannelWidth + ucOffset;
@@ -2489,12 +2398,10 @@ void rlmReviseMaxBw(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 			if (ucS1Origin) {
 				*peChannelWidth = (ucMaxBandwidth - ucOffset);
 
-				/* modify S1 for Bandwidth 160 -> 80 or
-				 * 320 -> 160
-				 */
+				/* modify S1 for Bandwidth 160 <-> 80 */
 				if ((ucCurrentBandwidth == MAX_BW_160MHZ &&
 					ucMaxBandwidth == MAX_BW_80MHZ) ||
-					(ucCurrentBandwidth == MAX_BW_320MHZ &&
+					(ucCurrentBandwidth == MAX_BW_80MHZ &&
 					ucMaxBandwidth == MAX_BW_160MHZ)) {
 					*pucS1 = nicGetS1(prBssInfo->eBand,
 						*pucPrimaryCh,
@@ -2504,8 +2411,7 @@ void rlmReviseMaxBw(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 		}
 
 		if (eChBwOrigin != *peChannelWidth) {
-			DBGLOG(RLM, INFO,
-				"Change BW(VHT)[%d->%d], S1[%d->%d]\n",
+			DBGLOG(RLM, INFO, "Change BW[%d->%d], S1[%d->%d)\n",
 				eChBwOrigin, *peChannelWidth,
 				ucS1Origin, *pucS1);
 		}
@@ -2534,11 +2440,11 @@ void rlmReviseMaxBw(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
  */
 /*----------------------------------------------------------------------------*/
 enum ENUM_CHNL_EXT rlmReviseSco(
-	enum ENUM_CHANNEL_WIDTH eChannelWidth,
-	uint8_t ucPrimaryCh,
-	uint8_t ucS1,
-	enum ENUM_CHNL_EXT eScoOrigin,
-	uint8_t ucMaxBandwidth)
+	IN enum ENUM_CHANNEL_WIDTH eChannelWidth,
+	IN uint8_t ucPrimaryCh,
+	IN uint8_t ucS1,
+	IN enum ENUM_CHNL_EXT eScoOrigin,
+	IN uint8_t ucMaxBandwidth)
 {
 	enum ENUM_CHNL_EXT eSCO = eScoOrigin;
 
@@ -2582,8 +2488,7 @@ void rlmFillVhtOpInfoByBssOpBw(struct BSS_INFO *prBssInfo, uint8_t ucBssOpBw)
 		prBssInfo->ucVhtChannelFrequencyS2 = 0;
 	} else if (ucBssOpBw == MAX_BW_320MHZ) {
 		prBssInfo->ucVhtChannelWidth = VHT_OP_CHANNEL_WIDTH_320;
-		prBssInfo->ucVhtChannelFrequencyS1 = nicGetS1(
-			prBssInfo->eBand,
+		prBssInfo->ucVhtChannelFrequencyS1 = nicGetVhtS1(
 			prBssInfo->ucPrimaryChannel, VHT_OP_CHANNEL_WIDTH_320);
 		prBssInfo->ucVhtChannelFrequencyS2 = 0;
 	} else {
@@ -2593,69 +2498,6 @@ void rlmFillVhtOpInfoByBssOpBw(struct BSS_INFO *prBssInfo, uint8_t ucBssOpBw)
 		prBssInfo->ucVhtChannelWidth = VHT_OP_CHANNEL_WIDTH_20_40;
 		prBssInfo->ucVhtChannelFrequencyS1 = 0;
 		prBssInfo->ucVhtChannelFrequencyS2 = 0;
-	}
-}
-
-void rlmParseMtkOui(
-	struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	struct BSS_INFO *prBssInfo,
-	uint8_t *pucIE)
-{
-	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
-	uint8_t *aucCapa = MTK_OUI_IE(pucIE)->aucCapability;
-	uint8_t *ie, *sub;
-	uint16_t ie_len, ie_offset, sub_len, sub_offset;
-
-	if (kalMemCmp(MTK_OUI_IE(pucIE)->aucOui,
-		aucMtkOui, sizeof(aucMtkOui)))
-		return;
-	else if (MTK_OUI_IE(pucIE)->ucLength <
-		ELEM_MIN_LEN_MTK_OUI)
-		return;
-
-#if (CFG_SUPPORT_TWT_HOTSPOT_AC == 1)
-	prStaRec->ucTWTHospotSupport =
-		((aucCapa[0] &
-		MTK_SYNERGY_CAP_SUPPORT_TWT_HOTSPOT_AC) ==
-		MTK_SYNERGY_CAP_SUPPORT_TWT_HOTSPOT_AC);
-#endif
-
-	prStaRec->ucGcCsaSupported =
-		((aucCapa[1] &
-		MTK_SYNERGY_CAP_SUPPORT_GC_CSA) ==
-		MTK_SYNERGY_CAP_SUPPORT_GC_CSA) &&
-		prAdapter->rWifiVar.fgP2pGcCsa;
-
-	DBGLOG(RLM, LOUD, "GcCsa: %d\n", prStaRec->ucGcCsaSupported);
-
-	ie = MTK_OUI_IE(pucIE)->aucInfoElem;
-	ie_len = IE_LEN(pucIE) - 7;
-
-	IE_FOR_EACH(ie, ie_len, ie_offset) {
-		if (IE_ID(ie) == MTK_OUI_ID_PRE_WIFI7) {
-			struct IE_MTK_PRE_WIFI7 *prPreWifi7 =
-				(struct IE_MTK_PRE_WIFI7 *)ie;
-
-			DBGLOG(RLM, TRACE, "MTK_OUI_PRE_WIFI7 %d.%d",
-				prPreWifi7->ucVersion1, prPreWifi7->ucVersion0);
-			DBGLOG_MEM8(RLM, TRACE, ie, IE_SIZE(ie));
-
-			sub = prPreWifi7->aucInfoElem;
-			sub_len = IE_LEN(prPreWifi7) - 2;
-
-			IE_FOR_EACH(sub, sub_len, sub_offset) {
-#if (CFG_SUPPORT_802_11BE == 1)
-				if (IE_ID_EXT(sub) == ELEM_EXT_ID_EHT_CAPS)
-					ehtRlmRecCapInfo(prAdapter,
-						prStaRec, sub);
-
-				if (IE_ID_EXT(sub) == ELEM_EXT_ID_EHT_OP)
-					ehtRlmRecOperation(prAdapter, prStaRec,
-						prBssInfo, sub);
-#endif
-			}
-		}
 	}
 }
 
@@ -2691,7 +2533,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 	struct IE_OP_MODE_NOTIFICATION *prOPNotif;
 	uint8_t fgHasOPModeIE = FALSE;
 	uint8_t fgHasNewOPModeIE = FALSE;
-	uint8_t fgUpdateToFWForDiffOPModeIE = TRUE;
 	uint8_t ucVhtOpModeChannelWidth = 0;
 	uint8_t ucVhtOpModeRxNss = 0;
 	uint8_t ucMaxBwAllowed;
@@ -2709,7 +2550,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 
 #if CFG_SUPPORT_DFS
 	struct IE_CHANNEL_SWITCH *prCSAIE;
-	struct IE_EX_CHANNEL_SWITCH *prExCSAIE;
 	struct SWITCH_CH_AND_BAND_PARAMS *prCSAParams;
 	uint8_t ucCurrentCsaCount;
 	struct IE_SECONDARY_OFFSET *prSecondaryOffsetIE;
@@ -2720,21 +2560,13 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 	enum ENUM_CHANNEL_WIDTH eChannelWidth = CW_20_40MHZ;
 	uint8_t ucHtOpChannelFrequencyS3 = 0;
 
-#if (CFG_SUPPORT_TWT_HOTSPOT_AC == 1)
-	uint8_t aucMtkOui[] = VENDOR_OUI_MTK;
-#endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-	uint8_t fgBtwtIeFound = FALSE;
-#endif
-	uint8_t *pucIEOpmode = NULL;
-
 	ASSERT(prAdapter);
 	ASSERT(prBssInfo);
 	ASSERT(pucIE);
 
 	DBGLOG(RLM, LOUD, "Dump beacon content from FW\n");
-	DBGLOG_MEM8(RLM, LOUD, pucIE, u2IELength);
+	if (aucDebugModule[DBG_RLM_IDX] & DBG_CLASS_LOUD)
+		dumpMemory8((uint8_t *) pucIE, (uint32_t) u2IELength);
 
 	prStaRec = prBssInfo->prStaRecOfAP;
 	if (!prStaRec)
@@ -3034,14 +2866,155 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 
 			break;
 		case ELEM_ID_OP_MODE:
-			/* Check OP mode IE at last */
-			pucIEOpmode = pucIE;
+			if (IE_LEN(pucIE) !=
+				    (sizeof(struct IE_OP_MODE_NOTIFICATION) -
+				     2))
+				break;
 
+			if (!(RLM_NET_IS_11AC(prBssInfo)
+#if (CFG_SUPPORT_WIFI_6G == 1)
+				|| (prBssInfo->eBand == BAND_6G &&
+					RLM_NET_IS_11AX(prBssInfo))
+#endif
+			))
+				break;
+
+			prOPNotif = (struct IE_OP_MODE_NOTIFICATION *) pucIE;
+
+			/* NOTE: An AP always sets this field to 0,
+			 * so break it if this bit is set.
+			 */
+			if ((prOPNotif->ucOpMode & VHT_OP_MODE_RX_NSS_TYPE)
+			    == VHT_OP_MODE_RX_NSS_TYPE) {
+				break;
+			}
+			fgHasOPModeIE = TRUE;
+
+			/* Check BIT(2) is BW80P80_160.
+			 * Refactor ucOpMode with ucVhtOpMode format.
+			 */
+			if (prOPNotif->ucOpMode &
+				VHT_OP_MODE_CHANNEL_WIDTH_80P80_160) {
+				prOPNotif->ucOpMode &=
+					~(VHT_OP_MODE_CHANNEL_WIDTH |
+					VHT_OP_MODE_CHANNEL_WIDTH_80P80_160);
+				prOPNotif->ucOpMode |=
+					(VHT_OP_MODE_CHANNEL_WIDTH_160_80P80 &
+					VHT_OP_MODE_CHANNEL_WIDTH);
+			}
+
+			/* Same OP mode, no need to update.
+			 * Let the further flow not to update VhtOpMode.
+			 */
+			if (prStaRec->ucVhtOpMode == prOPNotif->ucOpMode) {
+				ucInitVhtOpMode = prStaRec->ucVhtOpMode;
+				break;
+			}
+
+			fgHasNewOPModeIE = TRUE;
+			prStaRec->ucVhtOpMode = prOPNotif->ucOpMode;
+			ucVhtOpModeChannelWidth =
+				(prOPNotif->ucOpMode &
+				VHT_OP_MODE_CHANNEL_WIDTH);
+
+			ucVhtOpModeRxNss =
+				(prOPNotif->ucOpMode & VHT_OP_MODE_RX_NSS)
+				>> VHT_OP_MODE_RX_NSS_OFFSET;
+
+			if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
+				prStaRec->u2VhtRxMcsMap = BITS(0, 15) &
+					(~(VHT_CAP_INFO_MCS_1SS_MASK |
+					VHT_CAP_INFO_MCS_2SS_MASK));
+
+				prStaRec->u2VhtRxMcsMap |=
+					(prStaRec->u2VhtRxMcsMapAssoc &
+					(VHT_CAP_INFO_MCS_1SS_MASK |
+					VHT_CAP_INFO_MCS_2SS_MASK));
+			} else {
+				prStaRec->u2VhtRxMcsMap = BITS(0, 15) &
+					(~VHT_CAP_INFO_MCS_1SS_MASK);
+
+				prStaRec->u2VhtRxMcsMap |=
+					(prStaRec->u2VhtRxMcsMapAssoc &
+					VHT_CAP_INFO_MCS_1SS_MASK);
+			}
+			DBGLOG(RLM, INFO,
+			       "NSS=%x RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
+			       ucVhtOpModeRxNss, prStaRec->u2VhtRxMcsMap,
+			       prStaRec->u2VhtRxMcsMapAssoc);
+
+#if (CFG_SUPPORT_802_11AX == 1)
+			u2HeRxMcsMapAssoc = prStaRec->u2HeRxMcsMapBW80Assoc;
+			if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
+				prStaRec->u2HeRxMcsMapBW80 = BITS(0, 15) &
+					(~(HE_CAP_INFO_MCS_1SS_MASK |
+					HE_CAP_INFO_MCS_2SS_MASK));
+
+				prStaRec->u2HeRxMcsMapBW80 |=
+					(u2HeRxMcsMapAssoc &
+					(HE_CAP_INFO_MCS_1SS_MASK |
+					HE_CAP_INFO_MCS_2SS_MASK));
+			} else {
+				fgIsRx1ss = TRUE;
+
+				prStaRec->u2HeRxMcsMapBW80 = BITS(0, 15) &
+					(~HE_CAP_INFO_MCS_1SS_MASK);
+
+				prStaRec->u2HeRxMcsMapBW80 |=
+					(u2HeRxMcsMapAssoc &
+					HE_CAP_INFO_MCS_1SS_MASK);
+			}
+
+			DBGLOG(RLM, INFO,
+				"HeBW80, NSS=%d, RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
+				ucVhtOpModeRxNss,
+				prStaRec->u2HeRxMcsMapBW80,
+				prStaRec->u2HeRxMcsMapBW80Assoc);
+
+			if (ucMaxBwAllowed >= MAX_BW_160MHZ) {
+				u2HeRxMcsMapAssoc =
+					prStaRec->u2HeRxMcsMapBW160Assoc;
+				if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
+					prStaRec->u2HeRxMcsMapBW160 =
+						BITS(0, 15) &
+						(~(HE_CAP_INFO_MCS_1SS_MASK |
+						HE_CAP_INFO_MCS_2SS_MASK));
+
+					prStaRec->u2HeRxMcsMapBW160 |=
+						(u2HeRxMcsMapAssoc &
+						(HE_CAP_INFO_MCS_1SS_MASK |
+						HE_CAP_INFO_MCS_2SS_MASK));
+				} else {
+					prStaRec->u2HeRxMcsMapBW160 =
+						BITS(0, 15) &
+						(~HE_CAP_INFO_MCS_1SS_MASK);
+
+					prStaRec->u2HeRxMcsMapBW160 |=
+						(u2HeRxMcsMapAssoc &
+						HE_CAP_INFO_MCS_1SS_MASK);
+				}
+
+				DBGLOG(RLM, INFO,
+					"HeBW160, NSS=%d, RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
+					ucVhtOpModeRxNss,
+					prStaRec->u2HeRxMcsMapBW160,
+					prStaRec->u2HeRxMcsMapBW160Assoc);
+			}
+#if (CFG_SUPPORT_WIFI_6G == 1)
+			if (fgIsRx1ss)
+				prStaRec->u2He6gBandCapInfo &=
+					~HE_6G_CAP_INFO_SM_POWER_SAVE;
+			else
+				prStaRec->u2He6gBandCapInfo |=
+					HE_6G_CAP_INFO_SM_POWER_SAVE;
+#endif
+#endif /* CFG_SUPPORT_802_11AX == 1 */
 			break;
 #if CFG_SUPPORT_DFS
 		case ELEM_ID_WIDE_BAND_CHANNEL_SWITCH:
-			if (IE_LEN(pucIE) !=
-				(sizeof(struct IE_WIDE_BAND_CHANNEL) - 2))
+			if (!RLM_NET_IS_11AC(prBssInfo) ||
+			    IE_LEN(pucIE) !=
+				    (sizeof(struct IE_WIDE_BAND_CHANNEL) - 2))
 				break;
 			DBGLOG(RLM, INFO,
 			       "[CSA] ELEM_ID_WIDE_BAND_CHANNEL_SWITCH, 11AC\n");
@@ -3143,38 +3116,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 #endif
 			break;
 
-		case ELEM_ID_EX_CH_SW_ANNOUNCEMENT:
-			if (IE_LEN(pucIE) !=
-			    (sizeof(struct IE_EX_CHANNEL_SWITCH) - 2))
-				break;
-
-			prExCSAIE = (struct IE_EX_CHANNEL_SWITCH *)pucIE;
-
-			/* Mode 1 implies that addressed AP is advised to
-			 * transmit no further frames on current channel
-			 * until the scheduled channel switch.
-			 */
-			if (prExCSAIE->ucChannelSwitchMode != 1)
-				continue;
-
-#if (CFG_SUPPORT_WIFI_6G == 1)
-			if (prExCSAIE->ucNewOperatingClass >= 131 &&
-				prExCSAIE->ucNewOperatingClass <= 135)
-				prCSAParams->eCsaBand = BAND_6G;
-			else
-#endif
-			if (prExCSAIE->ucNewChannelNum <= 14)
-				prCSAParams->eCsaBand = BAND_2G4;
-			else
-				prCSAParams->eCsaBand = BAND_5G;
-
-			DBGLOG(RLM, INFO,
-				"[CSA] Op class[%d], Band[%d], CH[%d]\n",
-				prExCSAIE->ucNewOperatingClass,
-				prCSAParams->eCsaBand,
-				prExCSAIE->ucNewChannelNum);
-			break;
-
 		case ELEM_ID_SCO:
 			if (IE_LEN(pucIE) !=
 			    (sizeof(struct IE_SECONDARY_OFFSET) - 2))
@@ -3183,8 +3124,8 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			prSecondaryOffsetIE =
 				(struct IE_SECONDARY_OFFSET *)pucIE;
 			DBGLOG(RLM, INFO, "[CSA] SCO [%d]->[%d]\n",
-				prBssInfo->eBssSCO,
-				prSecondaryOffsetIE->ucSecondaryOffset);
+			       prBssInfo->eBssSCO,
+			       prSecondaryOffsetIE->ucSecondaryOffset);
 			prCSAParams->eSco = (enum ENUM_CHNL_EXT)
 					prSecondaryOffsetIE->ucSecondaryOffset;
 			break;
@@ -3199,13 +3140,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			rrmQuietHandleQuietIE(prBssInfo,
 					      (struct IE_QUIET *)pucIE);
 			fgHasQuietIE = TRUE;
-			break;
-#endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-		case ELEM_ID_TWT:
-			heRlmRecBTWTparams(prAdapter, prStaRec, pucIE);
-			fgBtwtIeFound = TRUE;
 			break;
 #endif
 
@@ -3286,227 +3220,26 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 			}
 #endif /* CFG_SUPPORT_WIFI_6G */
 #if (CFG_SUPPORT_802_11BE == 1)
-			if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_EHT_CAPS)
+			if (IE_ID_EXT(pucIE) == EID_EXT_EHT_CAPS)
 				ehtRlmRecCapInfo(prAdapter, prStaRec, pucIE);
-			else if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_EHT_OP)
-				ehtRlmRecOperation(prAdapter, prStaRec,
+			else if (IE_ID_EXT(pucIE) == EID_EXT_EHT_OP)
+				ehtRlmRecOperation(prAdapter,
 					prBssInfo, pucIE);
 #endif
 			break;
 #endif /* CFG_SUPPORT_802_11AX */
-		case ELEM_ID_VENDOR:
-			rlmParseMtkOui(prAdapter, prStaRec, prBssInfo, pucIE);
-			break;
 		default:
 			break;
 		} /* end of switch */
 	}	 /* end of IE_FOR_EACH */
 
-	if (pucIEOpmode != NULL) {
-		switch (IE_ID(pucIEOpmode)) {
-		case ELEM_ID_OP_MODE:
-			DBGLOG(RLM, TRACE, "Check OP mode IE at last\n");
-			if (IE_LEN(pucIEOpmode) !=
-				(sizeof(struct IE_OP_MODE_NOTIFICATION) -
-					 2)) {
-				DBGLOG(RLM, WARN,
-					"OP mode IE len check fail\n");
-				break;
-			}
-
-			if (!(RLM_NET_IS_11AC(prBssInfo)
-#if (CFG_SUPPORT_WIFI_6G == 1)
-				|| (prBssInfo->eBand == BAND_6G &&
-					RLM_NET_IS_11AX(prBssInfo))
-#endif
-			))
-				break;
-
-			prOPNotif =
-			(struct IE_OP_MODE_NOTIFICATION *) pucIEOpmode;
-
-			/* NOTE: An AP always sets this field to 0,
-			 * so break it if this bit is set.
-			 */
-			if ((prOPNotif->ucOpMode & VHT_OP_MODE_RX_NSS_TYPE)
-				== VHT_OP_MODE_RX_NSS_TYPE)
-				break;
-			fgHasOPModeIE = TRUE;
-
-			/* Check BIT(2) is BW80P80_160.
-			 * Refactor ucOpMode with ucVhtOpMode format.
-			 */
-			if (prOPNotif->ucOpMode &
-				VHT_OP_MODE_CHANNEL_WIDTH_80P80_160) {
-				prOPNotif->ucOpMode &=
-					~(VHT_OP_MODE_CHANNEL_WIDTH |
-					VHT_OP_MODE_CHANNEL_WIDTH_80P80_160);
-				prOPNotif->ucOpMode |=
-					(VHT_OP_MODE_CHANNEL_WIDTH_160_80P80 &
-					VHT_OP_MODE_CHANNEL_WIDTH);
-			}
-
-			/* Same OP mode, no need to update.
-			 * Let the further flow not to update VhtOpMode.
-			 */
-			if (prStaRec->ucVhtOpMode == prOPNotif->ucOpMode) {
-				ucInitVhtOpMode = prStaRec->ucVhtOpMode;
-				DBGLOG(RLM, LOUD,
-					"OP mode IE: same ucVhtOpMode\n");
-			} else {
-				prStaRec->ucVhtOpMode = prOPNotif->ucOpMode;
-			}
-
-			if (prStaRec->ucOpModeInOpNotificationIE
-				== prOPNotif->ucOpMode) {
-				DBGLOG(RLM, LOUD,
-					"OP mode IE: same ucOpModeInOpNotificationIE 0x%x\n",
-					prStaRec->ucOpModeInOpNotificationIE);
-				fgUpdateToFWForDiffOPModeIE = FALSE;
-			}
-
-			prStaRec->ucOpModeInOpNotificationIE =
-				prOPNotif->ucOpMode;
-
-			fgHasNewOPModeIE = TRUE;
-
-			ucVhtOpModeChannelWidth =
-				(prOPNotif->ucOpMode &
-				VHT_OP_MODE_CHANNEL_WIDTH);
-
-			ucVhtOpModeRxNss =
-				(prOPNotif->ucOpMode & VHT_OP_MODE_RX_NSS)
-				>> VHT_OP_MODE_RX_NSS_OFFSET;
-
-			if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
-				prStaRec->u2VhtRxMcsMap = BITS(0, 15) &
-					(~(VHT_CAP_INFO_MCS_1SS_MASK |
-					VHT_CAP_INFO_MCS_2SS_MASK));
-
-				prStaRec->u2VhtRxMcsMap |=
-					(prStaRec->u2VhtRxMcsMapAssoc &
-					(VHT_CAP_INFO_MCS_1SS_MASK |
-					VHT_CAP_INFO_MCS_2SS_MASK));
-			} else {
-				prStaRec->u2VhtRxMcsMap = BITS(0, 15) &
-					(~VHT_CAP_INFO_MCS_1SS_MASK);
-
-				prStaRec->u2VhtRxMcsMap |=
-					(prStaRec->u2VhtRxMcsMapAssoc &
-					VHT_CAP_INFO_MCS_1SS_MASK);
-			}
-			DBGLOG(RLM, INFO,
-				"[OP Mode IE] NSS=%x RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
-				ucVhtOpModeRxNss, prStaRec->u2VhtRxMcsMap,
-				prStaRec->u2VhtRxMcsMapAssoc);
-
-#if (CFG_SUPPORT_802_11AX == 1)
-			u2HeRxMcsMapAssoc = prStaRec->u2HeRxMcsMapBW80Assoc;
-			if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
-				prStaRec->u2HeRxMcsMapBW80 = BITS(0, 15) &
-					(~(HE_CAP_INFO_MCS_1SS_MASK |
-					HE_CAP_INFO_MCS_2SS_MASK));
-
-				prStaRec->u2HeRxMcsMapBW80 |=
-					(u2HeRxMcsMapAssoc &
-					(HE_CAP_INFO_MCS_1SS_MASK |
-					HE_CAP_INFO_MCS_2SS_MASK));
-			} else {
-				fgIsRx1ss = TRUE;
-
-				prStaRec->u2HeRxMcsMapBW80 = BITS(0, 15) &
-					(~HE_CAP_INFO_MCS_1SS_MASK);
-
-				prStaRec->u2HeRxMcsMapBW80 |=
-					(u2HeRxMcsMapAssoc &
-					HE_CAP_INFO_MCS_1SS_MASK);
-			}
-
-			DBGLOG(RLM, INFO,
-				"[OP Mode IE] HeBW80, NSS=%d, RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
-				ucVhtOpModeRxNss,
-				prStaRec->u2HeRxMcsMapBW80,
-				prStaRec->u2HeRxMcsMapBW80Assoc);
-
-			if (ucMaxBwAllowed >= MAX_BW_160MHZ) {
-				u2HeRxMcsMapAssoc =
-					prStaRec->u2HeRxMcsMapBW160Assoc;
-				if (ucVhtOpModeRxNss == VHT_OP_MODE_NSS_2) {
-					prStaRec->u2HeRxMcsMapBW160 =
-						BITS(0, 15) &
-						(~(HE_CAP_INFO_MCS_1SS_MASK |
-						HE_CAP_INFO_MCS_2SS_MASK));
-
-					prStaRec->u2HeRxMcsMapBW160 |=
-						(u2HeRxMcsMapAssoc &
-						(HE_CAP_INFO_MCS_1SS_MASK |
-						HE_CAP_INFO_MCS_2SS_MASK));
-				} else {
-					prStaRec->u2HeRxMcsMapBW160 =
-						BITS(0, 15) &
-						(~HE_CAP_INFO_MCS_1SS_MASK);
-
-					prStaRec->u2HeRxMcsMapBW160 |=
-						(u2HeRxMcsMapAssoc &
-						HE_CAP_INFO_MCS_1SS_MASK);
-				}
-
-				DBGLOG(RLM, INFO,
-					"[OP Mode IE] HeBW160, NSS=%d, RxMcsMap:0x%x, McsMapAssoc:0x%x\n",
-					ucVhtOpModeRxNss,
-					prStaRec->u2HeRxMcsMapBW160,
-					prStaRec->u2HeRxMcsMapBW160Assoc);
-			}
-#if (CFG_SUPPORT_WIFI_6G == 1)
-			if (fgIsRx1ss)
-				prStaRec->u2He6gBandCapInfo &=
-					~HE_6G_CAP_INFO_SM_POWER_SAVE;
-			else
-				prStaRec->u2He6gBandCapInfo |=
-					HE_6G_CAP_INFO_SM_POWER_SAVE;
-#endif
-#endif /* CFG_SUPPORT_802_11AX == 1 */
-			break;
-		default:
-			break;
-
-		}
-	} else {
-		/*
-		 * beacon with OP mode IE -> beacon without OP mode IE
-		 * for the first time, thus require update to FW
-		 */
-		if (fgHasOPModeIE == FALSE
-			&& prStaRec->ucOpModeInOpNotificationIE != 0xff) {
-			prStaRec->ucOpModeInOpNotificationIE = 0xff;
-			DBGLOG(RLM, TRACE,
-				"OP mode IE not present for the first time, need update to FW\n");
-			cnmStaSendUpdateCmd(prAdapter, prStaRec, NULL, FALSE);
-		} else if (fgHasOPModeIE == FALSE
-			&& prStaRec->ucOpModeInOpNotificationIE == 0xff) {
-			/* beacon w/o OP mode IE & no need to update to FW */
-			fgUpdateToFWForDiffOPModeIE = FALSE;
-		}
-	}
-
 	if (prStaRec->ucStaState == STA_STATE_3) {
 #if (CFG_SUPPORT_WIFI_6G == 1)
-		if (IsfgHe6gBandCapChange) {
-			if (fgHasNewOPModeIE == TRUE
-				&& fgUpdateToFWForDiffOPModeIE == FALSE) {
-			} else {
-				DBGLOG(RLM, LOUD,
-					"Update staRec due to IsfgHe6gBandCapChange");
-				cnmStaSendUpdateCmd(prAdapter, prStaRec,
-					NULL, FALSE);
-			}
-		}
-#endif
-		if (IsfgHtCapChange) {
-			DBGLOG(RLM, LOUD,
-				"Update staRec due to IsfgHtCapChange");
+		if (IsfgHe6gBandCapChange)
 			cnmStaSendUpdateCmd(prAdapter, prStaRec, NULL, FALSE);
-		}
+#endif
+		if (IsfgHtCapChange)
+			cnmStaSendUpdateCmd(prAdapter, prStaRec, NULL, FALSE);
 	}
 
 	/* Some AP will have wrong channel number (255) when running time.
@@ -3534,26 +3267,17 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 	 */
 	if (fgHasNewOPModeIE == TRUE) {
 		if (prStaRec->ucStaState == STA_STATE_3) {
-			if (fgUpdateToFWForDiffOPModeIE == TRUE) {
-				/* 1. Modify channel width parameters */
-				rlmRecOpModeBwForClient(ucVhtOpModeChannelWidth,
+			/* 1. Modify channel width parameters */
+			rlmRecOpModeBwForClient(ucVhtOpModeChannelWidth,
 						prBssInfo);
 
-				/* 2. Update StaRec to FW (BssInfo will be
-				* updated after return from this function)
-				*/
-				DBGLOG(RLM, INFO,
-			       "Update VhtOpMode to 0x%x, to FW due to OpMode Notificaition",
+			/* 2. Update StaRec to FW (BssInfo will be updated after
+			 * return from this function)
+			 */
+			DBGLOG(RLM, INFO,
+			       "Update OpMode to 0x%x, to FW due to OpMode Notificaition",
 			       prStaRec->ucVhtOpMode);
-#if (CFG_SUPPORT_802_11AX == 1)
-				DBGLOG(RLM, INFO,
-					"HeBW80 RxMcsMap:0x%x, HeBW160 RxMcsMap:0x%x\n",
-					prStaRec->u2HeRxMcsMapBW80,
-					prStaRec->u2HeRxMcsMapBW160);
-#endif
-				cnmStaSendUpdateCmd(prAdapter, prStaRec,
-					NULL, FALSE);
-			}
+			cnmStaSendUpdateCmd(prAdapter, prStaRec, NULL, FALSE);
 
 			/* 3. Revise by own OP BW if needed */
 			if ((prBssInfo->fgIsOpChangeChannelWidth)) {
@@ -3691,18 +3415,6 @@ static uint8_t rlmRecIeInfoForClient(struct ADAPTER *prAdapter,
 		}
 	}
 
-#if (CFG_SUPPORT_BTWT == 1)
-	if ((fgBtwtIeFound == FALSE) &&
-		(prStaRec->arTWTFlow[0].eBtwtState ==
-			ENUM_BTWT_FLOW_STATE_ACTIVATED)) {
-		prStaRec->arTWTFlow[0].eBtwtState =
-			ENUM_BTWT_FLOW_STATE_DEFAULT;
-		prStaRec->arTWTFlow[0].fgIsBTWT = FALSE;
-
-		btwtPlannerDelAgrtTbl(prAdapter, prBssInfo, prStaRec, 0);
-	}
-#endif
-
 	return ucPrimaryChannel;
 }
 
@@ -3826,9 +3538,6 @@ static void rlmRecAssocRespIeInfoForClient(struct ADAPTER *prAdapter,
 #endif
 	struct BSS_DESC *prBssDesc;
 	struct PARAM_SSID rSsid;
-#if (CFG_SUPPORT_BSS_MAX_IDLE_PERIOD == 1)
-	struct IE_BSS_MAX_IDLE_PERIOD *prBssMaxIdlePeriod;
-#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prBssInfo);
@@ -3883,26 +3592,13 @@ static void rlmRecAssocRespIeInfoForClient(struct ADAPTER *prAdapter,
 			}
 #endif
 #if (CFG_SUPPORT_802_11BE == 1)
-			if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_EHT_CAPS &&
+			if (IE_ID_EXT(pucIE) == EID_EXT_EHT_CAPS &&
 				RLM_NET_IS_11BE(prBssInfo))
 				fgIsHasEhtCap = TRUE;
 #endif
 			break;
-#if (CFG_SUPPORT_BSS_MAX_IDLE_PERIOD == 1)
-		case WLAN_EID_BSS_MAX_IDLE_PERIOD:
-			if (IE_LEN(pucIE) !=
-				(sizeof(struct IE_BSS_MAX_IDLE_PERIOD) - 2))
-				break;
 
-			prBssMaxIdlePeriod =
-				(struct IE_BSS_MAX_IDLE_PERIOD *) pucIE;
-			prBssInfo->u2MaxIdlePeriod =
-				prBssMaxIdlePeriod->u2MaxIdlePeriod;
-			prBssInfo->ucIdleOptions =
-				prBssMaxIdlePeriod->ucIdleOptions;
 
-			break;
-#endif
 		default:
 			break;
 		} /* end of switch */
@@ -4053,12 +3749,17 @@ static u_int8_t rlmRecBcnFromNeighborForClient(struct ADAPTER *prAdapter,
 	 * update procedure. We should give it the entry pointer of desired
 	 * channel list.
 	 */
-	eBand = prSwRfb->eRfBand;
+	RX_STATUS_GET(prRxDescOps, eBand, get_rf_band, prSwRfb->prRxStatus);
 	if (eBand != BAND_2G4)
 		return FALSE;
 
-	if (ucPriChannel == 0 || ucPriChannel > 14)
-		ucPriChannel = prSwRfb->ucChnlNum;
+	if (ucPriChannel == 0 || ucPriChannel > 14) {
+		RX_STATUS_GET(
+			prRxDescOps,
+			ucPriChannel,
+			get_ch_num,
+			prSwRfb->prRxStatus);
+	}
 
 	if (fgHtBss) {
 		ASSERT(prBssInfo->auc2G_PriChnlList[0] <= CHNL_LIST_SZ_2G);
@@ -4278,9 +3979,6 @@ void rlmProcessBcn(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 	u_int8_t fgNewSRParam = FALSE;
 #endif
 	uint8_t i;
-#if (CFG_SUPPORT_BTWT == 1)
-	struct WLAN_BEACON_FRAME *prWlanBeacon = NULL;
-#endif
 
 	ASSERT(prAdapter);
 	ASSERT(prSwRfb);
@@ -4319,20 +4017,6 @@ void rlmProcessBcn(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 					    ((struct WLAN_MAC_MGMT_HEADER
 						      *)(prSwRfb->pvHeader))
 						    ->aucBSSID)) {
-#if (CFG_SUPPORT_BTWT == 1)
-				prWlanBeacon = (struct WLAN_BEACON_FRAME *)
-								(prSwRfb->pvHeader);
-
-				if (prBssInfo->prStaRecOfAP) {
-					(prBssInfo->prStaRecOfAP
-						->au4Timestamp[0]) =
-					prWlanBeacon->au4Timestamp[0];
-					(prBssInfo->prStaRecOfAP
-						->au4Timestamp[1]) =
-					prWlanBeacon->au4Timestamp[1];
-				}
-#endif
-
 
 					fgNewParameter = rlmRecBcnInfoForClient(
 						prAdapter, prBssInfo, prSwRfb,
@@ -4376,15 +4060,8 @@ void rlmProcessBcn(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 
 			/* Appy new parameters if necessary */
 			if (fgNewParameter) {
-				if (IS_BSS_AIS(prBssInfo) &&
-					IS_AIS_ROAMING(prAdapter,
-						prBssInfo->ucBssIndex))
-					roamingFsmSetRecoverBitmap(prAdapter,
-						prBssInfo->ucBssIndex,
-						ROAMING_RECOVER_BSS_UPDATE);
-				else
-					nicUpdateBss(prAdapter,
-						     prBssInfo->ucBssIndex);
+				nicUpdateBss(prAdapter, prBssInfo->ucBssIndex);
+				rlmSyncOperationParams(prAdapter, prBssInfo);
 				fgNewParameter = FALSE;
 			}
 #if (CFG_SUPPORT_802_11AX == 1)
@@ -4914,7 +4591,7 @@ void rlmFillSyncCmdParam(struct CMD_SET_BSS_RLM_PARAM *prCmdBody,
 
 	if (RLM_NET_PARAM_VALID(prBssInfo)) {
 		DBGLOG(RLM, INFO,
-		       "N=%d b=%d c=%d s=%d e=%d h=%d I=0x%02x l=%d p=%d w(vht)=%d s1=%d s2=%d RxN=%d, TxN=%d\n",
+		       "N=%d b=%d c=%d s=%d e=%d h=%d I=0x%02x l=%d p=%d w=%d s1=%d s2=%d RxN=%d, TxN=%d\n",
 		       prCmdBody->ucBssIndex, prCmdBody->ucRfBand,
 		       prCmdBody->ucPrimaryChannel, prCmdBody->ucRfSco,
 		       prCmdBody->ucErpProtectMode, prCmdBody->ucHtProtectMode,
@@ -5004,7 +4681,7 @@ void rlmProcessAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 #if CFG_SUPPORT_802_11AC
 	struct IE_VHT_CAP *prVhtCap = NULL;
 	struct IE_OP_MODE_NOTIFICATION
-		*prOPModeNotification = NULL; /* Operation Mode Notification */
+		*prOPModeNotification; /* Operation Mode Notification */
 	u_int8_t fgHasOPModeIE = FALSE;
 #endif
 
@@ -5098,7 +4775,7 @@ void rlmProcessAssocReq(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb,
 #endif
 #endif
 #if (CFG_SUPPORT_802_11BE == 1)
-			if (IE_ID_EXT(pucIE) == ELEM_EXT_ID_EHT_CAPS)
+			if (IE_ID_EXT(pucIE) == EID_EXT_EHT_CAPS)
 				ehtRlmRecCapInfo(prAdapter, prStaRec, pucIE);
 #endif
 			break;
@@ -5367,13 +5044,12 @@ static void rlmBssReset(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo)
 #endif
 
 #if (CFG_SUPPORT_802_11BE == 1)
-	EHT_RESET_OP(prBssInfo->ucEhtOpParams);
+	memset(prBssInfo->ucEhtOpParams, 0, EHT_OP_BYTE_NUM);
 	/*TODO */
 #endif
 }
 
 #if CFG_SUPPORT_TDLS
-#if CFG_SUPPORT_802_11AC
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief
@@ -5389,17 +5065,10 @@ uint32_t rlmFillVhtCapIEByAdapter(struct ADAPTER *prAdapter,
 	struct IE_VHT_CAP *prVhtCap;
 	struct VHT_SUPPORTED_MCS_FIELD *prVhtSupportedMcsSet;
 	uint8_t i;
-	uint8_t ucMaxBw;
-	uint8_t supportNss;
 
-	if (!prAdapter) {
-		DBGLOG(TDLS, ERROR, "prAdapter error!\n");
-		return 0;
-	}
-	if (!prBssInfo) {
-		DBGLOG(TDLS, ERROR, "prBssInfo error!\n");
-		return 0;
-	}
+	ASSERT(prAdapter);
+	ASSERT(prBssInfo);
+	/* ASSERT(prMsduInfo); */
 
 	prVhtCap = (struct IE_VHT_CAP *)pOutBuf;
 
@@ -5407,48 +5076,14 @@ uint32_t rlmFillVhtCapIEByAdapter(struct ADAPTER *prAdapter,
 	prVhtCap->ucLength = sizeof(struct IE_VHT_CAP) - ELEM_HDR_LEN;
 	prVhtCap->u4VhtCapInfo = VHT_CAP_INFO_DEFAULT_VAL;
 
-	ucMaxBw = cnmGetBssMaxBw(prAdapter, prBssInfo->ucBssIndex);
-	supportNss = wlanGetSupportNss(prAdapter, prBssInfo->ucBssIndex);
-
-	prVhtCap->u4VhtCapInfo |= (prAdapter->rWifiVar.ucRxMaxMpduLen &
-			VHT_CAP_INFO_MAX_MPDU_LEN_MASK);
-
-	if (ucMaxBw == MAX_BW_160MHZ)
-		prVhtCap->u4VhtCapInfo |=
-			VHT_CAP_INFO_MAX_SUP_CHANNEL_WIDTH_SET_160;
-	else if (ucMaxBw == MAX_BW_80_80_MHZ)
-		prVhtCap->u4VhtCapInfo |=
-			VHT_CAP_INFO_MAX_SUP_CHANNEL_WIDTH_SET_160_80P80;
-
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxShortGI)) {
-		if (ucMaxBw >= MAX_BW_80MHZ)
-			prVhtCap->u4VhtCapInfo |= VHT_CAP_INFO_SHORT_GI_80;
-
-		if (ucMaxBw >= MAX_BW_160MHZ)
-			prVhtCap->u4VhtCapInfo |=
-				VHT_CAP_INFO_SHORT_GI_160_80P80;
-	}
+	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxShortGI))
+		prVhtCap->u4VhtCapInfo |= VHT_CAP_INFO_SHORT_GI_80;
 
 	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxLdpc))
 		prVhtCap->u4VhtCapInfo |= VHT_CAP_INFO_RX_LDPC;
 
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxStbc)) {
-		uint8_t tempRxStbcNss = prAdapter->rWifiVar.ucRxStbcNss;
-
-		if (tempRxStbcNss > supportNss) {
-			DBGLOG(TDLS, WARN,
-				"Apply Nss:%d -> %d as RxStbcNss in VHT Cap",
-				tempRxStbcNss, supportNss);
-			tempRxStbcNss = supportNss;
-		}
-		prVhtCap->u4VhtCapInfo |=
-			((tempRxStbcNss << VHT_CAP_INFO_RX_STBC_OFFSET) &
-			 VHT_CAP_INFO_RX_STBC_MASK);
-	}
-
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucTxStbc) &&
-			prBssInfo->ucOpTxNss >= 2)
-		prVhtCap->u4VhtCapInfo |= VHT_CAP_INFO_TX_STBC;
+	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxStbc))
+		prVhtCap->u4VhtCapInfo |= VHT_CAP_INFO_RX_STBC_ONE_STREAM;
 
 	/*set MCS map */
 	prVhtSupportedMcsSet = &prVhtCap->rVhtSupportedMcsSet;
@@ -5456,31 +5091,23 @@ uint32_t rlmFillVhtCapIEByAdapter(struct ADAPTER *prAdapter,
 		   sizeof(struct VHT_SUPPORTED_MCS_FIELD));
 
 	for (i = 0; i < 8; i++) {
-		uint8_t ucOffset = i * 2;
-		uint8_t ucMcsMap;
-
-		if (i < supportNss)
-			ucMcsMap = VHT_CAP_INFO_MCS_MAP_MCS9;
-		else
-			ucMcsMap = VHT_CAP_INFO_MCS_NOT_SUPPORTED;
-
-		prVhtSupportedMcsSet->u2RxMcsMap |= (ucMcsMap << ucOffset);
-		prVhtSupportedMcsSet->u2TxMcsMap |= (ucMcsMap << ucOffset);
+		prVhtSupportedMcsSet->u2RxMcsMap |= BITS(2 * i, (2 * i + 1));
+		prVhtSupportedMcsSet->u2TxMcsMap |= BITS(2 * i, (2 * i + 1));
 	}
 
+	prVhtSupportedMcsSet->u2RxMcsMap &=
+		(VHT_CAP_INFO_MCS_MAP_MCS9 << VHT_CAP_INFO_MCS_1SS_OFFSET);
+	prVhtSupportedMcsSet->u2TxMcsMap &=
+		(VHT_CAP_INFO_MCS_MAP_MCS9 << VHT_CAP_INFO_MCS_1SS_OFFSET);
 	prVhtSupportedMcsSet->u2RxHighestSupportedDataRate =
 		VHT_CAP_INFO_DEFAULT_HIGHEST_DATA_RATE;
 	prVhtSupportedMcsSet->u2TxHighestSupportedDataRate =
 		VHT_CAP_INFO_DEFAULT_HIGHEST_DATA_RATE;
 
-	if (IE_SIZE(prVhtCap) > (ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_CAP)) {
-		DBGLOG(TDLS, ERROR, "prVhtCap size error!\n");
-		return 0;
-	}
+	ASSERT(IE_SIZE(prVhtCap) <= (ELEM_HDR_LEN + ELEM_MAX_LEN_VHT_CAP));
 
 	return IE_SIZE(prVhtCap);
 }
-#endif
 #endif
 
 #if CFG_SUPPORT_NAN
@@ -5590,11 +5217,9 @@ uint32_t rlmFillNANHTCapIE(struct ADAPTER *prAdapter,
 
 	prHtCap->u4TxBeamformingCap = TX_BEAMFORMING_CAP_DEFAULT_VAL;
 
+	/* (prAdapter->rWifiVar.ucDbdcMode == DBDC_MODE_DISABLED) || */
 	if (prBssInfo->eBand == BAND_5G) {
-		/* HT BFee has IOT issue
-		 * only support HT BFee when force mode for testing
-		 */
-		if (IS_FEATURE_FORCE_ENABLED(prAdapter->rWifiVar.ucStaHtBfee))
+		if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHtBfee))
 			prHtCap->u4TxBeamformingCap = TX_BEAMFORMING_CAP_BFEE;
 		if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHtBfer))
 			prHtCap->u4TxBeamformingCap |= TX_BEAMFORMING_CAP_BFER;
@@ -5814,10 +5439,7 @@ uint32_t rlmFillHtCapIEByAdapter(struct ADAPTER *prAdapter,
 {
 	struct IE_HT_CAP *prHtCap;
 	struct SUP_MCS_SET_FIELD *prSupMcsSet;
-	uint8_t fg40mAllowed;
-	uint8_t ucIdx;
-	uint8_t supportNss = wlanGetSupportNss(
-				prAdapter, prBssInfo->ucBssIndex);
+	u_int8_t fg40mAllowed;
 
 	ASSERT(prAdapter);
 	ASSERT(prBssInfo);
@@ -5832,7 +5454,11 @@ uint32_t rlmFillHtCapIEByAdapter(struct ADAPTER *prAdapter,
 	prHtCap->ucLength = sizeof(struct IE_HT_CAP) - ELEM_HDR_LEN;
 
 	prHtCap->u2HtCapInfo = HT_CAP_INFO_DEFAULT_VAL;
-
+	if (!fg40mAllowed) {
+		prHtCap->u2HtCapInfo &= ~(HT_CAP_INFO_SUP_CHNL_WIDTH |
+					  HT_CAP_INFO_SHORT_GI_40M |
+					  HT_CAP_INFO_DSSS_CCK_IN_40M);
+	}
 	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxShortGI))
 		prHtCap->u2HtCapInfo |=
 			(HT_CAP_INFO_SHORT_GI_20M | HT_CAP_INFO_SHORT_GI_40M);
@@ -5840,48 +5466,8 @@ uint32_t rlmFillHtCapIEByAdapter(struct ADAPTER *prAdapter,
 	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxLdpc))
 		prHtCap->u2HtCapInfo |= HT_CAP_INFO_LDPC_CAP;
 
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucTxStbc) &&
-			prBssInfo->ucOpTxNss >= 2)
-		prHtCap->u2HtCapInfo |= HT_CAP_INFO_TX_STBC;
-
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxStbc)) {
-		uint8_t tempRxStbcNss = prAdapter->rWifiVar.ucRxStbcNss;
-
-		if (tempRxStbcNss > supportNss) {
-			DBGLOG(TDLS, WARN,
-				"Apply Nss:%d -> %d as RxStbcNss in HT Cap",
-				tempRxStbcNss, supportNss);
-			tempRxStbcNss = supportNss;
-		}
-
-		if (tempRxStbcNss == 1)
-			prHtCap->u2HtCapInfo |= HT_CAP_INFO_RX_STBC_1_SS;
-		else if (tempRxStbcNss == 2)
-			prHtCap->u2HtCapInfo |= HT_CAP_INFO_RX_STBC_2_SS;
-		else if (tempRxStbcNss >= 3)
-			prHtCap->u2HtCapInfo |= HT_CAP_INFO_RX_STBC_3_SS;
-	}
-
-	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxGf))
-		prHtCap->u2HtCapInfo |= HT_CAP_INFO_HT_GF;
-
-	if (prAdapter->rWifiVar.ucRxMaxMpduLen > VHT_CAP_INFO_MAX_MPDU_LEN_3K)
-		prHtCap->u2HtCapInfo |= HT_CAP_INFO_MAX_AMSDU_LEN;
-
-	if (!fg40mAllowed)
-		prHtCap->u2HtCapInfo &= ~(HT_CAP_INFO_SUP_CHNL_WIDTH |
-				HT_CAP_INFO_SHORT_GI_40M |
-				HT_CAP_INFO_DSSS_CCK_IN_40M);
-
-	/* SM power saving (IEEE 802.11, 2016, 10.2.4)
-	 * A non-AP HT STA may also use SM Power Save bits in the HT
-	 * Capabilities element of its Association Request to achieve
-	 * the same purpose. The latter allows the STA to use only a
-	 * single receive chain immediately after association.
-	 */
-	if (prBssInfo->ucOpRxNss < supportNss)
-		prHtCap->u2HtCapInfo &=
-			~HT_CAP_INFO_SM_POWER_SAVE; /*Set as static power save*/
+	if (IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucRxStbc))
+		prHtCap->u2HtCapInfo |= HT_CAP_INFO_RX_STBC_1_SS;
 
 	prHtCap->ucAmpduParam = AMPDU_PARAM_DEFAULT_VAL;
 
@@ -5889,8 +5475,7 @@ uint32_t rlmFillHtCapIEByAdapter(struct ADAPTER *prAdapter,
 	kalMemZero((void *)&prSupMcsSet->aucRxMcsBitmask[0],
 		   SUP_MCS_RX_BITMASK_OCTET_NUM);
 
-	for (ucIdx = 0; ucIdx < supportNss; ucIdx++)
-		prSupMcsSet->aucRxMcsBitmask[ucIdx] = BITS(0, 7);
+	prSupMcsSet->aucRxMcsBitmask[0] = BITS(0, 7);
 
 	if (fg40mAllowed && IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucMCS32))
 		prSupMcsSet->aucRxMcsBitmask[32 / 8] = BIT(0); /* MCS32 */
@@ -5925,9 +5510,9 @@ uint32_t rlmFillHtCapIEByAdapter(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-static void tpcComposeReportFrame(struct ADAPTER *prAdapter,
-				  struct STA_RECORD *prStaRec,
-				  PFN_TX_DONE_HANDLER pfTxDoneHandler)
+static void tpcComposeReportFrame(IN struct ADAPTER *prAdapter,
+				  IN struct STA_RECORD *prStaRec,
+				  IN PFN_TX_DONE_HANDLER pfTxDoneHandler)
 {
 	struct MSDU_INFO *prMsduInfo;
 	struct BSS_INFO *prBssInfo;
@@ -5937,8 +5522,6 @@ static void tpcComposeReportFrame(struct ADAPTER *prAdapter,
 	ASSERT(prAdapter);
 	ASSERT(prStaRec);
 
-	if (prStaRec->ucBssIndex >= MAX_BSSID_NUM)
-		return;
 	prBssInfo = &prAdapter->rWifiVar.arBssInfoPool[prStaRec->ucBssIndex];
 	ASSERT(prBssInfo);
 
@@ -5949,7 +5532,7 @@ static void tpcComposeReportFrame(struct ADAPTER *prAdapter,
 		return;
 
 	prTxFrame = (struct ACTION_TPC_REPORT_FRAME
-			     *)((uintptr_t)(prMsduInfo->prPacket) +
+			     *)((unsigned long)(prMsduInfo->prPacket) +
 				MAC_TX_RESERVED_FIELD);
 
 	prTxFrame->u2FrameCtrl = MAC_FRAME_ACTION;
@@ -6000,9 +5583,9 @@ static void tpcComposeReportFrame(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-static void msmtComposeReportFrame(struct ADAPTER *prAdapter,
-				   struct STA_RECORD *prStaRec,
-				   PFN_TX_DONE_HANDLER pfTxDoneHandler)
+static void msmtComposeReportFrame(IN struct ADAPTER *prAdapter,
+				   IN struct STA_RECORD *prStaRec,
+				   IN PFN_TX_DONE_HANDLER pfTxDoneHandler)
 {
 	struct MSDU_INFO *prMsduInfo;
 	struct BSS_INFO *prBssInfo;
@@ -6014,9 +5597,6 @@ static void msmtComposeReportFrame(struct ADAPTER *prAdapter,
 	ASSERT(prAdapter);
 	ASSERT(prStaRec);
 
-	if (prStaRec->ucBssIndex >= MAX_BSSID_NUM)
-		return;
-
 	prBssInfo = &prAdapter->rWifiVar.arBssInfoPool[prStaRec->ucBssIndex];
 	ASSERT(prBssInfo);
 
@@ -6027,7 +5607,7 @@ static void msmtComposeReportFrame(struct ADAPTER *prAdapter,
 		return;
 
 	prTxFrame = (struct ACTION_SM_REQ_FRAME
-			     *)((uintptr_t)(prMsduInfo->prPacket) +
+			     *)((unsigned long)(prMsduInfo->prPacket) +
 				MAC_TX_RESERVED_FIELD);
 	pucIE = prTxFrame->aucInfoElem;
 	prMeasurementRepIE = SM_MEASUREMENT_REP_IE(pucIE);
@@ -6157,10 +5737,6 @@ void rlmProcessSpecMgtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 	}
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(RLM, ERROR, "prBssInfo is null\n");
-		return;
-	}
 
 	DBGLOG_MEM8(RLM, INFO, pucIE, u2IELength);
 	switch (ucAction) {
@@ -6216,9 +5792,11 @@ void rlmProcessSpecMgtAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
 			switch (IE_ID(pucIE)) {
 
 			case ELEM_ID_WIDE_BAND_CHANNEL_SWITCH:
-				if (IE_LEN(pucIE) !=
-					(sizeof(struct IE_WIDE_BAND_CHANNEL) -
-						2)) {
+				if (!RLM_NET_IS_11AC(prBssInfo) ||
+				    IE_LEN(pucIE) !=
+					    (sizeof(struct
+						    IE_WIDE_BAND_CHANNEL) -
+					     2)) {
 					DBGLOG(RLM, INFO,
 					       "[CSA Mgt] ELEM_ID_WIDE_BAND_CHANNEL_SWITCH, Length\n");
 					break;
@@ -6341,8 +5919,8 @@ void rlmResetCSAParams(struct BSS_INFO *prBssInfo)
 	       prCSAParams->ucCsaCount, prBssInfo->ucBssIndex);
 }
 
-void rlmCsaTimeout(struct ADAPTER *prAdapter,
-				   uintptr_t ulParamPtr)
+void rlmCsaTimeout(IN struct ADAPTER *prAdapter,
+				   unsigned long ulParamPtr)
 {
 	uint8_t ucBssIndex = (uint8_t) ulParamPtr;
 	struct BSS_INFO *prBssInfo;
@@ -6366,21 +5944,17 @@ void rlmCsaTimeout(struct ADAPTER *prAdapter,
 	kalMemZero(&rSsid, sizeof(rSsid));
 	prCSAParams = &prBssInfo->CSAParams;
 	prBssInfo->ucPrimaryChannel = prCSAParams->ucCsaNewCh;
-	if (prCSAParams->eCsaBand != BAND_NULL)
-		prBssInfo->eBand = prCSAParams->eCsaBand;
-	else
-		prBssInfo->eBand = (prCSAParams->ucCsaNewCh <= 14)
-			? BAND_2G4 : BAND_5G;
-
-	/* Store VHT Channel width for later op mode operation */
-	prBssInfo->ucVhtChannelWidthBeforeCsa =
-		prBssInfo->ucVhtChannelWidth;
-
-	prBssInfo->ucVhtChannelWidth = prCSAParams->ucVhtBw;
-	prBssInfo->ucVhtChannelFrequencyS1 = prCSAParams->ucVhtS1;
-	prBssInfo->ucVhtChannelFrequencyS2 = prCSAParams->ucVhtS2;
+	prBssInfo->eBand = (prCSAParams->ucCsaNewCh <= 14) ? BAND_2G4 : BAND_5G;
 
 	if (HAS_WIDE_BAND_PARAMS(prCSAParams)) {
+		/* Store VHT Channel width for later op mode operation */
+		prBssInfo->ucVhtChannelWidthBeforeCsa =
+			prBssInfo->ucVhtChannelWidth;
+
+		prBssInfo->ucVhtChannelWidth = prCSAParams->ucVhtBw;
+		prBssInfo->ucVhtChannelFrequencyS1 = prCSAParams->ucVhtS1;
+		prBssInfo->ucVhtChannelFrequencyS2 = prCSAParams->ucVhtS2;
+
 		if (prBssInfo->fgIsOpChangeChannelWidth &&
 		    rlmGetVhtOpBwByBssOpBw(prBssInfo->ucOpChangeChannelWidth) <
 			     prBssInfo->ucVhtChannelWidth) {
@@ -6619,6 +6193,7 @@ uint32_t rlmSendSmPowerSaveFrame(struct ADAPTER *prAdapter,
 		DBGLOG(RLM, WARN,
 		       "Can't switch to RxNss = %d since we don't support.\n",
 		       ucOpRxNss);
+		cnmMgtPktFree(prAdapter, prMsduInfo);
 		return WLAN_STATUS_FAILURE;
 	}
 
@@ -6722,9 +6297,9 @@ uint32_t rlmSendNotifyChannelWidthFrame(struct ADAPTER *prAdapter,
  *
  */
 /*----------------------------------------------------------------------------*/
-uint32_t rlmNotifyVhtOpModeTxDone(struct ADAPTER *prAdapter,
-				  struct MSDU_INFO *prMsduInfo,
-				  enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+uint32_t rlmNotifyVhtOpModeTxDone(IN struct ADAPTER *prAdapter,
+				  IN struct MSDU_INFO *prMsduInfo,
+				  IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	u_int8_t fgIsSuccess = FALSE;
 
@@ -6751,9 +6326,9 @@ uint32_t rlmNotifyVhtOpModeTxDone(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-uint32_t rlmSmPowerSaveTxDone(struct ADAPTER *prAdapter,
-			      struct MSDU_INFO *prMsduInfo,
-			      enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+uint32_t rlmSmPowerSaveTxDone(IN struct ADAPTER *prAdapter,
+			      IN struct MSDU_INFO *prMsduInfo,
+			      IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	u_int8_t fgIsSuccess = FALSE;
 
@@ -6780,9 +6355,9 @@ uint32_t rlmSmPowerSaveTxDone(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-uint32_t rlmNotifyChannelWidthtTxDone(struct ADAPTER *prAdapter,
-				      struct MSDU_INFO *prMsduInfo,
-				      enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+uint32_t rlmNotifyChannelWidthtTxDone(IN struct ADAPTER *prAdapter,
+				      IN struct MSDU_INFO *prMsduInfo,
+				      IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	u_int8_t fgIsSuccess = FALSE;
 
@@ -6809,10 +6384,10 @@ uint32_t rlmNotifyChannelWidthtTxDone(struct ADAPTER *prAdapter,
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-static void rlmOpModeTxDoneHandler(struct ADAPTER *prAdapter,
-				   struct MSDU_INFO *prMsduInfo,
-				   uint8_t ucOpChangeType,
-				   u_int8_t fgIsSuccess)
+static void rlmOpModeTxDoneHandler(IN struct ADAPTER *prAdapter,
+				   IN struct MSDU_INFO *prMsduInfo,
+				   IN uint8_t ucOpChangeType,
+				   IN u_int8_t fgIsSuccess)
 {
 	uint32_t u4Status = WLAN_STATUS_SUCCESS;
 	struct BSS_INFO *prBssInfo = NULL;
@@ -7219,8 +6794,8 @@ uint8_t rlmGetBssOpBwByVhtAndHtOpInfo(struct BSS_INFO *prBssInfo)
 	return ucBssOpBw;
 }
 
-uint8_t rlmGetBssOpBwByOwnAndPeerCapability(struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo)
+uint8_t rlmGetBssOpBwByOwnAndPeerCapability(IN struct ADAPTER *prAdapter,
+	IN struct BSS_INFO *prBssInfo)
 {
 	uint8_t ucOpMaxBw = MAX_BW_UNKNOWN;
 	uint8_t ucBssOpBw = MAX_BW_20MHZ;
@@ -7379,9 +6954,6 @@ static uint8_t rlmGetOpModeBwByVhtAndHtOpInfo(struct BSS_INFO *prBssInfo)
 	case VHT_OP_CHANNEL_WIDTH_160:
 	case VHT_OP_CHANNEL_WIDTH_80P80:
 		ucOpModeBw = VHT_OP_MODE_CHANNEL_WIDTH_160_80P80;
-		break;
-	case VHT_OP_CHANNEL_WIDTH_320:
-		ucOpModeBw = VHT_OP_MODE_CHANNEL_WIDTH_320;
 		break;
 	default:
 		DBGLOG(RLM, WARN, "%s: unexpected VHT channel width: %d\n",
@@ -7557,15 +7129,8 @@ static void rlmCompleteOpModeChange(struct ADAPTER *prAdapter,
 		rlmChangeOwnOpInfo(prAdapter, prBssInfo);
 
 		/* <2> Update OP BW/Nss to FW */
-		if (!fgIsSwitchingP2pChnl) {
-			if (IS_BSS_AIS(prBssInfo) &&
-			    IS_AIS_ROAMING(prAdapter, prBssInfo->ucBssIndex))
-				roamingFsmSetRecoverBitmap(prAdapter,
-					prBssInfo->ucBssIndex,
-					ROAMING_RECOVER_RLM_SYNC);
-			else
-				rlmSyncOperationParams(prAdapter, prBssInfo);
-		}
+		if (!fgIsSwitchingP2pChnl)
+			rlmSyncOperationParams(prAdapter, prBssInfo);
 
 		/* <3> Update BCN/Probe Resp IE to notify peers our OP info is
 		 * changed (AP mode)
@@ -7674,11 +7239,9 @@ rlmChangeOperationMode(
 		return OP_CHANGE_STATUS_VALID_NO_CHANGE;
 	}
 
-#if CFG_SUPPORT_DBDC
 	/* Indicate operation mode changes */
 	kalIndicateOpModeChange(prAdapter, ucBssIndex,
 		ucChannelWidth, ucOpTxNss, ucOpRxNss);
-#endif
 
 	DBGLOG(RLM, INFO,
 		"Intend to change BSS[%d] OP Mode to BW[%d] RxNss[%d] TxNss[%d]\n",
@@ -7726,15 +7289,10 @@ rlmChangeOperationMode(
 		}
 
 #if CFG_SUPPORT_802_11AC
-		if (((RLM_NET_IS_11AC(prBssInfo) &&
-			(prStaRec->ucDesiredPhyTypeSet &
-			PHY_TYPE_SET_802_11AC))
+		if (RLM_NET_IS_11AC(prBssInfo)
 #if (CFG_SUPPORT_802_11AX == 1)
-			|| (RLM_NET_IS_11AX(prBssInfo) &&
-			(prStaRec->ucDesiredPhyTypeSet &
-			PHY_TYPE_SET_802_11AX))
+			|| RLM_NET_IS_11AX(prBssInfo)
 #endif
-			)
 			&& (fgIsChangeBw || fgIsChangeRxNss)) {
 			if (prBssInfo->pfOpChangeHandler)
 				prBssInfo->aucOpModeChangeState
@@ -8139,7 +7697,7 @@ void rlmDummyChangeOpHandler(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 	       ucBssIndex, fgIsChangeSuccess);
 }
 
-void rlmSetMaxTxPwrLimit(struct ADAPTER *prAdapter, int8_t cLimit,
+void rlmSetMaxTxPwrLimit(IN struct ADAPTER *prAdapter, int8_t cLimit,
 			 uint8_t ucEnable)
 {
 	struct CMD_SET_AP_CONSTRAINT_PWR_LIMIT rTxPwrLimit;
@@ -8175,53 +7733,6 @@ void rlmSetMaxTxPwrLimit(struct ADAPTER *prAdapter, int8_t cLimit,
 			    (uint8_t *)&rTxPwrLimit, NULL, 0);
 }
 
-#if (CFG_SUPPORT_802_11AX == 1)
-/*----------------------------------------------------------------------------*/
-/*!
- * @brief Enable/Disable the SR function according to
-      the wifi.cfg SREnable parameter
- *
- * @param prAdapter      a pointer to adapter private data structure.
- * @param fgIsEnableSr  a parameter to decide sr enable or disable.
- *
- * @return -
- */
-/*----------------------------------------------------------------------------*/
-void rlmSetSrControl(struct ADAPTER *prAdapter, bool fgIsEnableSr)
-{
-	struct _SR_CMD_SR_CAP_T *prCmdSrCap = NULL;
-
-	ASSERT(prAdapter);
-
-	prCmdSrCap = (struct _SR_CMD_SR_CAP_T *)
-		kalMemAlloc(sizeof(struct _SR_CMD_SR_CAP_T),
-			VIR_MEM_TYPE);
-	if (prCmdSrCap == NULL) {
-		DBGLOG(RLM, ERROR, "LM: Mem alloc fail for SR_CMD_SR_CAP\n");
-		return;
-	}
-
-	prCmdSrCap->rSrCmd.u1CmdSubId = SR_CMD_SET_SR_CAP_SREN_CTRL;
-	prCmdSrCap->rSrCmd.u1DbdcIdx = 0;
-	prCmdSrCap->rSrCap.fgSrEn = fgIsEnableSr;
-
-	wlanSendSetQueryExtCmd(prAdapter,
-		CMD_ID_LAYER_0_EXT_MAGIC_NUM,
-		EXT_CMD_ID_SR_CTRL,
-		TRUE,
-		FALSE,
-		TRUE,
-		NULL,
-		nicOidCmdTimeoutCommon,
-		sizeof(struct _SR_CMD_SR_CAP_T),
-		(uint8_t *) (prCmdSrCap),
-		NULL, 0);
-
-	kalMemFree(prCmdSrCap, VIR_MEM_TYPE,
-		   sizeof(struct _SR_CMD_SR_CAP_T));
-}
-#endif
-
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief Send channel switch frame
@@ -8231,9 +7742,9 @@ void rlmSetSrControl(struct ADAPTER *prAdapter, bool fgIsEnableSr)
  * \return none
  */
 /*----------------------------------------------------------------------------*/
-uint32_t rlmSendChannelSwitchTxDone(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus)
+uint32_t rlmSendChannelSwitchTxDone(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN enum ENUM_TX_RESULT_CODE rTxDoneStatus)
 {
 	do {
 		ASSERT_BREAK((prAdapter != NULL) && (prMsduInfo != NULL));
@@ -8249,7 +7760,7 @@ uint32_t rlmSendChannelSwitchTxDone(struct ADAPTER *prAdapter,
 }
 
 void rlmSendChannelSwitchFrame(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex)
+	IN uint8_t ucBssIndex)
 {
 	struct MSDU_INFO *prMsduInfo;
 	struct ACTION_CHANNEL_SWITCH_FRAME *prTxFrame;
@@ -8326,1127 +7837,3 @@ void rlmSendChannelSwitchFrame(struct ADAPTER *prAdapter,
 	nicTxEnqueueMsdu(prAdapter, prMsduInfo);
 }
 
-uint32_t rlmSendExChannelSwitchTxDone(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus)
-{
-	do {
-		ASSERT_BREAK((prAdapter != NULL) && (prMsduInfo != NULL));
-
-		DBGLOG(P2P, INFO,
-			"Extended CSA TX Done Status: %d, seqNo: %d\n",
-			rTxDoneStatus,
-			prMsduInfo->ucTxSeqNum);
-
-	} while (FALSE);
-
-	return WLAN_STATUS_SUCCESS;
-}
-
-void rlmSendExChannelSwitchFrame(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex)
-{
-	struct MSDU_INFO *prMsduInfo;
-	struct ACTION_EX_CHANNEL_SWITCH_FRAME *prTxFrame;
-	struct BSS_INFO *prBssInfo;
-	uint16_t u2EstimatedFrameLen;
-	PFN_TX_DONE_HANDLER pfTxDoneHandler = (PFN_TX_DONE_HANDLER)NULL;
-	uint8_t aucBMC[] = BC_MAC_ADDR;
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo)
-		return;
-
-	/* Calculate MSDU buffer length */
-	u2EstimatedFrameLen = MAC_TX_RESERVED_FIELD +
-			      sizeof(struct ACTION_EX_CHANNEL_SWITCH_FRAME);
-
-	/* Alloc MSDU_INFO */
-	prMsduInfo = (struct MSDU_INFO *)cnmMgtPktAlloc(prAdapter,
-							u2EstimatedFrameLen);
-	if (!prMsduInfo)
-		return;
-
-	kalMemZero(prMsduInfo->prPacket, u2EstimatedFrameLen);
-
-	prTxFrame = prMsduInfo->prPacket;
-
-	/* Fill frame ctrl */
-	prTxFrame->u2FrameCtrl = MAC_FRAME_ACTION;
-
-	COPY_MAC_ADDR(prTxFrame->aucDestAddr, aucBMC);
-	COPY_MAC_ADDR(prTxFrame->aucSrcAddr, prBssInfo->aucOwnMacAddr);
-	COPY_MAC_ADDR(prTxFrame->aucBSSID, prBssInfo->aucBSSID);
-
-	/* 3 Compose the frame body's frame */
-	prTxFrame->ucCategory = CATEGORY_PUBLIC_ACTION;
-	prTxFrame->ucAction = ACTION_PUBLIC_EX_CH_SW_ANNOUNCEMENT;
-
-	/* Extended Channel Switch Announcement element */
-	prTxFrame->aucInfoElem[0] = ELEM_ID_EX_CH_SW_ANNOUNCEMENT;
-	prTxFrame->aucInfoElem[1] = 4;
-	prTxFrame->aucInfoElem[2]
-		= prAdapter->rWifiVar.ucChannelSwitchMode;
-	prTxFrame->aucInfoElem[3]
-		= prAdapter->rWifiVar.ucNewOperatingClass;
-	prTxFrame->aucInfoElem[4]
-		= prAdapter->rWifiVar.ucNewChannelNumber;
-	prTxFrame->aucInfoElem[5]
-		= prAdapter->rWifiVar.ucChannelSwitchCount;
-
-	pfTxDoneHandler = rlmSendExChannelSwitchTxDone;
-
-	/* 4 Update information of MSDU_INFO_T */
-	TX_SET_MMPDU(prAdapter, prMsduInfo, prBssInfo->ucBssIndex,
-		     STA_REC_INDEX_BMCAST, WLAN_MAC_MGMT_HEADER_LEN,
-		     sizeof(struct ACTION_EX_CHANNEL_SWITCH_FRAME),
-		     pfTxDoneHandler,
-		     MSDU_RATE_MODE_AUTO);
-
-	/* 4 Enqueue the frame to send this action frame. */
-	nicTxEnqueueMsdu(prAdapter, prMsduInfo);
-}
-
-uint16_t rlmOpClassToBandwidth(uint8_t ucOpClass)
-{
-	switch (ucOpClass) {
-		case 81:
-		case 82:
-			return BW_20;
-		case 83: /* channels 1..9; 40 MHz */
-		case 84: /* channels 5..13; 40 MHz */
-			return BW_40;
-		case 115: /* channels 36,40,44,48; indoor only */
-			return BW_20;
-		case 116: /* channels 36,44; 40 MHz; indoor only */
-		case 117: /* channels 40,48; 40 MHz; indoor only */
-			return BW_40;
-		case 118: /* channels 52,56,60,64; dfs */
-			return BW_20;
-		case 119: /* channels 52,60; 40 MHz; dfs */
-		case 120: /* channels 56,64; 40 MHz; dfs */
-			return BW_40;
-		case 121: /* channels 100-140 */
-			return BW_20;
-		case 122: /* channels 100-142; 40 MHz */
-		case 123: /* channels 104-136; 40 MHz */
-			return BW_40;
-		case 124: /* channels 149,153,157,161 */
-		case 125: /* channels 149,153,157,161,165,169,173,177 */
-			return BW_20;
-		case 126: /* channels 149,157,161,165,169,173; 40 MHz */
-		case 127: /* channels 153..177; 40 MHz */
-			return BW_40;
-		case 128: /* center freqs 42, 58, 106, 122, 138, 155, 171; 80 MHz */
-			return BW_80;
-		case 129: /* center freqs 50, 114, 163; 160 MHz */
-			return BW_160;
-		case 130: /* center freqs 42, 58, 106, 122, 138, 155, 171; 80+80 MHz */
-			return BW_8080;
-		case 131: /* UHB channels, 20 MHz: 1, 5, 9.. */
-			return BW_20;
-		case 132: /* UHB channels, 40 MHz: 3, 11, 19.. */
-			return BW_40;
-		case 133: /* UHB channels, 80 MHz: 7, 23, 39.. */
-			return BW_80;
-		case 134: /* UHB channels, 160 MHz: 15, 47, 79.. */
-			return BW_160;
-		case 135: /* UHB channels, 80+80 MHz: 7, 23, 39.. */
-			return BW_8080;
-	}
-	return BW_20;
-}
-
-int32_t rlmGetOpClassForChannel(
-	int32_t channel,
-	enum ENUM_BAND band)
-{
-	const u_int8_t support11n = TRUE;
-	const u_int8_t support11ac = TRUE;
-
-	/* 2GHz Band */
-	if ((band == BAND_2G4) != 0) {
-		if (channel == 14)
-			return 82;
-
-		if (channel >= 1 && channel <= 13) {
-			if (!support11n)
-				/* 20MHz channel */
-				return 81;
-
-			if (channel <= 9)
-				/* HT40 with secondary channel
-				 * above primary
-				 */
-				return 83;
-
-			/* HT40 with secondary channel
-			 * below primary
-			 */
-			return 84;
-		}
-		/* Error */
-		return 0;
-	}
-
-	/* 5GHz Band */
-	if ((band == BAND_5G) != 0) {
-		if (support11ac) {
-			switch (channel) {
-			case 42:
-			case 58:
-			case 106:
-			case 122:
-			case 138:
-			case 155:
-				/* 80MHz channel */
-				return 128;
-			case 50:
-			case 114:
-				/* 160MHz channel */
-				return 129;
-			}
-		}
-
-		if (!support11n) {
-			if (channel >= 36 && channel <= 48)
-				return 115;
-
-			if (channel >= 52 && channel <= 64)
-				return 118;
-
-			if (channel >= 100 && channel <= 144)
-				return 121;
-
-			if (channel >= 149 && channel <= 161)
-				return 124;
-
-			if (channel >= 165 && channel <= 169)
-				return 125;
-
-		} else {
-			switch (channel) {
-			case 36:
-			case 44:
-				/* HT40 with secondary channel
-				 * above primary
-				 */
-				return 116;
-			case 40:
-			case 48:
-				/* HT40 with secondary channel
-				 * below primary
-				 */
-				return 117;
-			case 52:
-			case 60:
-				/* HT40 with secondary channel
-				 * above primary
-				 */
-				return  119;
-			case 56:
-			case 64:
-				/* HT40 with secondary channel
-				 * below primary
-				 */
-				return 120;
-			case 100:
-			case 108:
-			case 116:
-			case 124:
-			case 132:
-			case 140:
-				/* HT40 with secondary channel
-				 * above primary
-				 */
-				return 122;
-			case 104:
-			case 112:
-			case 120:
-			case 128:
-			case 136:
-			case 144:
-				/* HT40 with secondary channel
-				 * below primary
-				 */
-				return 123;
-			case 149:
-			case 157:
-				/* HT40 with secondary channel
-				 * above primary
-				 */
-				return 126;
-			case 153:
-			case 161:
-				/* HT40 with secondary channel
-				 * below primary
-				 */
-				return 127;
-			}
-		}
-		/* Error */
-		return 0;
-	}
-
-#if (CFG_SUPPORT_WIFI_6G == 1)
-	/* 6GHz Band */
-	if ((band == BAND_6G) != 0) {
-		/* Channels 1, 5. 9, 13, ... */
-		if ((channel & 0x03) == 0x01)
-			/* 20MHz channel */
-			return 131;
-
-		/* Channels 3, 11, 19, 27, ... */
-		if ((channel & 0x07) == 0x03)
-			/* 40MHz channel */
-			return 132;
-
-		/* Channels 7, 23, 39, 55, ... */
-		if ((channel & 0x0F) == 0x07)
-			/* 80MHz channel */
-			return 133;
-
-		/* Channels 15, 47, 69, ... */
-		if ((channel & 0x1F) == 0x0F)
-			/* 160MHz channel */
-			return 134;
-
-		if (channel == 2)
-			/* 20MHz channel */
-			return 136;
-
-		/* Error */
-		return 0;
-	}
-#endif
-
-	return 0;
-}
-
-#if CFG_SUPPORT_BFER
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief
-*
-* \param[in]
-*
-* \return none
-*/
-/*----------------------------------------------------------------------------*/
-void rlmBfStaRecPfmuUpdate(struct ADAPTER *prAdapter,
-				struct STA_RECORD *prStaRec)
-{
-	uint8_t ucBFerMaxNr, ucBFeeMaxNr, ucMode = 0;
-	struct BSS_INFO *prBssInfo;
-	struct CMD_STAREC_BF *prStaRecBF;
-	struct CMD_STAREC_UPDATE *prStaRecUpdateInfo;
-	uint32_t rWlanStatus = WLAN_STATUS_SUCCESS;
-	uint32_t u4SetBufferLen = sizeof(struct CMD_STAREC_BF);
-#if (CFG_SUPPORT_802_11BE == 1)
-	uint32_t u4EhtPhyCap1 = 0;
-#endif
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
-	ASSERT(prBssInfo);
-
-	if (RLM_NET_IS_11AC(prBssInfo) &&
-	    IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaVhtBfer))
-		ucMode = MODE_VHT;
-	else if (RLM_NET_IS_11N(prBssInfo) &&
-		IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHtBfer))
-		ucMode = MODE_HT;
-#if (CFG_SUPPORT_802_11AX == 1)
-	if (RLM_NET_IS_11AX(prBssInfo) &&
-		IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHeSuBfer))
-		ucMode = MODE_HE_SU;
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-	if (RLM_NET_IS_11BE(prBssInfo) &&
-		IS_FEATURE_ENABLED(prAdapter->rWifiVar.ucStaHeSuBfer))
-		ucMode = MODE_EHT_SU;
-#endif
-
-	prStaRecBF =
-	    (struct CMD_STAREC_BF *) cnmMemAlloc(prAdapter,
-		RAM_TYPE_MSG, u4SetBufferLen);
-
-	if (!prStaRecBF) {
-		DBGLOG(RLM, ERROR, "STA Rec memory alloc fail\n");
-		return;
-	}
-
-	prStaRecUpdateInfo =
-	    (struct CMD_STAREC_UPDATE *) cnmMemAlloc(prAdapter,
-		RAM_TYPE_MSG, (CMD_STAREC_UPDATE_HDR_SIZE + u4SetBufferLen));
-
-	if (!prStaRecUpdateInfo) {
-		cnmMemFree(prAdapter, prStaRecBF);
-		DBGLOG(RLM, ERROR, "STA Rec Update Info memory alloc fail\n");
-		return;
-	}
-
-	prStaRec->rTxBfPfmuStaInfo.u2PfmuId = 0xFFFF;
-
-	switch (ucMode) {
-#if (CFG_SUPPORT_802_11BE == 1)
-	case MODE_EHT_SU:
-		memcpy(&u4EhtPhyCap1, prStaRec->ucEhtPhyCapInfo,
-			sizeof(u4EhtPhyCap1));
-		prStaRec->rTxBfPfmuStaInfo.fgSU_MU = FALSE;
-		prStaRec->rTxBfPfmuStaInfo.u1TxBfCap =
-			((u4EhtPhyCap1 & DOT11BE_PHY_CAP_SU_BFEE) >> 6);
-
-		if (prStaRec->rTxBfPfmuStaInfo.u1TxBfCap) {
-			/* OFDM, NDPA/Report Poll/CTS2Self tx mode */
-			prStaRec->rTxBfPfmuStaInfo.ucSoundingPhy =
-						TX_RATE_MODE_OFDM;
-
-			/* 9: OFDM 24M */
-			prStaRec->rTxBfPfmuStaInfo.ucNdpaRate = PHY_RATE_24M;
-
-			/* VHT mode, NDP tx mode */
-			prStaRec->rTxBfPfmuStaInfo.ucTxMode =
-				TX_RATE_MODE_EHT_MU;
-
-			/* 0: MCS0 */
-			prStaRec->rTxBfPfmuStaInfo.ucNdpRate = PHY_RATE_MCS0;
-
-			/* 9: OFDM 24M */
-			prStaRec->rTxBfPfmuStaInfo.ucReptPollRate =
-				PHY_RATE_24M;
-
-			switch (prBssInfo->ucVhtChannelWidth) {
-			case VHT_OP_CHANNEL_WIDTH_320:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW =
-					VHT_OP_CHANNEL_WIDTH_320;
-				ucBFeeMaxNr =
-					GET_DOT11BE_PHY_CAP_BFEE_320M(
-						u4EhtPhyCap1);
-				break;
-			case VHT_OP_CHANNEL_WIDTH_160:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW =
-					MAX_BW_160MHZ;
-				ucBFeeMaxNr =
-					GET_DOT11BE_PHY_CAP_BFEE_160M(
-						u4EhtPhyCap1);
-				break;
-			case VHT_OP_CHANNEL_WIDTH_80:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_80MHZ;
-				ucBFeeMaxNr =
-					GET_DOT11BE_PHY_CAP_BFEE_SS_LE_EQ_80M(
-						u4EhtPhyCap1);
-				break;
-			case VHT_OP_CHANNEL_WIDTH_20_40:
-			default:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_20MHZ;
-				if (prBssInfo->eBssSCO != CHNL_EXT_SCN)
-					prStaRec->rTxBfPfmuStaInfo.ucCBW =
-								MAX_BW_40MHZ;
-				ucBFeeMaxNr =
-					GET_DOT11BE_PHY_CAP_BFEE_SS_LE_EQ_80M(
-						u4EhtPhyCap1);
-				break;
-			}
-
-			ucBFerMaxNr = 1;
-			prStaRec->rTxBfPfmuStaInfo.ucNr =
-				(ucBFerMaxNr < ucBFeeMaxNr) ?
-					ucBFerMaxNr : ucBFeeMaxNr;
-
-			if (RLM_NET_IS_11AC(prBssInfo)) {
-				prStaRec->rTxBfPfmuStaInfo.ucNc =
-					((prStaRec->u2VhtRxMcsMap &
-					VHT_CAP_INFO_MCS_2SS_MASK) !=
-						BITS(2, 3)) ? 1 : 0;
-			} else if (RLM_NET_IS_11N(prBssInfo)) {
-				prStaRec->rTxBfPfmuStaInfo.ucNc =
-				     (prStaRec->aucRxMcsBitmask[1] > 0) ? 1 : 0;
-			}
-		}
-		break;
-#endif
-#if (CFG_SUPPORT_802_11AX == 1)
-case MODE_HE_SU:
-	prStaRec->rTxBfPfmuStaInfo.fgSU_MU = FALSE;
-	prStaRec->rTxBfPfmuStaInfo.u1TxBfCap =
-			HE_GET_PHY_CAP_SU_BFMEE(prStaRec->ucHePhyCapInfo);
-
-	if (prStaRec->rTxBfPfmuStaInfo.u1TxBfCap) {
-		/* OFDM, NDPA/Report Poll/CTS2Self tx mode */
-		prStaRec->rTxBfPfmuStaInfo.ucSoundingPhy =
-						TX_RATE_MODE_OFDM;
-
-		/* 9: OFDM 24M */
-		prStaRec->rTxBfPfmuStaInfo.ucNdpaRate = PHY_RATE_24M;
-
-		/* VHT mode, NDP tx mode */
-		prStaRec->rTxBfPfmuStaInfo.ucTxMode = TX_RATE_MODE_HE_SU;
-
-		/* 0: MCS0 */
-		prStaRec->rTxBfPfmuStaInfo.ucNdpRate = PHY_RATE_MCS0;
-
-		/* 9: OFDM 24M */
-		prStaRec->rTxBfPfmuStaInfo.ucReptPollRate = PHY_RATE_24M;
-
-		switch (prBssInfo->ucVhtChannelWidth) {
-		case VHT_OP_CHANNEL_WIDTH_160:
-			prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_160MHZ;
-			break;
-		case VHT_OP_CHANNEL_WIDTH_80:
-			prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_80MHZ;
-			break;
-
-		case VHT_OP_CHANNEL_WIDTH_20_40:
-		default:
-			prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_20MHZ;
-			if (prBssInfo->eBssSCO != CHNL_EXT_SCN)
-				prStaRec->rTxBfPfmuStaInfo.ucCBW =
-							MAX_BW_40MHZ;
-			break;
-		}
-
-		ucBFerMaxNr = 1;
-		ucBFeeMaxNr = (prBssInfo->ucVhtChannelWidth <=
-			VHT_OP_CHANNEL_WIDTH_80) ?
-			HE_GET_PHY_CAP_BFMEE_STS_LT_OR_EQ_80M(
-				prStaRec->ucHePhyCapInfo) :
-			HE_GET_PHY_CAP_BFMEE_STS_GT_80M(
-				prStaRec->ucHePhyCapInfo);
-		prStaRec->rTxBfPfmuStaInfo.ucNr =
-			(ucBFerMaxNr < ucBFeeMaxNr) ?
-				ucBFerMaxNr : ucBFeeMaxNr;
-
-		if (RLM_NET_IS_11AC(prBssInfo)) {
-			prStaRec->rTxBfPfmuStaInfo.ucNc =
-				((prStaRec->u2VhtRxMcsMap &
-				VHT_CAP_INFO_MCS_2SS_MASK) !=
-						BITS(2, 3)) ? 1 : 0;
-		} else if (RLM_NET_IS_11N(prBssInfo)) {
-			prStaRec->rTxBfPfmuStaInfo.ucNc =
-				(prStaRec->aucRxMcsBitmask[1] > 0) ? 1 : 0;
-		}
-	}
-	break;
-
-#endif
-	case MODE_VHT:
-		prStaRec->rTxBfPfmuStaInfo.fgSU_MU = FALSE;
-		prStaRec->rTxBfPfmuStaInfo.u1TxBfCap =
-				rlmClientSupportsVhtETxBF(prStaRec);
-
-		if (prStaRec->rTxBfPfmuStaInfo.u1TxBfCap) {
-			/* OFDM, NDPA/Report Poll/CTS2Self tx mode */
-			prStaRec->rTxBfPfmuStaInfo.ucSoundingPhy =
-							TX_RATE_MODE_OFDM;
-
-			/* 9: OFDM 24M */
-			prStaRec->rTxBfPfmuStaInfo.ucNdpaRate = PHY_RATE_24M;
-
-			/* VHT mode, NDP tx mode */
-			prStaRec->rTxBfPfmuStaInfo.ucTxMode = TX_RATE_MODE_VHT;
-
-			/* 0: MCS0 */
-			prStaRec->rTxBfPfmuStaInfo.ucNdpRate = PHY_RATE_MCS0;
-
-			/* 9: OFDM 24M */
-			prStaRec->rTxBfPfmuStaInfo.ucReptPollRate = PHY_RATE_24M;
-
-			switch (prBssInfo->ucVhtChannelWidth) {
-			case VHT_OP_CHANNEL_WIDTH_160:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW =
-					MAX_BW_160MHZ;
-				break;
-			case VHT_OP_CHANNEL_WIDTH_80:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_80MHZ;
-				break;
-
-			case VHT_OP_CHANNEL_WIDTH_20_40:
-			default:
-				prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_20MHZ;
-				if (prBssInfo->eBssSCO != CHNL_EXT_SCN)
-					prStaRec->rTxBfPfmuStaInfo.ucCBW =
-								MAX_BW_40MHZ;
-				break;
-			}
-
-			ucBFerMaxNr = 1;
-			ucBFeeMaxNr = rlmClientSupportsVhtBfeeStsCap(prStaRec);
-			prStaRec->rTxBfPfmuStaInfo.ucNr =
-				(ucBFerMaxNr < ucBFeeMaxNr) ?
-					ucBFerMaxNr : ucBFeeMaxNr;
-			prStaRec->rTxBfPfmuStaInfo.ucNc =
-				((prStaRec->u2VhtRxMcsMap &
-					VHT_CAP_INFO_MCS_2SS_MASK) !=
-							BITS(2, 3)) ? 1 : 0;
-		}
-		break;
-
-	case MODE_HT:
-		prStaRec->rTxBfPfmuStaInfo.fgSU_MU = FALSE;
-		prStaRec->rTxBfPfmuStaInfo.u1TxBfCap =
-				rlmClientSupportsHtETxBF(prStaRec);
-
-		if (prStaRec->rTxBfPfmuStaInfo.u1TxBfCap) {
-			/* HT mode, NDPA/NDP tx mode */
-			prStaRec->rTxBfPfmuStaInfo.ucTxMode =
-						TX_RATE_MODE_HTMIX;
-
-			/* 0: HT MCS0 */
-			prStaRec->rTxBfPfmuStaInfo.ucNdpaRate = PHY_RATE_MCS0;
-
-			prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_20MHZ;
-			if (prBssInfo->eBssSCO != CHNL_EXT_SCN)
-				prStaRec->rTxBfPfmuStaInfo.ucCBW = MAX_BW_40MHZ;
-
-			ucBFerMaxNr = 1;
-			ucBFeeMaxNr =
-				(prStaRec->u4TxBeamformingCap &
-				TXBF_COMPRESSED_TX_ANTENNANUM_SUPPORTED) >>
-				TXBF_COMPRESSED_TX_ANTENNANUM_SUPPORTED_OFFSET;
-			prStaRec->rTxBfPfmuStaInfo.ucNr =
-				(ucBFerMaxNr < ucBFeeMaxNr) ?
-					ucBFerMaxNr : ucBFeeMaxNr;
-			prStaRec->rTxBfPfmuStaInfo.ucNc =
-				(prStaRec->aucRxMcsBitmask[1] > 0) ? 1 : 0;
-			prStaRec->rTxBfPfmuStaInfo.ucNdpRate =
-				prStaRec->rTxBfPfmuStaInfo.ucNr * 8;
-		}
-		break;
-	default:
-		cnmMemFree(prAdapter, prStaRecBF);
-		cnmMemFree(prAdapter, prStaRecUpdateInfo);
-		return;
-	}
-
-	DBGLOG(RLM, INFO, "ucMode=%d\n", ucMode);
-	DBGLOG(RLM, INFO, "rlmClientSupportsVhtETxBF(prStaRec)=%d\n",
-				rlmClientSupportsVhtETxBF(prStaRec));
-	DBGLOG(RLM, INFO, "rlmClientSupportsVhtBfeeStsCap(prStaRec)=%d\n",
-				rlmClientSupportsVhtBfeeStsCap(prStaRec));
-	DBGLOG(RLM, INFO, "prStaRec->u2VhtRxMcsMap=%x\n",
-				prStaRec->u2VhtRxMcsMap);
-
-	DBGLOG(RLM, INFO,
-	    "====================== BF StaRec Info =====================\n");
-	DBGLOG(RLM, INFO, "u2PfmuId       =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.u2PfmuId);
-	DBGLOG(RLM, INFO, "fgSU_MU        =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.fgSU_MU);
-	DBGLOG(RLM, INFO, "u1TxBfCap     =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.u1TxBfCap);
-	DBGLOG(RLM, INFO, "ucSoundingPhy  =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucSoundingPhy);
-	DBGLOG(RLM, INFO, "ucNdpaRate     =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucNdpaRate);
-	DBGLOG(RLM, INFO, "ucNdpRate      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucNdpRate);
-	DBGLOG(RLM, INFO, "ucReptPollRate =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucReptPollRate);
-	DBGLOG(RLM, INFO, "ucTxMode       =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucTxMode);
-	DBGLOG(RLM, INFO, "ucNc           =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucNc);
-	DBGLOG(RLM, INFO, "ucNr           =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucNr);
-	DBGLOG(RLM, INFO, "ucCBW          =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucCBW);
-	DBGLOG(RLM, INFO, "ucTotMemRequire=%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucTotMemRequire);
-	DBGLOG(RLM, INFO, "ucMemRequire20M=%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemRequire20M);
-	DBGLOG(RLM, INFO, "ucMemRow0      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemRow0);
-	DBGLOG(RLM, INFO, "ucMemCol0      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemCol0);
-	DBGLOG(RLM, INFO, "ucMemRow1      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemRow1);
-	DBGLOG(RLM, INFO, "ucMemCol1      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemCol1);
-	DBGLOG(RLM, INFO, "ucMemRow2      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemRow2);
-	DBGLOG(RLM, INFO, "ucMemCol2      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemCol2);
-	DBGLOG(RLM, INFO, "ucMemRow3      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemRow3);
-	DBGLOG(RLM, INFO, "ucMemCol3      =%d\n",
-				prStaRec->rTxBfPfmuStaInfo.ucMemCol3);
-	DBGLOG(RLM, INFO,
-	    "===========================================================\n");
-
-
-
-	prStaRecBF->u2Tag = STA_REC_BF;
-	prStaRecBF->u2Length = u4SetBufferLen;
-	kalMemCopy(&prStaRecBF->rTxBfPfmuInfo,
-		&prStaRec->rTxBfPfmuStaInfo, sizeof(struct TXBF_PFMU_STA_INFO));
-
-
-	prStaRecUpdateInfo->ucBssIndex = prStaRec->ucBssIndex;
-	prStaRecUpdateInfo->ucWlanIdx = prStaRec->ucWlanIndex;
-	prStaRecUpdateInfo->u2TotalElementNum = 1;
-	kalMemCopy(prStaRecUpdateInfo->aucBuffer, prStaRecBF, u4SetBufferLen);
-
-
-	rWlanStatus = wlanSendSetQueryExtCmd(prAdapter,
-			     CMD_ID_LAYER_0_EXT_MAGIC_NUM,
-			     EXT_CMD_ID_STAREC_UPDATE,
-			     TRUE,
-			     FALSE,
-			     FALSE,
-			     nicCmdEventSetCommon,
-			     nicOidCmdTimeoutCommon,
-			     (CMD_STAREC_UPDATE_HDR_SIZE + u4SetBufferLen),
-			     (uint8_t *) prStaRecUpdateInfo, NULL, 0);
-
-	if (rWlanStatus == WLAN_STATUS_FAILURE)
-		DBGLOG(RLM, ERROR, "Send BF sounding cmd fail\n");
-
-	cnmMemFree(prAdapter, prStaRecBF);
-	cnmMemFree(prAdapter, prStaRecUpdateInfo);
-
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief
-*
-* \param[in]
-*
-* \return none
-*/
-/*----------------------------------------------------------------------------*/
-void rlmETxBfTriggerPeriodicSounding(struct ADAPTER *prAdapter)
-{
-	uint32_t u4SetBufferLen = sizeof(union PARAM_CUSTOM_TXBF_ACTION_STRUCT);
-	union PARAM_CUSTOM_TXBF_ACTION_STRUCT rTxBfActionInfo;
-	union CMD_TXBF_ACTION rCmdTxBfActionInfo;
-	uint32_t rWlanStatus = WLAN_STATUS_SUCCESS;
-
-	DBGLOG(RLM, INFO, "rlmETxBfTriggerPeriodicSounding\n");
-
-	rTxBfActionInfo.rTxBfSoundingStart.ucTxBfCategory =
-								BF_SOUNDING_ON;
-
-	rTxBfActionInfo.rTxBfSoundingStart.ucSuMuSndMode =
-						    AUTO_SU_PERIODIC_SOUNDING;
-
-	rTxBfActionInfo.rTxBfSoundingStart.u4SoundingInterval = 0;
-
-	rTxBfActionInfo.rTxBfSoundingStart.ucStaNum = 0;
-
-	kalMemCopy(&rCmdTxBfActionInfo, &rTxBfActionInfo,
-					sizeof(union CMD_TXBF_ACTION));
-
-	rWlanStatus = wlanSendSetQueryExtCmd(prAdapter,
-					     CMD_ID_LAYER_0_EXT_MAGIC_NUM,
-					     EXT_CMD_ID_BF_ACTION,
-					     TRUE,
-					     FALSE,
-					     FALSE,
-					     nicCmdEventSetCommon,
-					     nicOidCmdTimeoutCommon,
-					     sizeof(union CMD_TXBF_ACTION),
-					     (uint8_t *) &rCmdTxBfActionInfo,
-					     &rTxBfActionInfo, u4SetBufferLen);
-
-	if (rWlanStatus == WLAN_STATUS_FAILURE)
-		DBGLOG(RLM, ERROR, "Send BF sounding cmd fail\n");
-
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief
-*
-* \param[in]
-*
-* \return none
-*/
-/*----------------------------------------------------------------------------*/
-bool
-rlmClientSupportsVhtETxBF(struct STA_RECORD *prStaRec)
-{
-	uint8_t ucVhtCapSuBfeeCap;
-
-	ucVhtCapSuBfeeCap =
-		(prStaRec->u4VhtCapInfo & VHT_CAP_INFO_SU_BEAMFORMEE_CAPABLE)
-		>> VHT_CAP_INFO_SU_BEAMFORMEE_CAPABLE_OFFSET;
-
-	return (ucVhtCapSuBfeeCap) ? TRUE : FALSE;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief
-*
-* \param[in]
-*
-* \return none
-*/
-/*----------------------------------------------------------------------------*/
-uint8_t
-rlmClientSupportsVhtBfeeStsCap(struct STA_RECORD *prStaRec)
-{
-	uint8_t ucVhtCapBfeeStsCap;
-
-	ucVhtCapBfeeStsCap =
-	    (prStaRec->u4VhtCapInfo &
-VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_SUP) >>
-VHT_CAP_INFO_COMPRESSED_STEERING_NUMBER_OF_BEAMFORMER_ANTENNAS_SUP_OFF;
-
-	return ucVhtCapBfeeStsCap;
-}
-
-/*----------------------------------------------------------------------------*/
-/*!
-* \brief
-*
-* \param[in]
-*
-* \return none
-*/
-/*----------------------------------------------------------------------------*/
-bool
-rlmClientSupportsHtETxBF(struct STA_RECORD *prStaRec)
-{
-	uint32_t u4RxNDPCap, u4ComBfFbkCap;
-
-	u4RxNDPCap = (prStaRec->u4TxBeamformingCap & TXBF_RX_NDP_CAPABLE)
-						>> TXBF_RX_NDP_CAPABLE_OFFSET;
-
-	/* Support compress feedback */
-	u4ComBfFbkCap = (prStaRec->u4TxBeamformingCap &
-			TXBF_EXPLICIT_COMPRESSED_FEEDBACK_IMMEDIATE_CAPABLE)
-			>> TXBF_EXPLICIT_COMPRESSED_FEEDBACK_CAPABLE_OFFSET;
-
-	return (u4RxNDPCap == 1) && (u4ComBfFbkCap > 0);
-}
-
-#endif
-
-#if CFG_AP_80211K_SUPPORT
-static void rlmMulAPAgentFillApRrmCapa(uint8_t *pucCapa)
-{
-	uint8_t ucIndex = 0;
-	uint8_t aucEnabledBits[] = {RRM_CAP_INFO_BEACON_PASSIVE_MEASURE_BIT,
-				    RRM_CAP_INFO_BEACON_ACTIVE_MEASURE_BIT,
-				    RRM_CAP_INFO_BEACON_TABLE_BIT,
-				    RRM_CAP_INFO_CHANNEL_LOAD_MEASURE_BIT,
-				    RRM_CAP_INFO_NOISE_HISTOGRAM_MEASURE_BIT,
-				    RRM_CAP_INFO_RRM_BIT};
-
-	for (; ucIndex < sizeof(aucEnabledBits); ucIndex++)
-		SET_EXT_CAP(pucCapa, ELEM_MAX_LEN_RRM_CAP,
-			    aucEnabledBits[ucIndex]);
-}
-
-void rlmMulAPAgentGenerateApRRMEnabledCapIE(
-				struct ADAPTER *prAdapter,
-				struct MSDU_INFO *prMsduInfo)
-{
-	struct IE_RRM_ENABLED_CAP *prRrmEnabledCap = NULL;
-
-	if (!prAdapter) {
-		DBGLOG(RLM, ERROR, "prAdapter is NULL!\n");
-		return;
-	}
-
-	if (!prMsduInfo) {
-		DBGLOG(RLM, ERROR, "prMsduInfo is NULL!\n");
-		return;
-	}
-
-	prRrmEnabledCap = (struct IE_RRM_ENABLED_CAP *)
-	    (((uint8_t *) prMsduInfo->prPacket) + prMsduInfo->u2FrameLength);
-	prRrmEnabledCap->ucId = ELEM_ID_RRM_ENABLED_CAP;
-	prRrmEnabledCap->ucLength = ELEM_MAX_LEN_RRM_CAP;
-	kalMemZero(&prRrmEnabledCap->aucCap[0], ELEM_MAX_LEN_RRM_CAP);
-	rlmMulAPAgentFillApRrmCapa(&prRrmEnabledCap->aucCap[0]);
-	prMsduInfo->u2FrameLength += IE_SIZE(prRrmEnabledCap);
-}
-
-void rlmMulAPAgentTxMeasurementRequest(
-				struct ADAPTER *prAdapter,
-				struct STA_RECORD *prStaRec,
-				struct SUB_ELEMENT_LIST *prSubIEs)
-{
-	static uint8_t ucDialogToken = 1;
-	struct MSDU_INFO *prMsduInfo = NULL;
-	struct BSS_INFO *prBssInfo = NULL;
-	uint8_t *pucPayload = NULL;
-	struct ACTION_RM_REQ_FRAME *prTxFrame = NULL;
-	uint16_t u2TxFrameLen = 500;
-	uint16_t u2FrameLen = 0;
-
-	if (!prStaRec)
-		return;
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(RLM, ERROR, "prBssInfo is NULL!\n");
-		return;
-	}
-	/* 1 Allocate MSDU Info */
-	prMsduInfo = (struct MSDU_INFO *)cnmMgtPktAlloc(
-		prAdapter, MAC_TX_RESERVED_FIELD + u2TxFrameLen);
-	if (!prMsduInfo)
-		return;
-	prTxFrame = (struct ACTION_RM_REQ_FRAME
-			     *)((uintptr_t)(prMsduInfo->prPacket) +
-				MAC_TX_RESERVED_FIELD);
-
-	/* 2 Compose The Mac Header. */
-	prTxFrame->u2FrameCtrl = MAC_FRAME_ACTION;
-	COPY_MAC_ADDR(prTxFrame->aucDestAddr, prStaRec->aucMacAddr);
-	COPY_MAC_ADDR(prTxFrame->aucSrcAddr, prBssInfo->aucOwnMacAddr);
-	COPY_MAC_ADDR(prTxFrame->aucBSSID, prBssInfo->aucBSSID);
-	prTxFrame->ucCategory = CATEGORY_RM_ACTION;
-	prTxFrame->ucAction = RM_ACTION_RM_REQUEST;
-	prTxFrame->u2Repetitions = HTONS(prStaRec->u2BcnReqRepetition);
-	u2FrameLen = OFFSET_OF(struct ACTION_RM_REQ_FRAME, aucInfoElem);
-	/* 3 Compose the frame body's frame. */
-	prTxFrame->ucDialogToken = ucDialogToken++;
-	u2TxFrameLen -= (sizeof(*prTxFrame) - 1);
-	pucPayload = &prTxFrame->aucInfoElem[0];
-	while (prSubIEs && u2TxFrameLen >= (prSubIEs->rSubIE.ucLength + 2)) {
-		kalMemCopy(pucPayload, &prSubIEs->rSubIE,
-			   prSubIEs->rSubIE.ucLength + 2);
-		pucPayload += prSubIEs->rSubIE.ucLength + 2;
-		u2FrameLen += prSubIEs->rSubIE.ucLength + 2;
-		prSubIEs = prSubIEs->prNext;
-		if (prSubIEs)
-			prTxFrame->u2Repetitions++;
-	}
-	nicTxSetMngPacket(prAdapter, prMsduInfo, prStaRec->ucBssIndex,
-			  prStaRec->ucIndex, WLAN_MAC_MGMT_HEADER_LEN,
-			  u2FrameLen, NULL, MSDU_RATE_MODE_AUTO);
-
-	/* 5 Enqueue the frame to send this action frame. */
-	nicTxEnqueueMsdu(prAdapter, prMsduInfo);
-}
-
-static u_int8_t rlmMulAPAgentRmReportFrameIsValid(
-					struct SW_RFB *prSwRfb)
-{
-	uint16_t u2ElemLen = 0;
-	uint16_t u2Offset =
-		(uint16_t)OFFSET_OF(struct ACTION_RM_REPORT_FRAME, aucInfoElem);
-	uint8_t *pucIE = (uint8_t *)prSwRfb->pvHeader;
-	struct IE_MEASUREMENT_REPORT *prCurrMeasElem = NULL;
-	uint16_t u2CalcIELen = 0;
-	uint16_t u2IELen = 0;
-
-	if (prSwRfb->u2PacketLen <= u2Offset) {
-		DBGLOG(RLM, ERROR, "RRM: Rm Packet length %d is too short\n",
-		       prSwRfb->u2PacketLen);
-		return FALSE;
-	}
-	pucIE += u2Offset;
-	u2ElemLen = prSwRfb->u2PacketLen - u2Offset;
-	IE_FOR_EACH(pucIE, u2ElemLen, u2Offset)
-	{
-		u2IELen = IE_LEN(pucIE);
-
-		/* The minimum value of the Length field is 3 (based on a
-		 ** minimum length for the Measurement Request field
-		 ** of 0 octets
-		 */
-		if (u2IELen <= 3) {
-			DBGLOG(RLM, ERROR, "RRM: Abnormal RM IE length is %d\n",
-			       u2IELen);
-			return FALSE;
-		}
-
-		/* Check whether the length of each measurment request element
-		 ** is reasonable
-		 */
-		prCurrMeasElem = (struct IE_MEASUREMENT_REPORT *)pucIE;
-		switch (prCurrMeasElem->ucMeasurementType) {
-		case ELEM_RM_TYPE_BEACON_REPORT:
-			if (u2IELen < (3 + OFFSET_OF(struct RM_BCN_REPORT,
-						     aucOptElem))) {
-				DBGLOG(RLM, ERROR,
-				       "RRM: Abnormal Becaon Req IE length is %d\n",
-				       u2IELen);
-				return FALSE;
-			}
-			break;
-		default:
-			DBGLOG(RLM, ERROR,
-			       "RRM: Not support: MeasurementType is %d, IE length is %d\n",
-				prCurrMeasElem->ucMeasurementType, u2IELen);
-			return FALSE;
-		}
-
-		u2CalcIELen += IE_SIZE(pucIE);
-	}
-	if (u2CalcIELen != u2ElemLen) {
-		DBGLOG(RLM, ERROR,
-		       "RRM: Calculated Total IE len is not equal to received length\n");
-		return FALSE;
-	}
-	return TRUE;
-}
-
-void rlmMulAPAgentProcessRadioMeasurementResponse(
-		struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb)
-{
-	struct ACTION_RM_REPORT_FRAME *prRxFrame = NULL;
-	uint8_t *pucOptInfo = NULL;
-	uint8_t *pucReportElem = NULL;
-	uint16_t u2TmpLen = 0;
-	struct IE_MEASUREMENT_REPORT *prMeasureReportIE = NULL;
-	struct RM_BCN_REPORT *prBeaconReportIE = NULL;
-	struct T_MULTI_AP_BEACON_METRICS_RESP *prBcnMeasureReport = NULL;
-	int32_t i4Ret = 0;
-
-	if (!prAdapter) {
-		DBGLOG(RLM, ERROR, "prAdapter is NULL!\n");
-		return;
-	}
-
-	if (!prSwRfb) {
-		DBGLOG(RLM, ERROR, "prSwRfb is NULL!\n");
-		return;
-	}
-
-	/*TODO, check it's soft ap mode or not ?*/
-
-	prRxFrame = (struct ACTION_RM_REPORT_FRAME *)prSwRfb->pvHeader;
-	if (!rlmMulAPAgentRmReportFrameIsValid(prSwRfb))
-		return;
-
-	prBcnMeasureReport = (struct T_MULTI_AP_BEACON_METRICS_RESP *)
-			kalMemAlloc(sizeof(
-				struct T_MULTI_AP_BEACON_METRICS_RESP),
-			VIR_MEM_TYPE);
-	if (prBcnMeasureReport == NULL) {
-		DBGLOG(INIT, ERROR, "alloc memory fail\n");
-		return;
-	}
-
-	kalMemZero(prBcnMeasureReport,
-		sizeof(struct T_MULTI_AP_BEACON_METRICS_RESP));
-	COPY_MAC_ADDR(prBcnMeasureReport->mStaMac, prRxFrame->aucSrcAddr);
-
-	pucOptInfo = &prRxFrame->aucInfoElem[0];
-	u2TmpLen = OFFSET_OF(struct ACTION_RM_REPORT_FRAME, aucInfoElem);
-	pucReportElem = prBcnMeasureReport->uElem;
-
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] u2FrameCtrl = 0x%x\n", prRxFrame->u2FrameCtrl);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] u2Duration = %u\n", prRxFrame->u2Duration);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] aucDestAddr = " MACSTR "\n",
-		prRxFrame->aucDestAddr);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] aucSrcAddr = " MACSTR "\n", prRxFrame->aucSrcAddr);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] aucBSSID = " MACSTR "\n", prRxFrame->aucBSSID);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] u2SeqCtrl = %u\n", prRxFrame->u2SeqCtrl);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] ucCategory = %u\n", prRxFrame->ucCategory);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] ucAction = %u\n", prRxFrame->ucAction);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] ucDialogToken = %u\n", prRxFrame->ucDialogToken);
-	/* Measurement Report Elements */
-	while (prSwRfb->u2PacketLen > u2TmpLen) {
-		switch (pucOptInfo[0]) {
-		case ELEM_ID_MEASUREMENT_REPORT:
-			prMeasureReportIE =
-				(struct IE_MEASUREMENT_REPORT *) &pucOptInfo[0];
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucId = %u\n",
-				prMeasureReportIE->ucId);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucLength = %u\n",
-				prMeasureReportIE->ucLength);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucToken = %u\n",
-				prMeasureReportIE->ucToken);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucReportMode = 0x%x\n",
-				prMeasureReportIE->ucReportMode);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucMeasurementType = 0x%x\n",
-				prMeasureReportIE->ucMeasurementType);
-			prBeaconReportIE =
-				(struct RM_BCN_REPORT *)
-				&prMeasureReportIE->aucReportFields[0];
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucRegulatoryClass = %d\n",
-				prBeaconReportIE->ucRegulatoryClass);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucChannel = %d\n",
-				prBeaconReportIE->ucChannel);
-			DBGLOG_MEM8(RLM, INFO,
-				prBeaconReportIE->aucStartTime, 8);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] u2Duration = %d\n",
-				prBeaconReportIE->u2Duration);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucReportInfo = 0x%x\n",
-				prBeaconReportIE->ucReportInfo);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucRCPI = 0x%x\n",
-				prBeaconReportIE->ucRCPI);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucRSNI = 0x%x\n",
-				prBeaconReportIE->ucRSNI);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] aucBSSID = " MACSTR "\n",
-				prBeaconReportIE->aucBSSID);
-			DBGLOG(RLM, INFO,
-				"[SAP_Test] ucAntennaID = %d\n",
-				prBeaconReportIE->ucAntennaID);
-			DBGLOG_MEM8(RLM, INFO,
-				prBeaconReportIE->aucParentTSF, 4);
-			DBGLOG_MEM8(RLM, INFO,
-				prBeaconReportIE->aucOptElem,
-				prMeasureReportIE->ucLength - 3 - 26);
-
-			prBcnMeasureReport->u8ElemNum++;
-			prBcnMeasureReport->uElemLen +=
-				(prMeasureReportIE->ucLength + 2);
-			kalMemCopy(pucReportElem,
-				&prMeasureReportIE->ucId,
-				prMeasureReportIE->ucLength + 2);
-			break;
-		default:
-			DBGLOG(RLM, INFO, "[SAP_Test] not know\n");
-			DBGLOG_MEM8(RLM, WARN,
-				pucOptInfo, pucOptInfo[1] + 2);
-			break;
-		}
-		pucOptInfo += (pucOptInfo[1] + 2);
-		u2TmpLen += (pucOptInfo[1] + 2);
-		pucReportElem += prMeasureReportIE->ucLength;
-	}
-
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] mStaMac = " MACSTR "\n",
-		prRxFrame->aucSrcAddr);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] u8ElemNum = %u\n",
-		prBcnMeasureReport->u8ElemNum);
-	DBGLOG(RLM, INFO,
-		"[SAP_Test] uElemLen = %u\n",
-		prBcnMeasureReport->uElemLen);
-	DBGLOG_MEM8(RLM, INFO,
-		prBcnMeasureReport->uElem,
-		prBcnMeasureReport->uElemLen);
-
-	i4Ret = MulAPAgentMontorSendMsg(
-		EV_WLAN_MULTIAP_BEACON_METRICS_RESPONSE,
-		prBcnMeasureReport, sizeof(*prBcnMeasureReport));
-	if (i4Ret < 0)
-		DBGLOG(AAA, ERROR,
-			"EV_WLAN_MULTIAP_BEACON_METRICS_RESPONSE nl send msg failed!\n");
-
-	kalMemFree(prBcnMeasureReport, VIR_MEM_TYPE,
-		sizeof(struct T_MULTI_AP_BEACON_METRICS_RESP));
-}
-#endif /* CFG_AP_80211K_SUPPORT */

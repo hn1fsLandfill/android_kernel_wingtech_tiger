@@ -78,33 +78,6 @@
  *                              C O N S T A N T S
  *******************************************************************************
  */
-#define NUM_OF_WFDMA1_TX_RING			0
-
-#if (CFG_SUPPORT_CONNAC2X == 1 || CFG_SUPPORT_CONNAC3X == 1)
-#undef NUM_OF_WFDMA1_TX_RING
-#ifdef CONFIG_NUM_OF_WFDMA_TX_RING
-#define NUM_OF_WFDMA1_TX_RING			(CONFIG_NUM_OF_WFDMA_TX_RING)
-#else
-#define NUM_OF_WFDMA1_TX_RING			1  /* WA CMD Ring */
-#endif
-#endif
-
-#define NUM_OF_TX_RING				(5+NUM_OF_WFDMA1_TX_RING)
-
-#define RX_RING_MAX_SIZE			4095
-
-#ifdef CONFIG_MTK_WIFI_HE160
-#define TX_RING_SIZE				1024
-#elif defined(CONFIG_MTK_WIFI_HE80)
-#define TX_RING_SIZE				1024
-#elif defined(CONFIG_MTK_WIFI_VHT80)
-#define TX_RING_SIZE				512
-#else
-#define TX_RING_SIZE				256
-#endif
-
-#define RXD_SIZE				16
-#define RX_BUFFER_AGGRESIZE			3840
 
 /*******************************************************************************
  *                             D A T A   T Y P E S
@@ -113,119 +86,16 @@
 
 struct GL_HIF_INFO;
 
-/*
- *	Data buffer for DMA operation, the buffer must be contiguous
- *	physical memory Both DMA to / from CPU use the same structure.
- */
-struct RTMP_DMABUF {
-	unsigned long AllocSize;
-	void *AllocVa;		/* TxBuf virtual address */
-	phys_addr_t AllocPa;		/* TxBuf physical address */
-};
-
-/*
- *	Control block (Descriptor) for all ring descriptor DMA operation,
- *	buffer must be contiguous physical memory. NDIS_PACKET stored the
- *	binding Rx packet descriptor which won't be released, driver has to
- *	wait until upper layer return the packet before giveing up this rx
- *	ring descriptor to ASIC. NDIS_BUFFER is assocaited pair to describe
- *	the packet buffer. For Tx, NDIS_PACKET stored the tx packet descriptor
- *  which driver should ACK upper layer when the tx is physically done or
- *  failed.
- */
-struct RTMP_DMACB {
-	unsigned long AllocSize;	/* Control block size */
-	void *AllocVa;			/* Control block virtual address */
-	phys_addr_t AllocPa;	        /* Control block physical address */
-	void *pPacket;
-	void *pBuffer;
-	phys_addr_t PacketPa;
-	struct RTMP_DMABUF DmaBuf;	/* Associated DMA buffer structure */
-	struct MSDU_TOKEN_ENTRY *prToken;
-};
-
-struct RTMP_TX_RING {
-	struct RTMP_DMACB Cell[TX_RING_SIZE];
-	uint32_t TxCpuIdx;
-	uint32_t TxDmaIdx;
-	uint32_t u4BufSize;
-	uint32_t u4RingSize;
-	uint32_t TxSwUsedIdx;
-	uint32_t u4UsedCnt;
-	uint32_t hw_desc_base;
-	uint32_t hw_desc_base_ext;
-	uint32_t hw_cidx_addr;
-	uint32_t hw_cidx_mask;
-	uint32_t hw_cidx_shift;
-	uint32_t hw_didx_addr;
-	uint32_t hw_didx_mask;
-	uint32_t hw_didx_shift;
-	uint32_t hw_cnt_addr;
-	uint32_t hw_cnt_mask;
-	uint32_t hw_cnt_shift;
-};
 
 /* host interface's private data structure, which is attached to os glue
  ** layer info structure.
  */
 struct GL_HIF_INFO {
-	uint32_t u4MawdL2TblCnt;
-	uint32_t u4IntStatus;
-#if (CFG_SUPPORT_HOST_OFFLOAD == 1)
-	uint32_t u4OffloadIntStatus;
-#endif
 };
 
 struct BUS_INFO {
-	void (*processAbnormalInterrupt)(struct ADAPTER *prAdapter);
-	struct DMASHDL_CFG *prDmashdlCfg;
-	const uint32_t host_int_rxdone_bits;
-	const uint32_t host_int_txdone_bits;
-	const uint32_t host_rx_ring_ext_ctrl_base;
 };
 
-struct RTMP_RX_RING {
-	struct RTMP_DMACB Cell[RX_RING_MAX_SIZE];
-	uint32_t RxCpuIdx;
-	uint32_t RxDmaIdx;
-	uint32_t u4BufSize;
-	uint32_t u4RingSize;
-	u_int8_t fgRxSegPkt;
-	uint32_t hw_desc_base;
-	uint32_t hw_desc_base_ext;
-	uint32_t hw_cidx_addr;
-	uint32_t hw_cidx_mask;
-	uint32_t hw_cidx_shift;
-	uint32_t hw_didx_addr;
-	uint32_t hw_didx_mask;
-	uint32_t hw_didx_shift;
-	uint32_t hw_cnt_addr;
-	uint32_t hw_cnt_mask;
-	uint32_t hw_cnt_shift;
-	bool fgIsDumpLog;
-	uint32_t u4PendingCnt;
-	void *pvPacket;
-	uint32_t u4PacketLen;
-};
-
-struct pcie2ap_remap {
-	uint32_t reg_base;
-	uint32_t reg_mask;
-	uint32_t reg_shift;
-	uint32_t base_addr;
-};
-
-struct ap2wf_remap {
-	uint32_t reg_base;
-	uint32_t reg_mask;
-	uint32_t reg_shift;
-	uint32_t base_addr;
-};
-
-struct PCIE_CHIP_CR_REMAPPING {
-	const struct pcie2ap_remap *pcie2ap;
-	const struct ap2wf_remap *ap2wf;
-};
 
 /*******************************************************************************
  *                            P U B L I C   D A T A
@@ -277,8 +147,6 @@ struct PCIE_CHIP_CR_REMAPPING {
 
 #define glClearHifInfo(_prGlueInfo)
 
-#define glResetHifInfo(_prGlueInfo)
-
 #define glBusInit(_pvData)
 
 #define glBusRelease(_pData)
@@ -293,15 +161,13 @@ struct PCIE_CHIP_CR_REMAPPING {
 
 #define glGetHifDev(_prHif, _ppDev)
 
-#define glGetChipInfo(_pprChipInfo)
-
 #define HAL_WAKE_UP_WIFI(_prAdapter)
 
 #define halWpdmaInitRing(_glueinfo, __fgResetHif) \
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__)
 
-uint8_t halTxRingDataSelect(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
+uint8_t halTxRingDataSelect(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo);
 
 /*******************************************************************************
  *                              F U N C T I O N S
@@ -395,31 +261,4 @@ void kal_virt_enable_fwdl(struct ADAPTER *ad, bool enable);
  * not: implementation for different HIF may refer to nic/hal.h
  */
 void kal_virt_get_int_status(struct ADAPTER *ad, uint32_t *status);
-
-/*
- * kal_virt_uhw_rd: read chip CR via USB UHW.
- * @ad: structure for adapter private data
- * @u4Offset: CR address
- * @pu4Value: return CR value
- * @pfgSts: return TRUE if IO operation is successful; otherwise, return FALSE
- *
- * note: implementation for different HIF may refer to nic/hal.h
- */
-void kal_virt_uhw_rd(struct ADAPTER *ad, uint32_t u4Offset, uint32_t *pu4Value,
-		     u_int8_t *pfgSts);
-
-/*
- * kal_virt_uhw_wr: write chip CR via USB UHW.
- * @ad: structure for adapter private data
- * @u4Offset: CR address
- * @u4Value: CR value
- * @pfgSts: return TRUE if IO operation is successful; otherwise, return FALSE
- *
- * note: implementation for different HIF may refer to nic/hal.h
- */
-void kal_virt_uhw_wr(struct ADAPTER *ad, uint32_t u4Offset, uint32_t u4Value,
-		     u_int8_t *pfgSts);
-
-void kal_virt_cancel_tx_rx(struct ADAPTER *ad);
-
 #endif /* _HIF_H */

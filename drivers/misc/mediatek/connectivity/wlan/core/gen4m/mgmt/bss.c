@@ -94,7 +94,7 @@ const uint8_t *apucNetworkType[NETWORK_TYPE_NUM] = {
 	(uint8_t *) "MBSS"
 };
 
-const uint8_t *apucNetworkOpMode[OP_MODE_NUM] = {
+const uint8_t *apucNetworkOpMode[] = {
 	(uint8_t *) "INFRASTRUCTURE",
 	(uint8_t *) "IBSS",
 	(uint8_t *) "ACCESS_POINT",
@@ -109,16 +109,10 @@ struct APPEND_VAR_IE_ENTRY txBcnIETable[] = {
 	 bssGenerateExtSuppRate_IE}	/* 50 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_ERP), NULL,
 	   rlmRspGenerateErpIE}	/* 42 */
-#if CFG_AP_80211K_SUPPORT
-	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_RRM_CAP), NULL,
-	   rlmMulAPAgentGenerateApRRMEnabledCapIE} /* 70 */
-#endif /* CFG_AP_80211K_SUPPORT */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_CAP), NULL,
 	   rlmRspGenerateHtCapIE}	/* 45 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_OP), NULL,
 	   rlmRspGenerateHtOpIE}	/* 61 */
-	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_TPE), NULL,
-	   rlmGenerateHtTPEIE}		/* 34 */
 #if CFG_ENABLE_WIFI_DIRECT
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_OBSS_SCAN), NULL,
 	   rlmRspGenerateObssScanIE}	/* 74 */
@@ -166,13 +160,10 @@ struct APPEND_VAR_IE_ENTRY txBcnIETable[] = {
 	   ehtRlmRspGenerateCapIE}
 	, {0, ehtRlmCalculateOpIELen,
 	   ehtRlmRspGenerateOpIE}
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	, {0, mldCalculateRnrIELen, mldGenerateRnrIE}
-	, {0, mldCalculateMlIELen, mldGenerateMlIE}
-#endif
 #endif
 #if CFG_SUPPORT_MTK_SYNERGY
-	, {0, rlmCalculateMTKOuiIELen, rlmGenerateMTKOuiIE}	/* 221 */
+	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL,
+	   rlmGenerateMTKOuiIE}	/* 221 */
 #endif
 #if (CFG_SUPPORT_DFS_MASTER == 1)
 	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_CSA), NULL,
@@ -189,16 +180,10 @@ struct APPEND_VAR_IE_ENTRY txProbRspIETable[] = {
 	 bssGenerateExtSuppRate_IE}	/* 50 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_ERP), NULL,
 	   rlmRspGenerateErpIE}	/* 42 */
-#if CFG_AP_80211K_SUPPORT
-	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_RRM_CAP), NULL,
-	   rlmMulAPAgentGenerateApRRMEnabledCapIE} /* 70 */
-#endif /* CFG_AP_80211K_SUPPORT */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_CAP), NULL,
 	   rlmRspGenerateHtCapIE}	/* 45 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_OP), NULL,
 	   rlmRspGenerateHtOpIE}	/* 61 */
-	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_TPE), NULL,
-	   rlmGenerateHtTPEIE}		/* 34 */
 #if CFG_ENABLE_WIFI_DIRECT
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_WPA), NULL,
 	   rsnGenerateWPAIE}	/* 221 */
@@ -234,16 +219,13 @@ struct APPEND_VAR_IE_ENTRY txProbRspIETable[] = {
 	   ehtRlmRspGenerateCapIE}
 	, {0, ehtRlmCalculateOpIELen,
 	   ehtRlmRspGenerateOpIE}
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	, {0, mldCalculateRnrIELen, mldGenerateRnrIE}
-	, {0, mldCalculateMlIELen, mldGenerateMlIE}
-#endif
 #endif
 #if CFG_SUPPORT_MTK_SYNERGY
-	, {0, rlmCalculateMTKOuiIELen, rlmGenerateMTKOuiIE}
+	, {(ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI), NULL,
+	   rlmGenerateMTKOuiIE}	/* 221 */
 #endif
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_RSN), NULL,
-	   rsnGenerateRSNXIE}	/* 244 */
+	   rsnGenerateRSNXIE}   /* 244 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_WPA), NULL,
 	   rsnGenerateOWEIE}
 };
@@ -285,9 +267,9 @@ struct APPEND_VAR_IE_ENTRY txProbRspIETable[] = {
  * @retval   VOID
  */
 /*---------------------------------------------------------------------------*/
-void bssDetermineStaRecPhyTypeSet(struct ADAPTER *prAdapter,
-				  struct BSS_DESC *prBssDesc,
-				  struct STA_RECORD *prStaRec)
+void bssDetermineStaRecPhyTypeSet(IN struct ADAPTER *prAdapter,
+				  IN struct BSS_DESC *prBssDesc,
+				  OUT struct STA_RECORD *prStaRec)
 {
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 	uint8_t ucHtOption = FEATURE_ENABLED;
@@ -378,7 +360,7 @@ void bssDetermineStaRecPhyTypeSet(struct ADAPTER *prAdapter,
 		prStaRec->ucPhyTypeSet &= ~PHY_TYPE_BIT_VHT;
 	else if (IS_FEATURE_FORCE_ENABLED(ucVhtOption))
 		prStaRec->ucPhyTypeSet |= PHY_TYPE_BIT_VHT;
-	else if (prBssInfo && prBssInfo->eBand == BAND_2G4 &&
+	else if (prBssDesc->eBand == BAND_2G4 &&
 		IS_FEATURE_DISABLED(prWifiVar->ucVhtIeIn2g)) {
 		prStaRec->ucPhyTypeSet &= ~PHY_TYPE_BIT_VHT;
 	}
@@ -392,17 +374,6 @@ void bssDetermineStaRecPhyTypeSet(struct ADAPTER *prAdapter,
 	}
 #endif
 #if (CFG_SUPPORT_802_11BE == 1)
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	/* eht and ml are together */
-	if (!prBssDesc->rMlInfo.fgValid &&
-	     prBssDesc->rMlInfo.fgMldType == MLD_TYPE_EXTERNAL) {
-		DBGLOG(BSS, INFO,
-		    "BSSID " MACSTR " invalid mld with eht not allowed\n",
-		    MAC2STR(prBssDesc->aucBSSID));
-		ucEhtOption = FEATURE_DISABLED;
-	}
-#endif
-
 	if (IS_FEATURE_DISABLED(ucEhtOption))
 		prStaRec->ucPhyTypeSet &= ~PHY_TYPE_BIT_EHT;
 	else if (IS_FEATURE_FORCE_ENABLED(ucEhtOption))
@@ -426,15 +397,15 @@ void bssDetermineStaRecPhyTypeSet(struct ADAPTER *prAdapter,
  * @retval   VOID
  */
 /*----------------------------------------------------------------------------*/
-void bssDetermineApBssInfoPhyTypeSet(struct ADAPTER *prAdapter,
-				     u_int8_t fgIsPureAp,
-				     struct BSS_INFO *prBssInfo)
+void bssDetermineApBssInfoPhyTypeSet(IN struct ADAPTER *prAdapter,
+				     IN u_int8_t fgIsPureAp,
+				     OUT struct BSS_INFO *prBssInfo)
 {
 	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
-	uint8_t ucHtOption;
-	uint8_t ucVhtOption;
+	uint8_t ucHtOption = FEATURE_ENABLED;
+	uint8_t ucVhtOption = FEATURE_ENABLED;
 #if (CFG_SUPPORT_802_11AX == 1)
-	uint8_t ucHeOption;
+	uint8_t ucHeOption = FEATURE_ENABLED;
 #endif
 #if (CFG_SUPPORT_802_11BE == 1)
 	uint8_t ucEhtOption = FEATURE_ENABLED;
@@ -508,39 +479,6 @@ void bssDetermineApBssInfoPhyTypeSet(struct ADAPTER *prAdapter,
 #endif
 
 	prBssInfo->ucPhyTypeSet &= prAdapter->rWifiVar.ucAvailablePhyTypeSet;
-#if (CFG_SUPPORT_802_11BE == 1)
-	if (!(prBssInfo->ucPhyTypeSet &
-		PHY_TYPE_SET_802_11AX))
-		prBssInfo->ucPhyTypeSet &=
-			~(PHY_TYPE_SET_802_11BE);
-#endif
-
-}
-
-uint32_t bssInfoConnType(struct ADAPTER *ad, struct BSS_INFO *bssinfo)
-{
-	if (bssinfo->eNetworkType == NETWORK_TYPE_AIS) {
-		return CONNECTION_INFRA_STA;
-	} else if (bssinfo->eNetworkType == NETWORK_TYPE_P2P) {
-		if (bssinfo->eCurrentOPMode == OP_MODE_INFRASTRUCTURE) {
-			return CONNECTION_P2P_GC;
-		} else if (bssinfo->eCurrentOPMode == OP_MODE_ACCESS_POINT) {
-#if CFG_ENABLE_WIFI_DIRECT
-			if (ad->fgIsP2PRegistered &&
-			    !p2pFuncIsAPMode(ad->rWifiVar.prP2PConnSettings[
-					bssinfo->u4PrivateData])) {
-				return CONNECTION_P2P_GO;
-			}
-#endif
-			return CONNECTION_INFRA_AP;
-		} else if (bssinfo->eCurrentOPMode == OP_MODE_P2P_DEVICE) {
-			return CONNECTION_P2P_DEVICE;
-		}
-	} else if (bssinfo->eNetworkType == NETWORK_TYPE_NAN) {
-		return CONNECTION_NAN;
-	}
-
-	return 0;
 
 }
 
@@ -558,21 +496,16 @@ uint32_t bssInfoConnType(struct ADAPTER *ad, struct BSS_INFO *bssinfo)
  * @retval   Pointer to STA_RECORD_T
  */
 /*---------------------------------------------------------------------------*/
-struct STA_RECORD *bssCreateStaRecFromBssDesc(struct ADAPTER *prAdapter,
-					      enum ENUM_STA_TYPE eStaType,
-					      uint8_t ucBssIndex,
-					      struct BSS_DESC *prBssDesc)
+struct STA_RECORD *bssCreateStaRecFromBssDesc(IN struct ADAPTER *prAdapter,
+					      IN enum ENUM_STA_TYPE eStaType,
+					      IN uint8_t ucBssIndex,
+					      IN struct BSS_DESC *prBssDesc)
 {
-	struct BSS_INFO *prBssInfo;
 	struct STA_RECORD *prStaRec;
 	uint8_t ucNonHTPhyTypeSet;
 	struct CONNECTION_SETTINGS *prConnSettings;
 
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(BSS, ERROR, "prBssInfo is null\n");
-		return NULL;
-	}
+	prConnSettings = aisGetConnSettings(prAdapter, ucBssIndex);
 
 	/* 4 <1> Get a valid STA_RECORD_T */
 	prStaRec =
@@ -595,14 +528,39 @@ struct STA_RECORD *bssCreateStaRecFromBssDesc(struct ADAPTER *prAdapter,
 		 * we may also reset the ucJoinFailureCount to 0.
 		 */
 	}
-
 	/* 4 <2> Update information from BSS_DESC_T to current P_STA_RECORD_T */
 	prStaRec->u2CapInfo = prBssDesc->u2CapInfo;
 
 	prStaRec->u2OperationalRateSet = prBssDesc->u2OperationalRateSet;
 	prStaRec->u2BSSBasicRateSet = prBssDesc->u2BSSBasicRateSet;
 
+#if 1
 	bssDetermineStaRecPhyTypeSet(prAdapter, prBssDesc, prStaRec);
+#else
+	prStaRec->ucPhyTypeSet = prBssDesc->ucPhyTypeSet;
+
+	if (IS_STA_IN_AIS(prStaRec)) {
+		if (!
+		    ((prConnSettings->eEncStatus ==
+		      ENUM_ENCRYPTION3_ENABLED)
+		     || (prConnSettings->eEncStatus ==
+			 ENUM_ENCRYPTION3_KEY_ABSENT)
+		     || (prConnSettings->eEncStatus ==
+			 ENUM_ENCRYPTION_DISABLED)
+		     || (prAdapter->prGlueInfo->u2WSCAssocInfoIELen)
+#if CFG_SUPPORT_WAPI
+		     || (prAdapter->prGlueInfo->u2WapiAssocInfoIESz)
+#endif
+)) {
+			DBGLOG(BSS, INFO,
+			       "Ignore the HT Bit for TKIP as pairwise cipher configed!\n");
+			prStaRec->ucPhyTypeSet &= ~PHY_TYPE_BIT_HT;
+		}
+	}
+
+	prStaRec->ucDesiredPhyTypeSet =
+	    prStaRec->ucPhyTypeSet & prAdapter->rWifiVar.ucAvailablePhyTypeSet;
+#endif
 
 	ucNonHTPhyTypeSet =
 	    prStaRec->ucDesiredPhyTypeSet & PHY_TYPE_SET_802_11ABG;
@@ -633,15 +591,9 @@ struct STA_RECORD *bssCreateStaRecFromBssDesc(struct ADAPTER *prAdapter,
 	}
 
 	/* Update non HT Desired Rate Set */
-	if (IS_BSS_INDEX_AIS(prAdapter, ucBssIndex)) {
-		prConnSettings = aisGetConnSettings(prAdapter, ucBssIndex);
-		prStaRec->u2DesiredNonHTRateSet =
-			(prStaRec->u2OperationalRateSet &
-			prConnSettings->u2DesiredNonHTRateSet);
-	} else {
-		prStaRec->u2DesiredNonHTRateSet =
-			(prStaRec->u2OperationalRateSet & RATE_SET_ALL_ABG);
-	}
+	prStaRec->u2DesiredNonHTRateSet =
+	    (prStaRec->
+	     u2OperationalRateSet & prConnSettings->u2DesiredNonHTRateSet);
 
 	/* 4 <3> Update information from BSS_DESC_T to current P_STA_RECORD_T */
 	if (IS_AP_STA(prStaRec)) {
@@ -666,22 +618,8 @@ struct STA_RECORD *bssCreateStaRecFromBssDesc(struct ADAPTER *prAdapter,
 	/* Update default Tx rate */
 	nicTxUpdateStaRecDefaultRate(prAdapter, prStaRec);
 
-	/* Update default op mode to a impossible value */
-	prStaRec->ucOpModeInOpNotificationIE = 0xff;
-
-	/* 4 <6> Decide if this BSS 20/40M bandwidth is allowed */
-	if ((prAdapter->rWifiVar.ucAvailablePhyTypeSet &
-	     PHY_TYPE_SET_802_11N) &&
-	    (prStaRec->ucPhyTypeSet & PHY_TYPE_SET_802_11N)) {
-		prBssInfo->fgAssoc40mBwAllowed =
-			cnmBss40mBwPermitted(prAdapter, ucBssIndex);
-	} else {
-		prBssInfo->fgAssoc40mBwAllowed = FALSE;
-	}
-	DBGLOG(RLM, TRACE, "STA 40mAllowed=%d\n",
-	       prBssInfo->fgAssoc40mBwAllowed);
-
 	return prStaRec;
+
 }				/* end of bssCreateStaRecFromBssDesc() */
 
 /*---------------------------------------------------------------------------*/
@@ -695,8 +633,8 @@ struct STA_RECORD *bssCreateStaRecFromBssDesc(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*---------------------------------------------------------------------------*/
-void bssComposeNullFrame(struct ADAPTER *prAdapter, uint8_t *pucBuffer,
-			 struct STA_RECORD *prStaRec)
+void bssComposeNullFrame(IN struct ADAPTER *prAdapter, IN uint8_t *pucBuffer,
+			 IN struct STA_RECORD *prStaRec)
 {
 	struct WLAN_MAC_HEADER *prNullFrame;
 	struct BSS_INFO *prBssInfo;
@@ -705,10 +643,6 @@ void bssComposeNullFrame(struct ADAPTER *prAdapter, uint8_t *pucBuffer,
 
 	ucBssIndex = prStaRec->ucBssIndex;
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(BSS, ERROR, "prBssInfo is null\n");
-		return;
-	}
 	prNullFrame = (struct WLAN_MAC_HEADER *)pucBuffer;
 
 	/* 4 <1> Decide the Frame Control Field */
@@ -768,9 +702,9 @@ void bssComposeNullFrame(struct ADAPTER *prAdapter, uint8_t *pucBuffer,
  */
 /*---------------------------------------------------------------------------*/
 void
-bssComposeQoSNullFrame(struct ADAPTER *prAdapter,
-		       uint8_t *pucBuffer, struct STA_RECORD *prStaRec,
-		       uint8_t ucUP, u_int8_t fgSetEOSP)
+bssComposeQoSNullFrame(IN struct ADAPTER *prAdapter,
+		       IN uint8_t *pucBuffer, IN struct STA_RECORD *prStaRec,
+		       IN uint8_t ucUP, IN u_int8_t fgSetEOSP)
 {
 	struct WLAN_MAC_HEADER_QOS *prQoSNullFrame;
 	struct BSS_INFO *prBssInfo;
@@ -847,8 +781,8 @@ bssComposeQoSNullFrame(struct ADAPTER *prAdapter,
  */
 /*---------------------------------------------------------------------------*/
 uint32_t
-bssSendNullFrame(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
-		 PFN_TX_DONE_HANDLER pfTxDoneHandler)
+bssSendNullFrame(IN struct ADAPTER *prAdapter, IN struct STA_RECORD *prStaRec,
+		 IN PFN_TX_DONE_HANDLER pfTxDoneHandler)
 {
 	struct MSDU_INFO *prMsduInfo;
 	uint16_t u2EstimatedFrameLen;
@@ -865,7 +799,7 @@ bssSendNullFrame(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
 	}
 	/* 4 <2> Compose Null frame in MSDU_INfO_T. */
 	bssComposeNullFrame(prAdapter,
-			    (uint8_t *) ((uintptr_t)prMsduInfo->prPacket +
+			    (uint8_t *) ((unsigned long)prMsduInfo->prPacket +
 					 MAC_TX_RESERVED_FIELD), prStaRec);
 	TX_SET_MMPDU(prAdapter,
 		     prMsduInfo,
@@ -893,9 +827,9 @@ bssSendNullFrame(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
  */
 /*---------------------------------------------------------------------------*/
 uint32_t
-bssSendQoSNullFrame(struct ADAPTER *prAdapter,
-		    struct STA_RECORD *prStaRec, uint8_t ucUP,
-		    PFN_TX_DONE_HANDLER pfTxDoneHandler)
+bssSendQoSNullFrame(IN struct ADAPTER *prAdapter,
+		    IN struct STA_RECORD *prStaRec, IN uint8_t ucUP,
+		    IN PFN_TX_DONE_HANDLER pfTxDoneHandler)
 {
 	struct MSDU_INFO *prMsduInfo;
 	uint16_t u2EstimatedFrameLen;
@@ -913,7 +847,7 @@ bssSendQoSNullFrame(struct ADAPTER *prAdapter,
 	/* 4 <2> Compose Null frame in MSDU_INfO_T. */
 	bssComposeQoSNullFrame(prAdapter,
 			       (uint8_t
-				*) ((uintptr_t)(prMsduInfo->prPacket) +
+				*) ((unsigned long)(prMsduInfo->prPacket) +
 				    MAC_TX_RESERVED_FIELD), prStaRec, ucUP,
 			       FALSE);
 
@@ -946,21 +880,17 @@ bssSendQoSNullFrame(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*---------------------------------------------------------------------------*/
-void bssGenerateExtSuppRate_IE(struct ADAPTER *prAdapter,
-			       struct MSDU_INFO *prMsduInfo)
+void bssGenerateExtSuppRate_IE(IN struct ADAPTER *prAdapter,
+			       IN struct MSDU_INFO *prMsduInfo)
 {
 	struct BSS_INFO *prBssInfo;
 	uint8_t *pucBuffer;
 	uint8_t ucExtSupRatesLen;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(BSS, ERROR, "prBssInfo is null\n");
-		return;
-	}
 	pucBuffer =
-	    (uint8_t *) ((uintptr_t)prMsduInfo->prPacket +
-			 (uintptr_t)prMsduInfo->u2FrameLength);
+	    (uint8_t *) ((unsigned long)prMsduInfo->prPacket +
+			 (unsigned long)prMsduInfo->u2FrameLength);
 
 	if (prBssInfo->ucAllSupportedRatesLen > ELEM_MAX_LEN_SUP_RATES)
 
@@ -997,16 +927,16 @@ void bssGenerateExtSuppRate_IE(struct ADAPTER *prAdapter,
  */
 /*---------------------------------------------------------------------------*/
 void
-bssBuildBeaconProbeRespFrameCommonIEs(struct MSDU_INFO *prMsduInfo,
-				      struct BSS_INFO *prBssInfo,
-				      uint8_t *pucDestAddr)
+bssBuildBeaconProbeRespFrameCommonIEs(IN struct MSDU_INFO *prMsduInfo,
+				      IN struct BSS_INFO *prBssInfo,
+				      IN uint8_t *pucDestAddr)
 {
 	uint8_t *pucBuffer;
 	uint8_t ucSupRatesLen;
 
 	pucBuffer =
-	    (uint8_t *) ((uintptr_t)prMsduInfo->prPacket +
-			 (uintptr_t)prMsduInfo->u2FrameLength);
+	    (uint8_t *) ((unsigned long)prMsduInfo->prPacket +
+			 (unsigned long)prMsduInfo->u2FrameLength);
 	/* 4 <1> Fill the SSID element. */
 	SSID_IE(pucBuffer)->ucId = ELEM_ID_SSID;
 
@@ -1116,7 +1046,7 @@ bssBuildBeaconProbeRespFrameCommonIEs(struct MSDU_INFO *prMsduInfo,
 			 */
 		}
 	}
-#if CFG_SUPPORT_802_11D
+
 	/* 4 <6> Fill the DS Parameter Set element. */
 	if (prBssInfo->ucCountryIELen != 0) {
 		COUNTRY_IE(pucBuffer)->ucId = ELEM_ID_COUNTRY_INFO;
@@ -1133,7 +1063,6 @@ bssBuildBeaconProbeRespFrameCommonIEs(struct MSDU_INFO *prMsduInfo,
 
 		prMsduInfo->u2FrameLength += IE_SIZE(pucBuffer);
 	}
-#endif
 }			/* end of bssBuildBeaconProbeRespFrameCommonIEs() */
 
 /*---------------------------------------------------------------------------*/
@@ -1153,12 +1082,12 @@ bssBuildBeaconProbeRespFrameCommonIEs(struct MSDU_INFO *prMsduInfo,
  */
 /*---------------------------------------------------------------------------*/
 void
-bssComposeBeaconProbeRespFrameHeaderAndFF(uint8_t *pucBuffer,
-					  uint8_t *pucDestAddr,
-					  uint8_t *pucOwnMACAddress,
-					  uint8_t *pucBSSID,
-					  uint16_t u2BeaconInterval,
-					  uint16_t u2CapInfo)
+bssComposeBeaconProbeRespFrameHeaderAndFF(IN uint8_t *pucBuffer,
+					  IN uint8_t *pucDestAddr,
+					  IN uint8_t *pucOwnMACAddress,
+					  IN uint8_t *pucBSSID,
+					  IN uint16_t u2BeaconInterval,
+					  IN uint16_t u2CapInfo)
 {
 	struct WLAN_BEACON_FRAME *prBcnProbRspFrame;
 	uint8_t aucBCAddr[] = BC_MAC_ADDR;
@@ -1213,29 +1142,45 @@ bssComposeBeaconProbeRespFrameHeaderAndFF(uint8_t *pucBuffer,
 	/* NOTE(Kevin): Optimized for ARM */
 }		/* end of bssComposeBeaconProbeRespFrameHeaderAndFF() */
 
-uint32_t bssUpdateBeaconContent(struct ADAPTER
-				*prAdapter, uint8_t uBssIndex)
+uint32_t bssUpdateBeaconContent(IN struct ADAPTER
+				*prAdapter, IN uint8_t uBssIndex)
 {
 	return bssUpdateBeaconContentEx(prAdapter,
 		uBssIndex,
 		IE_UPD_METHOD_UPDATE_ALL);
 }
 
-struct MSDU_INFO *bssComposeBeaconContent(struct ADAPTER *prAdapter,
-				uint8_t ucBssIndex)
+/*---------------------------------------------------------------------------*/
+/*!
+ * @brief Update the Beacon Frame Template to FW for AIS AdHoc and P2P GO.
+ *
+ * @param[in] prAdapter         Pointer to the Adapter structure.
+ * @param[in] ucBssIndex        Specify which network reply the Probe Response.
+ *
+ * @retval WLAN_STATUS_SUCCESS   Success.
+ */
+/*---------------------------------------------------------------------------*/
+uint32_t bssUpdateBeaconContentEx(IN struct ADAPTER *prAdapter,
+				IN uint8_t ucBssIndex,
+				enum ENUM_IE_UPD_METHOD eMethod)
 {
 	struct BSS_INFO *prBssInfo;
 	struct MSDU_INFO *prMsduInfo;
+	struct WLAN_BEACON_FRAME *prBcnFrame;
 	uint32_t i;
 
 	DEBUGFUNC("bssUpdateBeaconContent");
 	DBGLOG(INIT, LOUD, "\n");
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-	if (!prBssInfo) {
-		DBGLOG(BSS, ERROR, "prBssInfo is null\n");
-		return NULL;
+
+	if (!prBssInfo || !prBssInfo->fgIsInUse) {
+		DBGLOG(P2P, WARN,
+			"bss%d is not in used\n",
+			ucBssIndex);
+		return 0;
 	}
+
 	/* 4 <1> Allocate a PKT_INFO_T for Beacon Frame */
 	/* Allocate a MSDU_INFO_T */
 	/* For Beacon */
@@ -1245,17 +1190,18 @@ struct MSDU_INFO *bssComposeBeaconContent(struct ADAPTER *prAdapter,
 	 * so skip if it is
 	 */
 	if (prMsduInfo == NULL)
-		return NULL;
+		return WLAN_STATUS_SUCCESS;
 
 	/* 4 <2> Compose header */
 	bssComposeBeaconProbeRespFrameHeaderAndFF((uint8_t *)
-		((uintptr_t)(prMsduInfo->prPacket)
-			+ MAC_TX_RESERVED_FIELD),
-			NULL,
-			prBssInfo->aucOwnMacAddr,
-			prBssInfo->aucBSSID,
-			prBssInfo->u2BeaconInterval,
-			prBssInfo->u2CapInfo);
+						  ((unsigned
+						    long)(prMsduInfo->prPacket)
+						   + MAC_TX_RESERVED_FIELD),
+						  NULL,
+						  prBssInfo->aucOwnMacAddr,
+						  prBssInfo->aucBSSID,
+						  prBssInfo->u2BeaconInterval,
+						  prBssInfo->u2CapInfo);
 
 	prMsduInfo->u2FrameLength = (WLAN_MAC_MGMT_HEADER_LEN +
 				     (TIMESTAMP_FIELD_LEN +
@@ -1269,11 +1215,6 @@ struct MSDU_INFO *bssComposeBeaconContent(struct ADAPTER *prAdapter,
 
 	/* 4 <4> Compose IEs in MSDU_INFO_T */
 
-#if defined(CFG_AAD_NONCE_NO_REPLACE)
-	nicTxConfigPktControlFlag(prMsduInfo,
-				  MSDU_CONTROL_FLAG_HIDE_INFO, TRUE);
-#endif
-
 	/* Append IE for Beacon */
 	for (i = 0;
 	     i < sizeof(txBcnIETable) / sizeof(struct APPEND_VAR_IE_ENTRY);
@@ -1283,51 +1224,14 @@ struct MSDU_INFO *bssComposeBeaconContent(struct ADAPTER *prAdapter,
 
 	}
 
-	sortMgmtFrameIE(prAdapter, prMsduInfo);
+	prBcnFrame = (struct WLAN_BEACON_FRAME *)prMsduInfo->prPacket;
 
-	return prMsduInfo;
-}
-
-/*---------------------------------------------------------------------------*/
-/*!
- * @brief Update the Beacon Frame Template to FW for AIS AdHoc and P2P GO.
- *
- * @param[in] prAdapter         Pointer to the Adapter structure.
- * @param[in] ucBssIndex        Specify which network reply the Probe Response.
- *
- * @retval WLAN_STATUS_SUCCESS   Success.
- */
-/*---------------------------------------------------------------------------*/
-uint32_t bssUpdateBeaconContentEx(struct ADAPTER *prAdapter,
-				uint8_t ucBssIndex,
-				enum ENUM_IE_UPD_METHOD eMethod)
-{
-
-	struct MSDU_INFO *prMsduInfo;
-	struct BSS_INFO *prBssInfo;
-	struct WLAN_BEACON_FRAME *prBcnFrame;
-
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
-
-	if (!prBssInfo || !prBssInfo->fgIsInUse) {
-		DBGLOG(P2P, WARN,
-			"bss%d is not in used\n",
-			ucBssIndex);
-		return 0;
-	}
-
-	prMsduInfo = bssComposeBeaconContent(prAdapter, ucBssIndex);
-	if (!prMsduInfo)
-		return WLAN_STATUS_SUCCESS;
-
-	DBGLOG(P2P, TRACE, "Dump beacon content %d to FW, method:%d\n",
-		ucBssIndex, eMethod);
+	DBGLOG(P2P, TRACE, "Dump beacon content to FW, method:%d\n", eMethod);
 	if (aucDebugModule[DBG_P2P_IDX] & DBG_CLASS_TRACE) {
 		dumpMemory8((uint8_t *) prMsduInfo->prPacket,
 			(uint32_t) prMsduInfo->u2FrameLength);
 	}
 
-	prBcnFrame = (struct WLAN_BEACON_FRAME *)prMsduInfo->prPacket;
 	return nicUpdateBeaconIETemplate(prAdapter,
 				 eMethod,
 				 ucBssIndex,
@@ -1354,9 +1258,9 @@ uint32_t bssUpdateBeaconContentEx(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 uint32_t
-bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
-			   uint8_t ucBssIndex, uint8_t *pucDestAddr,
-			   uint32_t u4ControlFlags)
+bssSendBeaconProbeResponse(IN struct ADAPTER *prAdapter,
+			   IN uint8_t ucBssIndex, IN uint8_t *pucDestAddr,
+			   IN uint32_t u4ControlFlags)
 {
 	struct BSS_INFO *prBssInfo;
 	struct MSDU_INFO *prMsduInfo;
@@ -1431,7 +1335,7 @@ bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
 	if (u4ControlFlags & BSS_PROBE_RESP_USE_P2P_DEV_ADDR) {
 		if (prAdapter->fgIsP2PRegistered) {
 			bssComposeBeaconProbeRespFrameHeaderAndFF((uint8_t *)
-				((uintptr_t)
+				((unsigned long)
 				(prMsduInfo->prPacket) + MAC_TX_RESERVED_FIELD),
 				pucDestAddr,
 				prAdapter->rWifiVar.aucDeviceAddress,
@@ -1444,7 +1348,7 @@ bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
 #endif /* CFG_ENABLE_WIFI_DIRECT */
 	{
 		bssComposeBeaconProbeRespFrameHeaderAndFF((uint8_t *)
-			  ((uintptr_t)
+			  ((unsigned long)
 			   (prMsduInfo->prPacket) + MAC_TX_RESERVED_FIELD),
 			   pucDestAddr, prBssInfo->aucOwnMacAddr,
 			   prBssInfo->aucBSSID,
@@ -1468,11 +1372,6 @@ bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
 	bssBuildBeaconProbeRespFrameCommonIEs(prMsduInfo, prBssInfo,
 					      pucDestAddr);
 
-#if defined(CFG_AAD_NONCE_NO_REPLACE)
-	nicTxConfigPktControlFlag(prMsduInfo,
-				  MSDU_CONTROL_FLAG_HIDE_INFO, TRUE);
-#endif
-
 	/* 4 <5> Compose IEs in MSDU_INFO_T */
 
 	/* Append IE */
@@ -1483,7 +1382,7 @@ bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
 	}
 
 	/* Set limited retry count and lifetime for Probe Resp is reasonable */
-	nicTxSetPktLifeTime(prAdapter, prMsduInfo, 100);
+	nicTxSetPktLifeTime(prMsduInfo, 100);
 	nicTxSetPktRetryLimit(prMsduInfo, 2);
 
 	/* TODO(Kevin):
@@ -1509,8 +1408,8 @@ bssSendBeaconProbeResponse(struct ADAPTER *prAdapter,
  * @retval WLAN_STATUS_SUCCESS   Always return success
  */
 /*----------------------------------------------------------------------------*/
-uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
-				struct SW_RFB *prSwRfb)
+uint32_t bssProcessProbeRequest(IN struct ADAPTER *prAdapter,
+				IN struct SW_RFB *prSwRfb)
 {
 	struct WLAN_MAC_MGMT_HEADER *prMgtHdr;
 	struct BSS_INFO *prBssInfo;
@@ -1522,12 +1421,6 @@ uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
 	enum ENUM_BAND eBand = 0;
 	uint8_t ucHwChannelNum = 0;
 	struct RX_DESC_OPS_T *prRxDescOps;
-#if CFG_AP_80211KVR_INTERFACE
-	uint8_t ucIndex;
-	struct T_MULTI_AP_STA_UNASSOC_METRICS *prUnAssocSTA;
-	uint8_t aucNullAddr[] = NULL_MAC_ADDR;
-	struct HW_MAC_RX_STS_GROUP_3 *prRxStatusGroup3;
-#endif
 
 	prRxDescOps = prAdapter->chip_info->prRxDescOps;
 	/* 4 <1> Parse Probe Req and Get BSSID */
@@ -1549,13 +1442,22 @@ uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
 
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
-		if ((!prBssInfo) || ((!fgIsBcBssid)
+		if ((!fgIsBcBssid)
 		    && UNEQUAL_MAC_ADDR(prBssInfo->aucBSSID,
-					prMgtHdr->aucBSSID)))
+					prMgtHdr->aucBSSID))
 			continue;
 
-		eBand = prSwRfb->eRfBand;
-		ucHwChannelNum = prSwRfb->ucChnlNum;
+		RX_STATUS_GET(
+			prRxDescOps,
+			eBand,
+			get_rf_band,
+			prSwRfb->prRxStatus);
+
+		RX_STATUS_GET(
+			prRxDescOps,
+			ucHwChannelNum,
+			get_ch_num,
+			prSwRfb->prRxStatus);
 
 		nicRxdChNumTranslate(eBand, &ucHwChannelNum);
 
@@ -1568,6 +1470,7 @@ uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
 		fgReplyProbeResp = FALSE;
 
 		if (prBssInfo->eNetworkType == NETWORK_TYPE_AIS) {
+
 #if CFG_SUPPORT_ADHOC
 			fgReplyProbeResp =
 			    aisValidateProbeReq(prAdapter, prSwRfb,
@@ -1586,31 +1489,6 @@ uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
 						     prAdapter->ucP2PDevBssIdx),
 						    (uint8_t)
 						    prBssInfo->u4PrivateData);
-#if CFG_AP_80211KVR_INTERFACE
-			for (ucIndex = 0;
-				ucIndex < SAP_UNASSOC_METRICS_STA_MAX;
-				ucIndex++) {
-				prUnAssocSTA =
-					&prBssInfo->arUnAssocSTA[ucIndex];
-
-				if (EQUAL_MAC_ADDR(prUnAssocSTA->mStaMac,
-					prMgtHdr->aucSrcAddr)
-					&& UNEQUAL_MAC_ADDR(aucNullAddr,
-					prMgtHdr->aucSrcAddr)) {
-					prRxStatusGroup3 =
-					prSwRfb->prRxStatusGroup3;
-					prUnAssocSTA->iRssi =
-						RCPI_TO_dBm(
-						((prRxStatusGroup3)
-						->u4RxVector[3]
-						& RX_VT_RCPI0_MASK)
-						>> RX_VT_RCPI0_OFFSET);
-					prUnAssocSTA->u8Channel =
-						prBssInfo->ucPrimaryChannel;
-					prUnAssocSTA->uTime = kalGetTimeTick();
-				}
-			}
-#endif
 		}
 #endif
 #if CFG_ENABLE_BT_OVER_WIFI
@@ -1647,8 +1525,8 @@ uint32_t bssProcessProbeRequest(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void bssInitializeClientList(struct ADAPTER *prAdapter,
-			     struct BSS_INFO *prBssInfo)
+void bssInitializeClientList(IN struct ADAPTER *prAdapter,
+			     IN struct BSS_INFO *prBssInfo)
 {
 	struct LINK *prStaRecOfClientList;
 
@@ -1674,8 +1552,8 @@ void bssInitializeClientList(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void bssAddClient(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
-		  struct STA_RECORD *prStaRec)
+void bssAddClient(IN struct ADAPTER *prAdapter, IN struct BSS_INFO *prBssInfo,
+		  IN struct STA_RECORD *prStaRec)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1712,9 +1590,9 @@ void bssAddClient(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t bssRemoveClient(struct ADAPTER *prAdapter,
-			 struct BSS_INFO *prBssInfo,
-			 struct STA_RECORD *prStaRec)
+u_int8_t bssRemoveClient(IN struct ADAPTER *prAdapter,
+			 IN struct BSS_INFO *prBssInfo,
+			 IN struct STA_RECORD *prStaRec)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1746,9 +1624,9 @@ u_int8_t bssRemoveClient(struct ADAPTER *prAdapter,
 	return FALSE;
 }				/* end of bssRemoveStaRecFromClientList() */
 
-struct STA_RECORD *bssRemoveClientByMac(struct ADAPTER *prAdapter,
-					struct BSS_INFO *prBssInfo,
-					uint8_t *pucMac)
+struct STA_RECORD *bssRemoveClientByMac(IN struct ADAPTER *prAdapter,
+					IN struct BSS_INFO *prBssInfo,
+					IN uint8_t *pucMac)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1779,9 +1657,9 @@ struct STA_RECORD *bssRemoveClientByMac(struct ADAPTER *prAdapter,
 	return NULL;
 }
 
-struct STA_RECORD *bssGetClientByMac(struct ADAPTER *prAdapter,
-				     struct BSS_INFO *prBssInfo,
-				     uint8_t *pucMac)
+struct STA_RECORD *bssGetClientByMac(IN struct ADAPTER *prAdapter,
+				     IN struct BSS_INFO *prBssInfo,
+				     IN uint8_t *pucMac)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1807,8 +1685,8 @@ struct STA_RECORD *bssGetClientByMac(struct ADAPTER *prAdapter,
 	return NULL;
 }
 
-struct STA_RECORD *bssRemoveHeadClient(struct ADAPTER *prAdapter,
-				       struct BSS_INFO *prBssInfo)
+struct STA_RECORD *bssRemoveHeadClient(IN struct ADAPTER *prAdapter,
+				       IN struct BSS_INFO *prBssInfo)
 {
 	struct LINK *prStaRecOfClientList;
 	struct STA_RECORD *prStaRec = NULL;
@@ -1824,14 +1702,14 @@ struct STA_RECORD *bssRemoveHeadClient(struct ADAPTER *prAdapter,
 	return prStaRec;
 }
 
-uint32_t bssGetClientCount(struct ADAPTER *prAdapter,
-			   struct BSS_INFO *prBssInfo)
+uint32_t bssGetClientCount(IN struct ADAPTER *prAdapter,
+			   IN struct BSS_INFO *prBssInfo)
 {
 	return prBssInfo->rStaRecOfClientList.u4NumElem;
 }
 
-void bssDumpClientList(struct ADAPTER *prAdapter,
-		       struct BSS_INFO *prBssInfo)
+void bssDumpClientList(IN struct ADAPTER *prAdapter,
+		       IN struct BSS_INFO *prBssInfo)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1857,8 +1735,8 @@ void bssDumpClientList(struct ADAPTER *prAdapter,
 	}
 }
 
-void bssCheckClientList(struct ADAPTER *prAdapter,
-			struct BSS_INFO *prBssInfo)
+void bssCheckClientList(IN struct ADAPTER *prAdapter,
+			IN struct BSS_INFO *prBssInfo)
 {
 	struct LINK *prClientList;
 	struct STA_RECORD *prCurrStaRec;
@@ -1939,9 +1817,9 @@ void bssCheckClientList(struct ADAPTER *prAdapter,
  */
 /*----------------------------------------------------------------------------*/
 void
-ibssProcessMatchedBeacon(struct ADAPTER *prAdapter,
-			 struct BSS_INFO *prBssInfo,
-			 struct BSS_DESC *prBssDesc, uint8_t ucRCPI)
+ibssProcessMatchedBeacon(IN struct ADAPTER *prAdapter,
+			 IN struct BSS_INFO *prBssInfo,
+			 IN struct BSS_DESC *prBssDesc, IN uint8_t ucRCPI)
 {
 	struct STA_RECORD *prStaRec = NULL;
 
@@ -2201,9 +2079,9 @@ ibssProcessMatchedBeacon(struct ADAPTER *prAdapter,
  * @retval WLAN_STATUS_SUCCESS   Pass the check of Capability.
  */
 /*----------------------------------------------------------------------------*/
-uint32_t ibssCheckCapabilityForAdHocMode(struct ADAPTER *prAdapter,
-					 struct BSS_DESC *prBssDesc,
-					 uint8_t ucBssIndex)
+uint32_t ibssCheckCapabilityForAdHocMode(IN struct ADAPTER *prAdapter,
+					 IN struct BSS_DESC *prBssDesc,
+					 IN uint8_t ucBssIndex)
 {
 	struct CONNECTION_SETTINGS *prConnSettings;
 	uint32_t rStatus = WLAN_STATUS_FAILURE;
@@ -2261,8 +2139,8 @@ uint32_t ibssCheckCapabilityForAdHocMode(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void ibssInitForAdHoc(struct ADAPTER *prAdapter,
-		      struct BSS_INFO *prBssInfo)
+void ibssInitForAdHoc(IN struct ADAPTER *prAdapter,
+		      IN struct BSS_INFO *prBssInfo)
 {
 	uint8_t aucBSSID[MAC_ADDR_LEN];
 	uint16_t *pu2BSSID = (uint16_t *) &aucBSSID[0];
@@ -2354,8 +2232,8 @@ void ibssInitForAdHoc(struct ADAPTER *prAdapter,
  * @return (none)
  */
 /*----------------------------------------------------------------------------*/
-void bssInitForAP(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
-		  u_int8_t fgIsRateUpdate)
+void bssInitForAP(IN struct ADAPTER *prAdapter, IN struct BSS_INFO *prBssInfo,
+		  IN u_int8_t fgIsRateUpdate)
 {
 	struct AC_QUE_PARMS *prACQueParms;
 
@@ -2431,9 +2309,6 @@ void bssInitForAP(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
 
 	if (prBssInfo->fgUseShortSlotTime)
 		prBssInfo->u2CapInfo |= CAP_INFO_SHORT_SLOT_TIME;
-#if CFG_AP_80211K_SUPPORT
-	prBssInfo->u2CapInfo |= CAP_INFO_RADIO_MEASUREMENT;
-#endif /* CFG_AP_80211K_SUPPORT */
 #endif
 	/* 4 <6> Find Lowest Basic Rate Index for default TX Rate of MMPDU */
 	nicTxUpdateBssDefaultRate(prBssInfo);
@@ -2506,20 +2381,19 @@ void bssInitForAP(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
 
 #endif /* CFG_SUPPORT_AAA */
 
-void bssCreateStaRecFromAuth(struct ADAPTER *prAdapter)
+void bssCreateStaRecFromAuth(IN struct ADAPTER *prAdapter)
 {
 
 }
 
-void bssUpdateStaRecFromAssocReq(struct ADAPTER *prAdapter)
+void bssUpdateStaRecFromAssocReq(IN struct ADAPTER *prAdapter)
 {
 
 }
 
-void bssDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
+void bssDumpBssInfo(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIndex)
 {
 	struct BSS_INFO *prBssInfo;
-	uint32_t u4NetworkType, u4CurrentOPMode;
 	/* P_LINK_T prStaRecOfClientList = (P_LINK_T) NULL; */
 	/* P_STA_RECORD_T prCurrStaRec = (P_STA_RECORD_T) NULL; */
 
@@ -2541,15 +2415,13 @@ void bssDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
 	       MAC2STR(prBssInfo->aucOwnMacAddr), MAC2STR(prBssInfo->aucBSSID),
 	       HIDE(prBssInfo->aucSSID));
 
-	u4NetworkType = prBssInfo->eNetworkType;
-	u4CurrentOPMode = prBssInfo->eCurrentOPMode;
-	if (u4NetworkType < NETWORK_TYPE_NUM
-			&& u4CurrentOPMode < OP_MODE_NUM) {
+	if (prBssInfo->eNetworkType < NETWORK_TYPE_NUM
+			&& prBssInfo->eCurrentOPMode < OP_MODE_NUM) {
 		DBGLOG(SW4, INFO,
 			"BSS IDX[%u] Type[%s] OPMode[%s] ConnState[%u] Absent[%u]\n",
 			prBssInfo->ucBssIndex,
-			apucNetworkType[u4NetworkType],
-			apucNetworkOpMode[u4CurrentOPMode],
+			apucNetworkType[prBssInfo->eNetworkType],
+			apucNetworkOpMode[prBssInfo->eCurrentOPMode],
 			prBssInfo->eConnectionState, prBssInfo->fgIsNetAbsent);
 	}
 
@@ -2623,8 +2495,8 @@ void bssDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
 	DBGLOG(SW4, INFO, "============== Dump Done ==============\n");
 }
 
-int8_t bssGetRxNss(struct ADAPTER *prAdapter,
-	struct BSS_DESC *prBssDesc)
+int8_t bssGetRxNss(IN struct ADAPTER *prAdapter,
+	IN struct BSS_DESC *prBssDesc)
 {
 	uint8_t  ucIeByte = 0;
 	int8_t   ucBssNss = 0;
@@ -2638,7 +2510,7 @@ int8_t bssGetRxNss(struct ADAPTER *prAdapter,
 
 	pucIe = kalFindIeMatchMask(
 		ELEM_ID_HT_CAP,
-		prBssDesc->pucIeBuf,
+		&prBssDesc->aucIEBuf[0],
 		prBssDesc->u2IELength,
 		NULL, 0, 0, NULL);
 
@@ -2661,18 +2533,14 @@ int8_t bssGetRxNss(struct ADAPTER *prAdapter,
 
 
 #if (CFG_SUPPORT_HE_ER == 1)
-void bssProcessErTxModeEvent(struct ADAPTER *prAdapter,
-	struct WIFI_EVENT *prEvent)
+void bssProcessErTxModeEvent(IN struct ADAPTER *prAdapter,
+	IN struct WIFI_EVENT *prEvent)
 {
 	struct BSS_INFO *prBssInfo;
 	struct EVENT_ER_TX_MODE *prErTxMode;
 
 	prErTxMode = (struct EVENT_ER_TX_MODE *) (prEvent->aucBuffer);
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prErTxMode->ucBssInfoIdx);
-	if (!prBssInfo) {
-		DBGLOG(BSS, ERROR, "prBssInfo is null\n");
-		return;
-	}
 
 	prBssInfo->ucErMode = prErTxMode->ucErMode;
 
@@ -2692,8 +2560,8 @@ void bssProcessErTxModeEvent(struct ADAPTER *prAdapter,
  * @return ENUM_WLAN_IOT_AP_HANDLE_ACTION
  */
 /*----------------------------------------------------------------------------*/
-uint32_t bssGetIotApAction(struct ADAPTER *prAdapter,
-	struct BSS_DESC *prBssDesc)
+uint32_t bssGetIotApAction(IN struct ADAPTER *prAdapter,
+	IN struct BSS_DESC *prBssDesc)
 {
 	uint8_t  ucCnt = 0;
 	int8_t   ucBssNss;
@@ -2715,7 +2583,7 @@ uint32_t bssGetIotApAction(struct ADAPTER *prAdapter,
 	prBssDesc->fgIotApActionValid = TRUE;
 	prBssDesc->ucIotApAct = WLAN_IOT_AP_VOID;
 
-	pucIes = prBssDesc->pucIeBuf;
+	pucIes = &prBssDesc->aucIEBuf[0];
 	for (ucCnt = 0; ucCnt < CFG_IOT_AP_RULE_MAX_CNT; ucCnt++) {
 		prIotApRule = &prAdapter->rIotApRule[ucCnt];
 		u2MatchFlag = prIotApRule->u2MatchFlag;

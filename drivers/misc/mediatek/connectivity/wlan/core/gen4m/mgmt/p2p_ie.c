@@ -51,9 +51,9 @@
  *****************************************************************************/
 #include "precomp.h"
 
-uint32_t p2pCalculate_IEForAssocReq(struct ADAPTER *prAdapter,
-		uint8_t ucBssIndex,
-		struct STA_RECORD *prStaRec)
+uint32_t p2pCalculate_IEForAssocReq(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucBssIndex,
+		IN struct STA_RECORD *prStaRec)
 {
 	struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo =
 		(struct P2P_ROLE_FSM_INFO *) NULL;
@@ -68,6 +68,7 @@ uint32_t p2pCalculate_IEForAssocReq(struct ADAPTER *prAdapter,
 		prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 		if (!prP2pBssInfo)
 			break;
+
 		prP2pRoleFsmInfo =
 			P2P_ROLE_INDEX_2_ROLE_FSM_INFO(prAdapter,
 				(uint8_t) prP2pBssInfo->u4PrivateData);
@@ -120,10 +121,8 @@ uint32_t p2pCalculate_IEForAssocReq(struct ADAPTER *prAdapter,
 #endif
 
 #if CFG_SUPPORT_MTK_SYNERGY
-		if (prAdapter->rWifiVar.ucMtkOui == FEATURE_ENABLED) {
-			u4RetValue += rlmCalculateMTKOuiIELen(prAdapter,
-				 prStaRec->ucBssIndex, prStaRec);
-		}
+		if (prAdapter->rWifiVar.ucMtkOui == FEATURE_ENABLED)
+			u4RetValue += (ELEM_HDR_LEN + ELEM_MIN_LEN_MTK_OUI);
 #endif
 	} while (FALSE);
 
@@ -139,8 +138,8 @@ uint32_t p2pCalculate_IEForAssocReq(struct ADAPTER *prAdapter,
  * @return none
  */
 /*----------------------------------------------------------------------------*/
-void p2pGenerate_IEForAssocReq(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo)
+void p2pGenerate_IEForAssocReq(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo)
 {
 	struct BSS_INFO *prBssInfo = (struct BSS_INFO *) NULL;
 	struct P2P_ROLE_FSM_INFO *prP2pRoleFsmInfo =
@@ -151,6 +150,7 @@ void p2pGenerate_IEForAssocReq(struct ADAPTER *prAdapter,
 
 	do {
 		ASSERT_BREAK((prAdapter != NULL) && (prMsduInfo != NULL));
+
 		prBssInfo =
 			GET_BSS_INFO_BY_INDEX(prAdapter,
 				prMsduInfo->ucBssIndex);
@@ -162,8 +162,8 @@ void p2pGenerate_IEForAssocReq(struct ADAPTER *prAdapter,
 
 		prConnReqInfo = &(prP2pRoleFsmInfo->rConnReqInfo);
 
-		pucIEBuf = (uint8_t *) ((uintptr_t) prMsduInfo->prPacket
-			+ prMsduInfo->u2FrameLength);
+		pucIEBuf = (uint8_t *) ((unsigned long) prMsduInfo->prPacket
+			+ (unsigned long) prMsduInfo->u2FrameLength);
 
 		kalMemCopy(pucIEBuf, prConnReqInfo->aucIEBuf,
 			prConnReqInfo->u4BufLength);
@@ -204,13 +204,13 @@ void p2pGenerate_IEForAssocReq(struct ADAPTER *prAdapter,
 	return;
 
 }				/* p2pGenerate_IEForAssocReq */
-#if CFG_SUPPORT_WFD
+
 uint32_t
-wfdFuncAppendAttriDevInfo(struct ADAPTER *prAdapter,
-		u_int8_t fgIsAssocFrame,
-		uint16_t *pu2Offset,
-		uint8_t *pucBuf,
-		uint16_t u2BufSize)
+wfdFuncAppendAttriDevInfo(IN struct ADAPTER *prAdapter,
+		IN u_int8_t fgIsAssocFrame,
+		IN uint16_t *pu2Offset,
+		IN uint8_t *pucBuf,
+		IN uint16_t u2BufSize)
 {
 	uint32_t u4AttriLen = 0;
 	uint8_t *pucBuffer = NULL;
@@ -233,8 +233,8 @@ wfdFuncAppendAttriDevInfo(struct ADAPTER *prAdapter,
 			break;
 		}
 
-		pucBuffer = (uint8_t *) ((uintptr_t) pucBuf
-			+ *pu2Offset);
+		pucBuffer = (uint8_t *) ((unsigned long) pucBuf
+			+ (unsigned long) (*pu2Offset));
 
 		ASSERT_BREAK(pucBuffer != NULL);
 
@@ -264,5 +264,3 @@ wfdFuncAppendAttriDevInfo(struct ADAPTER *prAdapter,
 }
 
 /* wfdFuncAppendAttriDevInfo */
-#endif
-

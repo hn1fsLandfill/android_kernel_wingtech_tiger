@@ -143,8 +143,9 @@ uint8_t nic_txd_v1_queue_idx_op(
 }
 
 #if (CFG_TCP_IP_CHKSUM_OFFLOAD == 1)
-void nic_txd_v1_chksum_op(void *prTxDesc, uint8_t ucChksumFlag,
-			struct MSDU_INFO *prMsduInfo)
+void nic_txd_v1_chksum_op(
+	void *prTxDesc,
+	uint8_t ucChksumFlag)
 {
 	if ((ucChksumFlag & TX_CS_IP_GEN))
 		HAL_MAC_TX_DESC_SET_IP_CHKSUM(
@@ -152,18 +153,6 @@ void nic_txd_v1_chksum_op(void *prTxDesc, uint8_t ucChksumFlag,
 	if ((ucChksumFlag & TX_CS_TCP_UDP_GEN))
 		HAL_MAC_TX_DESC_SET_TCP_UDP_CHKSUM(
 			(struct HW_MAC_TX_DESC *)prTxDesc);
-	/*
-	 * If kernel do not expect HW checksum for this frame, set ~AMSDU.
-	 * The ICMP frame check were done by checking pfTxDoneHandler
-	 * in nic_txd_*_compose().
-	 * In that case ICMP do not need HW checksum would cause following
-	 * frames need checksum but skipped, but only happened if IcmpTxs
-	 * were disabled for special test case.
-	 */
-	if (!(ucChksumFlag & (TX_CS_IP_GEN | TX_CS_TCP_UDP_GEN)) &&
-	    prMsduInfo->ucPktType != ENUM_PKT_ICMP)
-		HAL_MAC_TX_DESC_UNSET_HW_AMSDU(
-				(struct HW_MAC_TX_DESC *)prTxDesc);
 }
 #endif /* CFG_TCP_IP_CHKSUM_OFFLOAD == 1 */
 
@@ -182,7 +171,6 @@ void nic_txd_v1_header_format_op(
 }
 
 void nic_txd_v1_fill_by_pkt_option(
-	struct ADAPTER *prAdapter,
 	struct MSDU_INFO *prMsduInfo,
 	void *prTxD)
 {
@@ -230,7 +218,7 @@ void nic_txd_v1_fill_by_pkt_option(
 	case HEADER_FORMAT_802_11_NORMAL_MODE:
 		if (fgProtected && prMsduInfo->prPacket) {
 			struct WLAN_MAC_HEADER *prWlanHeader =
-				(struct WLAN_MAC_HEADER *) ((uintptr_t) (
+				(struct WLAN_MAC_HEADER *) ((unsigned long) (
 				prMsduInfo->prPacket) + MAC_TX_RESERVED_FIELD);
 
 			prWlanHeader->u2FrameCtrl |= MASK_FC_PROTECTED_FRAME;
@@ -460,7 +448,7 @@ void nic_txd_v1_compose(
 		HAL_MAC_TX_DESC_SET_SHORT_FORMAT(prTxDesc);
 
 		/* Update Packet option */
-		nic_txd_v1_fill_by_pkt_option(prAdapter, prMsduInfo, prTxDesc);
+		nic_txd_v1_fill_by_pkt_option(prMsduInfo, prTxDesc);
 
 		/* Short format, Skip DW 2~6 */
 		return;
@@ -468,14 +456,14 @@ void nic_txd_v1_compose(
 	HAL_MAC_TX_DESC_SET_LONG_FORMAT(prTxDesc);
 
 	/* Update Packet option */
-	nic_txd_v1_fill_by_pkt_option(prAdapter, prMsduInfo, prTxDesc);
+	nic_txd_v1_fill_by_pkt_option(prMsduInfo, prTxDesc);
 
 	nic_txd_v1_fill_by_pkt_ctrl(prMsduInfo, prTxDesc);
 
 	/* Type */
 	if (prMsduInfo->fgIs802_11) {
 		struct WLAN_MAC_HEADER *prWlanHeader =
-			(struct WLAN_MAC_HEADER *) ((uintptr_t) (
+			(struct WLAN_MAC_HEADER *) ((unsigned long) (
 			prMsduInfo->prPacket) + MAC_TX_RESERVED_FIELD);
 
 		HAL_MAC_TX_DESC_SET_TYPE(prTxDesc,
@@ -487,8 +475,7 @@ void nic_txd_v1_compose(
 	/* PID */
 	if (prMsduInfo->pfTxDoneHandler) {
 		prMsduInfo->ucPID = nicTxAssignPID(prAdapter,
-				prMsduInfo->ucWlanIndex,
-				prMsduInfo->ucPacketType); /* 0/1: data/mgmt */
+						   prMsduInfo->ucWlanIndex);
 		HAL_MAC_TX_DESC_SET_PID(prTxDesc, prMsduInfo->ucPID);
 		HAL_MAC_TX_DESC_SET_TXS_TO_MCU(prTxDesc);
 	} else if (prAdapter->rWifiVar.ucDataTxDone == 2) {
@@ -550,6 +537,117 @@ void nic_txd_v1_compose(
 		break;
 	}
 
+}
+
+
+void nic_txd_v1_compose_security_frame(
+	struct ADAPTER *prAdapter,
+	struct CMD_INFO *prCmdInfo,
+	uint8_t *prTxDescBuffer,
+	uint8_t *pucTxDescLength)
+{
+	struct HW_MAC_TX_DESC *prTxDesc = (struct HW_MAC_TX_DESC *)
+					  prTxDescBuffer;
+	uint8_t ucTxDescAndPaddingLength =
+		NIC_TX_DESC_LONG_FORMAT_LENGTH + NIC_TX_DESC_PADDING_LENGTH;
+
+	struct BSS_INFO *prBssInfo;
+	uint8_t ucTid = 0;
+	uint8_t ucTempTC = TC4_INDEX;
+	void *prNativePacket;
+	uint8_t ucEtherTypeOffsetInWord;
+	struct MSDU_INFO *prMsduInfo;
+
+	prMsduInfo = prCmdInfo->prMsduInfo;
+	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
+					  prMsduInfo->ucBssIndex);
+	prNativePacket = prMsduInfo->prPacket;
+
+	ASSERT(prNativePacket);
+
+	kalMemZero(prTxDesc, ucTxDescAndPaddingLength);
+
+	/* WLAN index */
+	prMsduInfo->ucWlanIndex = nicTxGetWlanIdx(prAdapter,
+		prMsduInfo->ucBssIndex, prMsduInfo->ucStaRecIndex);
+
+	/* UC to a connected peer */
+	HAL_MAC_TX_DESC_SET_WLAN_INDEX(prTxDesc,
+				       prMsduInfo->ucWlanIndex);
+	/* Redirect Security frame to TID0 */
+	/* ucTempTC = arNetwork2TcResource[prStaRec->ucBssIndex]
+	 * [aucTid2ACI[ucTid]];
+	 */
+
+	/* Tx byte count */
+	HAL_MAC_TX_DESC_SET_TX_BYTE_COUNT(prTxDesc,
+		ucTxDescAndPaddingLength + prCmdInfo->u2InfoBufLen);
+
+	/* Ether-type offset */
+	ucEtherTypeOffsetInWord = ((ETHER_HEADER_LEN -
+		ETHER_TYPE_LEN) + NIC_TX_PSE_HEADER_LENGTH) >> 1;
+	HAL_MAC_TX_DESC_SET_ETHER_TYPE_OFFSET(prTxDesc,
+					      ucEtherTypeOffsetInWord);
+
+	/* Port index / queue index */
+	HAL_MAC_TX_DESC_SET_PORT_INDEX(prTxDesc,
+		nicTxGetTxDestPortIdxByTc(ucTempTC));
+	HAL_MAC_TX_DESC_SET_QUEUE_INDEX(prTxDesc,
+		nicTxGetTxDestQIdxByTc(ucTempTC));
+
+	/* Header format */
+	HAL_MAC_TX_DESC_SET_HEADER_FORMAT(prTxDesc,
+					  HEADER_FORMAT_NON_802_11);
+
+	/* Long Format */
+	HAL_MAC_TX_DESC_SET_LONG_FORMAT(prTxDesc);
+
+	/* Update Packet option */
+	nicTxFillDescByPktOption(prAdapter, prMsduInfo, prTxDesc);
+
+	if (!GLUE_TEST_PKT_FLAG(prNativePacket, ENUM_PKT_802_3)) {
+		/* Set EthernetII */
+		HAL_MAC_TX_DESC_SET_ETHERNET_II(prTxDesc);
+	}
+	/* Header Padding */
+	HAL_MAC_TX_DESC_SET_HEADER_PADDING(prTxDesc,
+					   NIC_TX_DESC_HEADER_PADDING_LENGTH);
+
+	/* TID */
+	HAL_MAC_TX_DESC_SET_TID(prTxDesc, ucTid);
+
+	/* Remaining TX time */
+	HAL_MAC_TX_DESC_SET_REMAINING_LIFE_TIME_IN_MS(prTxDesc,
+			nicTxGetRemainingTxTimeByTc(ucTempTC));
+
+	/* Tx count limit */
+	HAL_MAC_TX_DESC_SET_REMAINING_TX_COUNT(prTxDesc,
+			nicTxGetTxCountLimitByTc(ucTempTC));
+
+	/* Set lowest BSS basic rate */
+	HAL_MAC_TX_DESC_SET_FR_RATE(prTxDesc,
+				    prBssInfo->u2HwDefaultFixedRateCode);
+	HAL_MAC_TX_DESC_SET_FIXED_RATE_MODE_TO_DESC(prTxDesc);
+	HAL_MAC_TX_DESC_SET_FIXED_RATE_ENABLE(prTxDesc);
+
+	/* Packet Format */
+	HAL_MAC_TX_DESC_SET_PKT_FORMAT(prTxDesc,
+				       TXD_PKT_FORMAT_COMMAND);
+
+	/* Own MAC */
+	HAL_MAC_TX_DESC_SET_OWN_MAC_INDEX(prTxDesc,
+					  prBssInfo->ucOwnMacIndex);
+
+	/* PID */
+	if (prMsduInfo->pfTxDoneHandler) {
+		prMsduInfo->ucPID = nicTxAssignPID(prAdapter,
+						   prMsduInfo->ucWlanIndex);
+		HAL_MAC_TX_DESC_SET_PID(prTxDesc, prMsduInfo->ucPID);
+		HAL_MAC_TX_DESC_SET_TXS_TO_MCU(prTxDesc);
+	}
+
+	if (pucTxDescLength)
+		*pucTxDescLength = ucTxDescAndPaddingLength;
 }
 
 void nic_txd_v1_set_pkt_fixed_rate_option_full(

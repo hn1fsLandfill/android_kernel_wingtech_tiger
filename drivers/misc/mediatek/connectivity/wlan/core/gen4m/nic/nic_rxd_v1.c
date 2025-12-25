@@ -271,8 +271,6 @@ void nic_rxd_v1_fill_rfb(
 	prSwRfb->fgIsAmpdu = HAL_RX_STATUS_IS_AMPDU_FORMAT(prRxStatus);
 	prSwRfb->ucRxvSeqNo = HAL_RX_STATUS_GET_RXV_SEQ_NO(prRxStatus);
 	prSwRfb->ucChnlNum = HAL_RX_STATUS_GET_CHNL_NUM(prRxStatus);
-	prSwRfb->eRfBand = HAL_RX_STATUS_GET_RF_BAND(prRxStatus);
-	prSwRfb->ucTcl = HAL_RX_STATUS_GET_TCL(prRxStatus);
 
 #if 0
 	if (prHifRxHdr->ucReorder &
@@ -335,12 +333,6 @@ u_int8_t nic_rxd_v1_sanity_check(
 
 	prChipInfo = prAdapter->chip_info;
 	prRxStatus = (struct HW_MAC_RX_DESC *)prSwRfb->prRxStatus;
-
-	if (prSwRfb->pvPacket == NULL) {
-		fgDrop = TRUE;
-		goto end;
-	}
-
 	/* BA session */
 	if ((prRxStatus->u2StatusFlag & RXS_DW2_AMPDU_nERR_BITMAP)
 	    == RXS_DW2_AMPDU_nERR_VALUE)
@@ -416,11 +408,7 @@ u_int8_t nic_rxd_v1_sanity_check(
 		}
 #endif
 
-end:
 		if (fgDrop) {
-			if (prSwRfb->pvPacket == NULL)
-				RX_INC_CNT(prRxCtrl, RX_NULL_PACKET_COUNT);
-
 			if (HAL_RX_STATUS_IS_FCS_ERROR(prRxStatus))
 				RX_INC_CNT(prRxCtrl, RX_FCS_ERR_DROP_COUNT);
 

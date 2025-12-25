@@ -12,7 +12,6 @@
 #include <linux/firmware.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/ratelimit.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
@@ -119,8 +118,6 @@ extern uint8_t btmtk_log_lvl;
 	do { if (btmtk_log_lvl >= BTMTK_LOG_LVL_INFO) pr_info("[btmtk_info] "fmt"\n", ##__VA_ARGS__); } while (0)
 #define BTMTK_DBG(fmt, ...)	 \
 	do { if (btmtk_log_lvl >= BTMTK_LOG_LVL_DBG) pr_info("[btmtk_dbg] "fmt"\n", ##__VA_ARGS__); } while (0)
-#define BTMTK_LIMIT(fmt, ...)	\
-	do { if (btmtk_log_lvl >= BTMTK_LOG_LVL_INFO) printk_ratelimited(KERN_INFO "[btmtk_info] "fmt"\n", ##__VA_ARGS__); } while (0)
 
 #define BTMTK_INFO_RAW(p, l, fmt, ...)						\
 	do {	\

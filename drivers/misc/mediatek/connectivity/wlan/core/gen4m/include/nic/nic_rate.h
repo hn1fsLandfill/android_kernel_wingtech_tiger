@@ -106,6 +106,7 @@ enum ENUM_BAND_WIDTH {
 #define TX_RATE_MODE_HE_ER      9
 #define TX_RATE_MODE_HE_TRIG    10
 #define TX_RATE_MODE_HE_MU      11
+#define TX_RATE_MODE_EHT        12
 #define TX_RATE_MODE_EHT_ER     13
 #define TX_RATE_MODE_EHT_TRIG   14
 #define TX_RATE_MODE_EHT_MU     15
@@ -126,7 +127,6 @@ enum ENUM_BAND_WIDTH {
 #define MCS_IDX_MAX_RATE_HT  7
 #define MCS_IDX_MAX_RATE_VHT 9
 #define MCS_IDX_MAX_RATE_HE 11
-#define MCS_IDX_MAX_RATE_EHT 13
 
 /*******************************************************************************
  *                         D A T A   T Y P E S
@@ -152,9 +152,7 @@ enum ENUM_TX_MODE_STR_IDX {
 	ENUM_TX_MODE_HE_MU,
 #endif
 #if (CFG_SUPPORT_802_11BE == 1)
-	ENUM_TX_MODE_EHT_ER = TX_RATE_MODE_EHT_ER,
-	ENUM_TX_MODE_EHT_TRIG,
-	ENUM_TX_MODE_EHT_MU,
+	ENUM_TX_MODE_EHT = TX_RATE_MODE_EHT,
 #endif
 	ENUM_TX_MODE_NUM
 };
@@ -196,40 +194,18 @@ enum HE_LTF {
  *                                 M A C R O S
  *******************************************************************************
  */
-#if (CFG_SUPPORT_CONNAC3X == 1)
-#define HW_TX_RATE_TO_MODE(_x)		CONNAC3X_HW_TX_RATE_TO_MODE(_x)
-#define HW_TX_RATE_TO_NSS(_x)		CONNAC3X_HW_TX_RATE_TO_NSS(_x)
-#define HW_TX_RATE_TO_STBC(_x)		CONNAC3X_HW_TX_RATE_TO_STBC(_x)
-#define HW_TX_RATE_TO_MCS(_x)		CONNAC3X_HW_TX_RATE_TO_MCS(_x)
-#define HW_TX_RATE_TO_DCM(_x)		CONNAC3X_HW_TX_RATE_TO_DCM(_x)
-#define HW_TX_RATE_TO_106T(_x)		CONNAC3X_HW_TX_RATE_TO_106T(_x)
-#elif (CFG_SUPPORT_CONNAC2X == 1)
+#if (CFG_SUPPORT_CONNAC2X == 1)
 #define HW_TX_RATE_TO_MODE(_x)		CONNAC2X_HW_TX_RATE_TO_MODE(_x)
 #define HW_TX_RATE_TO_NSS(_x)		CONNAC2X_HW_TX_RATE_TO_NSS(_x)
 #define HW_TX_RATE_TO_STBC(_x)		CONNAC2X_HW_TX_RATE_TO_STBC(_x)
-#define HW_TX_RATE_TO_MCS(_x)		((_x) & (0x3f))
-#define HW_TX_RATE_TO_DCM(_x)		CONNAC2X_HW_TX_RATE_TO_DCM(_x)
-#define HW_TX_RATE_TO_106T(_x)		CONNAC2X_HW_TX_RATE_TO_106T(_x)
 #else
 #define HW_TX_RATE_TO_MODE(_x)		(((_x) & (0x7 << 6)) >> 6)
 #define HW_TX_RATE_TO_NSS(_x)		(((_x) & (0x3 << 9)) >> 9)
 #define HW_TX_RATE_TO_STBC(_x)		(((_x) & (0x1 << 11)) >> 11)
-#define HW_TX_RATE_TO_MCS(_x)		((_x) & (0x3f))
 #endif
+#define HW_TX_RATE_TO_MCS(_x)		((_x) & (0x3f))
 
-#if (CFG_SUPPORT_CONNAC3X == 1)
-#define TX_VECTOR_GET_TX_RATE(_txv)	CONNAC3X_TXV_GET_TX_RATE(_txv)
-#define TX_VECTOR_GET_TX_LDPC(_txv)	CONNAC3X_TXV_GET_TX_LDPC(_txv)
-#define TX_VECTOR_GET_TX_STBC(_txv)	CONNAC3X_TXV_GET_TX_STBC(_txv)
-#define TX_VECTOR_GET_TX_FRMODE(_txv)	CONNAC3X_TXV_GET_TX_FRMODE(_txv)
-#define TX_VECTOR_GET_TX_MODE(_txv)	CONNAC3X_TXV_GET_TX_MODE(_txv)
-#define TX_VECTOR_GET_TX_NSTS(_txv)	CONNAC3X_TXV_GET_TX_NSTS(_txv)
-#define TX_VECTOR_GET_TX_PWR(_txv)	CONNAC3X_TXV_GET_TX_PWR(_txv)
-#define TX_VECTOR_GET_TX_SGI(_txv)	CONNAC3X_TXV_GET_TX_SGI(_txv)
-#define TX_VECTOR_GET_TX_SPE_IDX(_txv)	CONNAC3X_TXV_GET_TX_SPE_IDX(_txv)
-#define TX_VECTOR_GET_TX_DCM(_txv)	CONNAC3X_TXV_GET_TX_DCM(_txv)
-#define TX_VECTOR_GET_TX_106T(_txv)	CONNAC3X_TXV_GET_TX_106T(_txv)
-#elif (CFG_SUPPORT_CONNAC2X == 1)
+#if (CFG_SUPPORT_CONNAC2X == 1)
 #define TX_VECTOR_GET_TX_RATE(_txv)	CONNAC2X_TXV_GET_TX_RATE(_txv)
 #define TX_VECTOR_GET_TX_LDPC(_txv)	CONNAC2X_TXV_GET_TX_LDPC(_txv)
 #define TX_VECTOR_GET_TX_STBC(_txv)	CONNAC2X_TXV_GET_TX_STBC(_txv)
@@ -238,8 +214,6 @@ enum HE_LTF {
 #define TX_VECTOR_GET_TX_NSTS(_txv)	CONNAC2X_TXV_GET_TX_NSTS(_txv)
 #define TX_VECTOR_GET_TX_PWR(_txv)	CONNAC2X_TXV_GET_TX_PWR(_txv)
 #define TX_VECTOR_GET_TX_SGI(_txv)	CONNAC2X_TXV_GET_TX_SGI(_txv)
-#define TX_VECTOR_GET_TX_DCM(_txv)	CONNAC2X_TXV_GET_TX_DCM(_txv)
-#define TX_VECTOR_GET_TX_106T(_txv)	CONNAC2X_TXV_GET_TX_106T(_txv)
 #else
 #define TX_VECTOR_GET_TX_RATE(_txv)     (((_txv)->u4TxV[0]) & BITS(0, 6))
 #define TX_VECTOR_GET_TX_LDPC(_txv)     ((((_txv)->u4TxV[0]) >> 7) & BIT(0))
@@ -262,51 +236,51 @@ enum HE_LTF {
  */
 uint32_t
 nicGetPhyRateByMcsRate(
-	uint8_t ucIdx,
-	uint8_t ucBw,
-	uint8_t ucGI
+	IN uint8_t ucIdx,
+	IN uint8_t ucBw,
+	IN uint8_t ucGI
 );
 
 uint32_t
 nicGetHwRateByPhyRate(
-	uint8_t ucIdx
+	IN uint8_t ucIdx
 );
 
 uint32_t
 nicSwIndex2RateIndex(
-	uint8_t ucRateSwIndex,
-	uint8_t *pucRateIndex,
-	uint8_t *pucPreambleOption
+	IN uint8_t ucRateSwIndex,
+	OUT uint8_t *pucRateIndex,
+	OUT uint8_t *pucPreambleOption
 );
 
 uint32_t
 nicRateIndex2RateCode(
-	uint8_t ucPreambleOption,
-	uint8_t ucRateIndex,
-	uint16_t *pu2RateCode
+	IN uint8_t ucPreambleOption,
+	IN uint8_t ucRateIndex,
+	OUT uint16_t *pu2RateCode
 );
 
 uint32_t
 nicRateCode2PhyRate(
-	uint16_t u2RateCode,
-	uint8_t ucBandwidth,
-	uint8_t ucGI,
-	uint8_t ucRateNss
+	IN uint16_t u2RateCode,
+	IN uint8_t ucBandwidth,
+	IN uint8_t ucGI,
+	IN uint8_t ucRateNss
 );
 
 uint32_t
 nicRateCode2DataRate(
-	uint16_t u2RateCode,
-	uint8_t ucBandwidth,
-	uint8_t ucGI
+	IN uint16_t u2RateCode,
+	IN uint8_t ucBandwidth,
+	IN uint8_t ucGI
 );
 
 u_int8_t
 nicGetRateIndexFromRateSetWithLimit(
-	uint16_t u2RateSet,
-	uint32_t u4PhyRateLimit,
-	u_int8_t fgGetLowest,
-	uint8_t *pucRateSwIndex
+	IN uint16_t u2RateSet,
+	IN uint32_t u4PhyRateLimit,
+	IN u_int8_t fgGetLowest,
+	OUT uint8_t *pucRateSwIndex
 );
 
 char *nicHwRateOfdmStr(
@@ -320,27 +294,22 @@ uint32_t nicRateHeLtfCheckGi(
 	struct FIXED_RATE_INFO *pFixedRate);
 
 uint8_t nicGetTxSgiInfo(
-	struct PARAM_PEER_CAP *prWtblPeerCap,
-	uint8_t u1TxMode);
+	IN struct PARAM_PEER_CAP *prWtblPeerCap,
+	IN uint8_t u1TxMode);
 
 uint8_t nicGetTxLdpcInfo(
-	uint8_t ucTxMode,
-	struct PARAM_TX_CONFIG *prWtblTxConfig);
+	IN struct PARAM_TX_CONFIG *prWtblTxConfig);
 
-int32_t nicGetTxRateInfo(char *pcCommand, int i4TotalLen,
+int32_t nicGetTxRateInfo(IN char *pcCommand, IN int i4TotalLen,
 			u_int8_t fgDumpAll,
 			struct PARAM_HW_WLAN_INFO *prHwWlanInfo,
 			struct PARAM_GET_STA_STATISTICS *prQueryStaStatistics);
 
-int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, char *pcCommand,
-			int i4TotalLen, uint8_t ucWlanIdx);
+int32_t nicGetRxRateInfo(struct ADAPTER *prAdapter, IN char *pcCommand,
+			IN int i4TotalLen, IN uint8_t ucWlanIdx);
 
-uint16_t nicGetStatIdxInfo(struct ADAPTER *prAdapter,
-			uint8_t ucWlanIdx);
-
-uint16_t
-nicRateInfo2RateCode(uint32_t  u4TxMode,
-	uint32_t  u4Rate);
+uint16_t nicGetStatIdxInfo(IN struct ADAPTER *prAdapter,
+			IN uint8_t ucWlanIdx);
 
 /*******************************************************************************
  *                              F U N C T I O N S

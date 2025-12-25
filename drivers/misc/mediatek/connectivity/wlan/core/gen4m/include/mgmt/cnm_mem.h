@@ -130,8 +130,6 @@
  */
 #define STA_REC_EXCLUDE_NONE		CFG_STA_REC_NUM
 
-#define MLD_LINK_INDEX_NOT_FOUND	0xFF
-
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -163,8 +161,7 @@ struct BUF_INFO {
  */
 enum ENUM_RAM_TYPE {
 	RAM_TYPE_MSG = 0,
-	RAM_TYPE_BUF,
-	RAM_TYPE_ATOMIC_MSG
+	RAM_TYPE_BUF
 };
 
 enum ENUM_BUFFER_SOURCE {
@@ -265,10 +262,8 @@ struct STA_PMF_CFG {
 /* Define STA record structure */
 struct STA_RECORD {
 	struct LINK_ENTRY rLinkEntry;
-	struct LINK_ENTRY rLinkEntryMld;
 	uint8_t ucIndex;	/* Not modify it except initializing */
 	uint8_t ucWlanIndex;	/* WLAN table index */
-	enum ENUM_MBMC_BN eHwBandIdx;
 
 #if 0 /* TODO: Remove this */
 	/* The BSS STA Rx WLAN index, IBSS Rx BC WLAN table
@@ -290,18 +285,6 @@ struct STA_RECORD {
 	enum ENUM_STA_TYPE eStaType;
 
 	uint8_t ucBssIndex;	/* BSS_INFO_I index */
-
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-	uint8_t ucMldStaIndex;	/* MLD_STAREC index */
-	uint8_t ucLinkIndex;
-	/*
-	 * the tid-to-link bitmap,  BIT0 for TID0, BIT1 for TID1...
-	 *     1'b1: supoort transmission for the TID in this link
-	 *     1'b0: NOT support transmission for the TID in this link
-	 */
-	uint8_t ucTidBitmap;
-	uint8_t aucMldAddr[MAC_ADDR_LEN];
-#endif
 
 	uint8_t ucStaState;	/* STATE_1,2,3 */
 
@@ -389,7 +372,6 @@ struct STA_RECORD {
 	uint16_t u2VhtTxHighestSupportedDataRate;
 	uint8_t ucVhtOpMode;
 #endif
-	uint8_t ucOpModeInOpNotificationIE;
 
 #if (CFG_SUPPORT_802_11AX == 1)
 	/*--------------------------------------------------------------------*/
@@ -417,11 +399,6 @@ struct STA_RECORD {
 	/*--------------------------------------------------------------------*/
 	uint8_t ucEhtMacCapInfo[EHT_MAC_CAP_BYTE_NUM];
 	uint8_t ucEhtPhyCapInfo[EHT_PHY_CAP_BYTE_NUM];
-	uint8_t ucEhtPhyCapInfoExt[EHT_PHY_CAP_BYTE_NUM];
-	uint8_t aucMcsMap20MHzSta[4];
-	uint8_t aucMcsMap80MHz[3];
-	uint8_t aucMcsMap160MHz[3];
-	uint8_t aucMcsMap320MHz[3];
 #endif
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
@@ -665,12 +642,7 @@ struct STA_RECORD {
 	uint32_t u4EnqueueCounter;
 	uint32_t u4DeqeueuCounter;
 #endif
-#if CFG_AP_80211KVR_INTERFACE
-	uint64_t u8TotalTxBytes;
-	uint64_t u8TotalRxBytes;
-	uint64_t u8TotalRxPkts;
-	uint64_t u8GetDataRateTime;
-#endif
+
 #if 1
 	/*----------------------------------------------------------------------
 	 * To be removed, this is to make que_mgt compilation success only
@@ -720,9 +692,6 @@ struct STA_RECORD {
 	uint16_t u2MaxLinkSpeed;	/* unit is 0.5 Mbps */
 	uint16_t u2MinLinkSpeed;
 	uint32_t u4Flags;	/* reserved for MTK Synergies */
-#if CFG_SUPPORT_RXSMM_WHITELIST
-	u_int8_t fgRxsmmEnable;	/* WhiteList for RxSMM enable */
-#endif
 
 #if CFG_SUPPORT_TDLS
 	u_int8_t fgTdlsIsProhibited;	/* TRUE: AP prohibits TDLS links */
@@ -742,8 +711,15 @@ struct STA_RECORD {
 	struct TXBF_PFMU_STA_INFO rTxBfPfmuStaInfo;
 #endif
 #if CFG_SUPPORT_MSP
-	uint32_t au4RxV[RXV_NUM];
+	uint32_t u4RxVector0;
+	uint32_t u4RxVector1;
+	uint32_t u4RxVector2;
+	uint32_t u4RxVector3;
+	uint32_t u4RxVector4;
 #endif
+	uint8_t fgPRXVValid;
+	uint8_t fgCRXVValid;
+
 	uint8_t ucSmDialogToken;	/* Spectrum Mngt Dialog Token */
 	uint8_t ucSmMsmtRequestMode;	/* Measurement Request Mode */
 	uint8_t ucSmMsmtToken;		/* Measurement Request Token */
@@ -756,15 +732,7 @@ struct STA_RECORD {
 #if CFG_SUPPORT_802_11W
 	/* AP PMF */
 	struct STA_PMF_CFG rPmfCfg;
-	/* STA PMF */
-	uint32_t u4assocComeBackTime;
 #endif
-#if CFG_AP_80211K_SUPPORT
-	uint16_t u2BcnReqRepetition;
-#endif
-#if CFG_AP_80211V_SUPPORT
-	struct TIMER rBTMReqDisassocTimer;
-#endif /* CFG_AP_80211V_SUPPORT */
 #if DSCP_SUPPORT
 	uint8_t  qosMapSet[64];
 #endif
@@ -772,17 +740,6 @@ struct STA_RECORD {
 	/* TWT Requester state */
 	enum _ENUM_TWT_REQUESTER_STATE_T aeTWTReqState;
 	struct _TWT_FLOW_T arTWTFlow[TWT_MAX_FLOW_NUM];
-
-#if (CFG_SUPPORT_TWT_HOTSPOT == 1)
-	u_int8_t ucTWTHospotSupport;
-	u_int8_t ucTWTFlowId;
-	struct _TWT_HOTSPOT_CTRL_T TWTHotspotCtrl;
-	struct _TWT_HOTSPOT_STA_NODE *prTWTHotspotStaNode;
-#endif
-
-#if (CFG_SUPPORT_BTWT == 1)
-	uint32_t au4Timestamp[2];
-#endif
 #endif
 #if (CFG_SUPPORT_802_11AX == 1)
 	struct HE_A_CTRL_OM_T arHeACtrlOm;
@@ -799,6 +756,7 @@ struct STA_RECORD {
 #if CFG_SUPPORT_HE_ER
 	u_int8_t fgIsExtendedRange;
 #endif
+
 /* fos_change begin*/
 #if CFG_SUPPORT_STAT_STATISTICS
 	uint32_t u4LastPhyRate;
@@ -832,47 +790,175 @@ struct STA_RECORD {
 			[STATS_LLS_MAX_VHT_BW_NUM][STATS_LLS_VHT_NUM];
 		uint32_t u4RxMpduHE[STATS_LLS_MAX_NSS_NUM]
 			[STATS_LLS_MAX_HE_BW_NUM][STATS_LLS_HE_NUM];
-		uint32_t u4RxMpduEHT[STATS_LLS_MAX_NSS_NUM]
-			[STATS_LLS_MAX_EHT_BW_NUM][STATS_LLS_EHT_NUM];
 	};
 #endif
-#if (CFG_WIFI_GET_MCS_INFO == 1)
-	uint32_t au4RxV0[MCS_INFO_SAMPLE_CNT];
-	uint32_t au4RxV1[MCS_INFO_SAMPLE_CNT];
-	uint32_t au4RxV2[MCS_INFO_SAMPLE_CNT];
-#endif
 
-#if CFG_SUPPORT_MLR
-	/* Peer MLR capability */
-	u_int8_t fgIsMlrSupported;
-	uint8_t ucMlrSupportBitmap;
-	/* Peer MLR status */
-	uint8_t ucMlrMode;
-	uint8_t ucMlrState;
-	u_int8_t fgEnableTxFrag;
-#endif
 	u_int8_t fgIsMscsSupported;
 	struct LINK rMscsMonitorList;
 	struct LINK rMscsTcpMonitorList;
-	u_int8_t ucGcCsaSupported;
 };
 
-#if (CFG_SUPPORT_802_11BE_MLO == 1)
-struct MLD_STA_RECORD {
-	u_int8_t fgIsInUse;
-	uint8_t ucIdx;
-	uint8_t ucGroupMldId; /* id from mld bss */
-	uint8_t aucPeerMldAddr[MAC_ADDR_LEN];
-	uint16_t u2PrimaryMldId;
-	uint16_t u2SecondMldId;
-	uint16_t u2SetupWlanId;
-	uint8_t fgNSEP;
-	uint8_t fgMldType;
-	uint8_t aucStrBitmap[3];
-	uint8_t aucEmlCap[3];
-	struct LINK rStarecList;
-	uint64_t aucRxPktCnt[ENUM_BAND_NUM];
-	uint32_t u4StaBitmap;
+#if 0
+/* use nic_tx.h instead */
+/* MSDU_INFO and SW_RFB structure */
+struct MSDU_INFO {
+
+	/* 4 ----------------MSDU_INFO and SW_RFB Common Fields-------------- */
+
+	struct LINK_ENTRY rLinkEntry;
+	uint8_t *pucBuffer;	/* Pointer to the associated buffer */
+
+	uint8_t ucBufferSource;	/* HIF TX0, HIF TX1, MAC RX, or MNG Pool */
+
+	/* Network type index that this TX packet is assocaited with */
+	uint8_t ucNetworkTypeIndex;
+
+	/* 0 to 5 (used by HIF TX to increment the corresponding TC counter) */
+	uint8_t ucTC;
+
+	uint8_t ucTID;		/* Traffic Identification */
+
+	u_int8_t fgIs802_11Frame;	/* Set to TRUE for 802.11 frame */
+	uint8_t ucMacHeaderLength;
+	uint16_t u2PayloadLength;
+	uint8_t *pucMacHeader;	/* 802.11 header  */
+	uint8_t *pucPayload;	/* 802.11 payload */
+
+	OS_SYSTIME rArrivalTime;	/* System Timestamp (4) */
+	struct STA_RECORD *prStaRec;
+
+#if CFG_PROFILE_BUFFER_TRACING
+	ENUM_BUFFER_ACTIVITY_TYPE_T eActivity[2];
+	uint32_t rActivityTime[2];
+#endif
+#if DBG && CFG_BUFFER_FREE_CHK
+	u_int8_t fgBufferInSource;
+#endif
+
+	/* For specify some Control Flags, e.g. Basic Rate */
+	uint8_t ucControlFlag;
+
+	/* 4 -----------------------Non-Common ------------------------- */
+	/* TODO: move flags to ucControlFlag */
+
+	u_int8_t fgIs1xFrame;	/* Set to TRUE for 802.1x frame */
+
+	/* TXM: For TX Done handling, callback function & parameter (5) */
+	u_int8_t fgIsTxFailed;	/* Set to TRUE if transmission failure */
+
+	PFN_TX_DONE_HANDLER pfTxDoneHandler;
+
+	uint64_t u8TimeStamp;	/* record the TX timestamp */
+
+	/* TXM: For PS forwarding control (per-STA flow control) */
+	/* Delivery-enabled, non-delivery-enabled, non-PS */
+	uint8_t ucPsForwardingType;
+
+	/* The Power Save session id for PS forwarding control */
+	uint8_t ucPsSessionID;
+
+	/* TXM: For MAC TX DMA operations */
+	uint8_t ucMacTxQueIdx;	/*  MAC TX queue: AC0-AC6, BCM, or BCN */
+
+	/* Set to true if Ack is not required for this packet */
+	u_int8_t fgNoAck;
+
+	u_int8_t fgBIP;		/* Set to true if BIP is used for this packet */
+	uint8_t ucFragTotalCount;
+	uint8_t ucFragFinishedCount;
+
+	/* Fragmentation threshold without WLAN Header & FCS */
+	uint16_t u2FragThreshold;
+
+	u_int8_t fgFixedRate;	/* If a fixed rate is used, set to TRUE. */
+
+	/* The rate code copied to MAC TX Desc */
+	uint8_t ucFixedRateCode;
+
+	/* The retry limit when a fixed rate is used */
+	uint8_t ucFixedRateRetryLimit;
+
+	/* Set to true if this packet is the end of BMC */
+	u_int8_t fgIsBmcQueueEnd;
+
+	/* TXM: For flushing ACL frames */
+	uint16_t u2PalLLH;	/* 802.11 PAL LLH */
+	/* UINT_16     u2LLH; */
+	uint16_t u2ACLSeq;	/* u2LLH+u2ACLSeq for AM HCI flush ACL frame */
+
+	/* TXM for retransmitting a flushed packet */
+	u_int8_t fgIsSnAssigned;
+
+	/* To remember the Sequence Control field of this MPDU */
+	uint16_t u2SequenceNumber;
+};
+#endif
+
+#if 0
+/* nic_rx.h */
+struct SW_RFB {
+
+	/* 4 ----------------MSDU_INFO and SW_RFB Common Fields-------------- */
+
+	struct LINK_ENTRY rLinkEntry;
+	uint8_t *pucBuffer;	/* Pointer to the associated buffer */
+
+	uint8_t ucBufferSource;	/* HIF TX0, HIF TX1, MAC RX, or MNG Pool */
+
+	/* Network type index that this TX packet is assocaited with */
+	uint8_t ucNetworkTypeIndex;
+
+	/* 0 to 5 (used by HIF TX to increment the corresponding TC counter) */
+	uint8_t ucTC;
+
+	uint8_t ucTID;		/* Traffic Identification */
+
+	u_int8_t fgIs802_11Frame;	/* Set to TRUE for 802.11 frame */
+	uint8_t ucMacHeaderLength;
+	uint16_t u2PayloadLength;
+	uint8_t *pucMacHeader;	/* 802.11 header  */
+	uint8_t *pucPayload;	/* 802.11 payload */
+
+	OS_SYSTIME rArrivalTime;	/* System Timestamp (4) */
+	struct STA_RECORD *prStaRec;
+
+#if CFG_PROFILE_BUFFER_TRACING
+	ENUM_BUFFER_ACTIVITY_TYPE_T eActivity[2];
+	uint32_t rActivityTime[2];
+#endif
+#if DBG && CFG_BUFFER_FREE_CHK
+	u_int8_t fgBufferInSource;
+#endif
+
+	/* For specify some Control Flags, e.g. Basic Rate */
+	uint8_t ucControlFlag;
+
+	/* 4 -----------------------Non-Common ------------------------- */
+
+	/* For composing the HIF RX Header (TODO: move flags to
+	 * ucControlFlag)
+	 */
+	/* Pointer to the Response packet to * HIF RX0 or RX1 */
+	uint8_t *pucHifRxPacket;
+
+	uint16_t u2HifRxPacketLength;
+	uint8_t ucHeaderOffset;
+	uint8_t ucHifRxPortIndex;
+
+	uint16_t u2SequenceControl;
+
+	/* (For MAC RX packet parsing) set to TRUE if 4 addresses are present */
+	u_int8_t fgIsA4Frame;
+
+	u_int8_t fgIsBAR;
+	u_int8_t fgIsQoSData;
+	u_int8_t fgIsAmsduSubframe;	/* Set to TRUE for A-MSDU Subframe */
+
+	/* For HIF RX DMA Desc */
+	u_int8_t fgTUChecksumCheckRequired;
+	u_int8_t fgIPChecksumCheckRequired;
+	uint8_t ucEtherTypeOffset;
+
 };
 #endif
 
@@ -900,10 +986,7 @@ struct CMD_PEER_UPDATE_HT_CAP_MCS_INFO {
 };
 
 struct CMD_PEER_UPDATE_VHT_CAP_MCS_INFO {
-	uint16_t u2RxMcsMap;
-	uint16_t u2RxHighest;
-	uint16_t u2TxMcsMap;
-	uint16_t u2TxHighest;
+	uint8_t arRxMask[SUP_MCS_RX_BITMASK_OCTET_NUM];
 };
 
 struct CMD_PEER_UPDATE_HT_CAP {
@@ -919,7 +1002,7 @@ struct CMD_PEER_UPDATE_HT_CAP {
 };
 
 struct CMD_PEER_UPDATE_VHT_CAP {
-	uint32_t u4CapInfo;
+	uint16_t u2CapInfo;
 	/* 16 bytes MCS information */
 	struct CMD_PEER_UPDATE_VHT_CAP_MCS_INFO rVMCS;
 
@@ -950,7 +1033,6 @@ struct CMD_PEER_UPDATE {
 	struct CMD_PEER_UPDATE_VHT_CAP rVHtCap;
 
 	u_int8_t fgIsSupHt;
-	u_int8_t fgIsSupVht;
 	enum ENUM_STA_TYPE eStaType;
 	uint8_t ucBssIdx;
 
@@ -1043,48 +1125,48 @@ struct MEM_TRACK {
  *******************************************************************************
  */
 
-struct MSDU_INFO *cnmPktAllocWrapper(struct ADAPTER *prAdapter,
-	uint32_t u4Length, uint8_t *pucStr);
+struct MSDU_INFO *cnmPktAllocWrapper(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4Length, IN uint8_t *pucStr);
 
-void cnmPktFreeWrapper(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo, uint8_t *pucStr);
+void cnmPktFreeWrapper(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo, IN uint8_t *pucStr);
 
 #if CFG_DBG_MGT_BUF
-struct MSDU_INFO *cnmPktAllocX(struct ADAPTER *prAdapter,
-	uint32_t u4Length, uint8_t *fileAndLine);
+struct MSDU_INFO *cnmPktAllocX(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4Length, uint8_t *fileAndLine);
 #else
-struct MSDU_INFO *cnmPktAlloc(struct ADAPTER *prAdapter,
-	uint32_t u4Length);
+struct MSDU_INFO *cnmPktAlloc(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4Length);
 #endif
-void cnmPktFree(struct ADAPTER *prAdapter, struct MSDU_INFO *prMsduInfo);
+void cnmPktFree(IN struct ADAPTER *prAdapter, IN struct MSDU_INFO *prMsduInfo);
 
-void cnmMemInit(struct ADAPTER *prAdapter);
+void cnmMemInit(IN struct ADAPTER *prAdapter);
 
 #if CFG_DBG_MGT_BUF
-void *cnmMemAllocX(struct ADAPTER *prAdapter,
-	enum ENUM_RAM_TYPE eRamType, uint32_t u4Length,
+void *cnmMemAllocX(IN struct ADAPTER *prAdapter,
+	IN enum ENUM_RAM_TYPE eRamType, IN uint32_t u4Length,
 	uint8_t *fileAndLine);
 #else
-void *cnmMemAlloc(struct ADAPTER *prAdapter, enum ENUM_RAM_TYPE eRamType,
-	uint32_t u4Length);
+void *cnmMemAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_RAM_TYPE eRamType,
+	IN uint32_t u4Length);
 #endif
 
-void cnmMemFree(struct ADAPTER *prAdapter, void *pvMemory);
+void cnmMemFree(IN struct ADAPTER *prAdapter, IN void *pvMemory);
 
-void cnmStaRecInit(struct ADAPTER *prAdapter);
+void cnmStaRecInit(IN struct ADAPTER *prAdapter);
 
 struct STA_RECORD *
-cnmStaRecAlloc(struct ADAPTER *prAdapter, enum ENUM_STA_TYPE eStaType,
-	uint8_t ucBssIndex, uint8_t *pucMacAddr);
+cnmStaRecAlloc(IN struct ADAPTER *prAdapter, IN enum ENUM_STA_TYPE eStaType,
+	IN uint8_t ucBssIndex, IN uint8_t *pucMacAddr);
 
-void cnmStaRecFree(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec);
+void cnmStaRecFree(IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec);
 
 void cnmStaFreeAllStaByNetwork(struct ADAPTER *prAdapter, uint8_t ucBssIndex,
 	uint8_t ucStaRecIndexExcluded);
 
-struct STA_RECORD *cnmGetStaRecByIndex(struct ADAPTER *prAdapter,
-	uint8_t ucIndex);
+struct STA_RECORD *cnmGetStaRecByIndex(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucIndex);
 
 struct STA_RECORD *cnmGetStaRecByIndexWithoutInUseCheck(
 	struct ADAPTER *prAdapter,
@@ -1093,19 +1175,13 @@ struct STA_RECORD *cnmGetStaRecByIndexWithoutInUseCheck(
 struct STA_RECORD *cnmGetStaRecByAddress(struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex, uint8_t aucPeerMACAddress[]);
 
-void cnmStaRecChangeState(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec, uint8_t ucNewState);
+void cnmStaRecChangeState(IN struct ADAPTER *prAdapter,
+	IN OUT struct STA_RECORD *prStaRec, IN uint8_t ucNewState);
 
-int cnmShowBssInfo(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo,
-	char *pcCommand, int i4TotalLen);
-int cnmShowStaRec(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
-	char *pcCommand, int i4TotalLen);
+void cnmDumpStaRec(IN struct ADAPTER *prAdapter, IN uint8_t ucStaRecIdx);
 
-void cnmDumpBssInfo(struct ADAPTER *prAdapter, uint8_t ucBssIdx);
-void cnmDumpStaRec(struct ADAPTER *prAdapter, uint8_t ucStaRecIdx);
-
-uint32_t cnmDumpMemoryStatus(struct ADAPTER *prAdapter, uint8_t *pucBuf,
-	uint32_t u4Max);
+uint32_t cnmDumpMemoryStatus(IN struct ADAPTER *prAdapter, IN uint8_t *pucBuf,
+	IN uint32_t u4Max);
 
 #if CFG_SUPPORT_TDLS
 uint32_t			/* TDLS_STATUS */

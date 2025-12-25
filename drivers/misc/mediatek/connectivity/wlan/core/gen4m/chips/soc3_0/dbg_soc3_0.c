@@ -82,6 +82,9 @@
 #include "wf_ple.h"
 #include "hal_dmashdl_soc3_0.h"
 #include "soc3_0.h"
+#if CFG_MTK_MDDP_SUPPORT
+#include "mddp.h"
+#endif
 /*******************************************************************************
  *                              C O N S T A N T S
  *******************************************************************************
@@ -996,8 +999,8 @@ struct wfdma_group_info wfmda_wm_rx_group_driver_base[] = {
  *******************************************************************************
  */
 
-void soc3_0_show_wfdma_dbg_probe_info(struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+void soc3_0_show_wfdma_dbg_probe_info(IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	uint32_t i = 0, u4DbgIdxAddr = 0, u4DbgProbeAddr = 0, u4DbgIdxValue = 0,
 		u4DbgProbeValue = 0;
@@ -1052,9 +1055,9 @@ static void DumpPPDebugCr(struct ADAPTER *prAdapter)
 }
 
 static void dump_wfdma_dbg_value(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t wfdma_idx)
+	IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
+	IN uint32_t wfdma_idx)
 {
 #define BUF_SIZE 1024
 
@@ -1101,16 +1104,16 @@ static void dump_wfdma_dbg_value(
 }
 
 void show_wfdma_dbg_flag_log(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 0);
 	dump_wfdma_dbg_value(prAdapter, enum_wfdma_type, 1);
 }
 
 void show_wfdma_dbg_log(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	/* Dump Host WFMDA info */
 	DBGLOG(HAL, TRACE, "WFMDA Configuration:\n");
@@ -1119,7 +1122,7 @@ void show_wfdma_dbg_log(
 	connac2x_show_wfdma_ring_info(prAdapter, enum_wfdma_type);
 }
 
-void soc3_0_show_wfdma_info(struct ADAPTER *prAdapter)
+void soc3_0_show_wfdma_info(IN struct ADAPTER *prAdapter)
 {
 	struct mt66xx_chip_info *prChipInfo;
 	struct BUS_INFO *prBusInfo;
@@ -1141,10 +1144,14 @@ void soc3_0_show_wfdma_info(struct ADAPTER *prAdapter)
 	show_wfdma_dbg_flag_log(prAdapter, WFDMA_TYPE_WM);
 
 	DumpPPDebugCr(prAdapter);
+
+#if CFG_MTK_MDDP_SUPPORT
+	mddpNotifyDumpDebugInfo();
+#endif
 }
 
-void soc3_0_show_wfdma_info_by_type(struct ADAPTER *prAdapter,
-	bool bShowWFDMA_type)
+void soc3_0_show_wfdma_info_by_type(IN struct ADAPTER *prAdapter,
+	IN bool bShowWFDMA_type)
 {
 	if (bShowWFDMA_type) {
 		show_wfdma_dbg_log(prAdapter, WFDMA_TYPE_WM);
@@ -1155,7 +1162,7 @@ void soc3_0_show_wfdma_info_by_type(struct ADAPTER *prAdapter,
 	}
 }
 
-void soc3_0_show_dmashdl_info(struct ADAPTER *prAdapter)
+void soc3_0_show_dmashdl_info(IN struct ADAPTER *prAdapter)
 {
 	uint32_t value = 0;
 	uint8_t idx;
@@ -1243,7 +1250,7 @@ void soc3_0_show_dmashdl_info(struct ADAPTER *prAdapter)
 		DBGLOG(HAL, INFO, "DMASHDL: no counter mismatch\n");
 }
 
-void soc3_0_dump_mac_info(struct ADAPTER *prAdapter)
+void soc3_0_dump_mac_info(IN struct ADAPTER *prAdapter)
 {
 #define BUF_SIZE 1024
 #define CR_COUNT 12
@@ -1364,7 +1371,7 @@ void soc3_0_dump_mac_info(struct ADAPTER *prAdapter)
 
 #if WFSYS_SUPPORT_BUS_HANG_READ_FROM_DRIVER_BASE
 void show_wfdma_interrupt_info_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	uint32_t idx;
 	uint32_t u4hostBaseCrAddr = 0;
@@ -1445,7 +1452,7 @@ void show_wfdma_interrupt_info_without_adapter(
 }
 
 void show_wfdma_glo_info_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	uint32_t idx;
 	uint32_t u4hostBaseCrAddr = 0;
@@ -1479,7 +1486,7 @@ void show_wfdma_glo_info_without_adapter(
 }
 
 void show_wfdma_ring_info_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 
 	uint32_t idx = 0;
@@ -1573,9 +1580,9 @@ void show_wfdma_ring_info_without_adapter(
 }
 
 static void dump_dbg_value_without_adapter(
-	uint32_t pdma_base_cr,
-	uint32_t set_value,
-	uint32_t isMandatoryDump)
+	IN uint32_t pdma_base_cr,
+	IN uint32_t set_value,
+	IN uint32_t isMandatoryDump)
 {
 	uint32_t set_debug_cr = 0;
 	uint32_t get_debug_cr = 0;
@@ -1599,9 +1606,9 @@ static void dump_dbg_value_without_adapter(
 }
 
 static void dump_wfdma_dbg_value_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t wfdma_idx,
-	uint32_t isMandatoryDump)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
+	IN uint32_t wfdma_idx,
+	IN uint32_t isMandatoryDump)
 {
 	uint32_t pdma_base_cr = 0;
 	uint32_t set_debug_flag_value = 0;
@@ -1677,8 +1684,8 @@ static void dump_wfdma_dbg_value_without_adapter(
 }
 
 static void show_wfdma_dbg_flag_log_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
-	uint32_t isMandatoryDump)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type,
+	IN uint32_t isMandatoryDump)
 {
 	dump_wfdma_dbg_value_without_adapter(
 		enum_wfdma_type, 0, isMandatoryDump);
@@ -1687,7 +1694,7 @@ static void show_wfdma_dbg_flag_log_without_adapter(
 }
 
 static void show_wfdma_dbg_log_without_adapter(
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type)
 {
 	/* Dump Host WFMDA info */
 	DBGLOG(HAL, TRACE, "WFMDA Configuration:\n");
@@ -1698,7 +1705,7 @@ static void show_wfdma_dbg_log_without_adapter(
 
 /* bIsHostDMA = 1 (how Host PDMA) else (WM PDMA) */
 void soc3_0_show_wfdma_info_by_type_without_adapter(
-	bool bShowWFDMA_type)
+	IN bool bShowWFDMA_type)
 {
 	if (bShowWFDMA_type) {
 		show_wfdma_dbg_log_without_adapter(WFDMA_TYPE_WM);

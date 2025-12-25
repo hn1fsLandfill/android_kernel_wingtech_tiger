@@ -425,11 +425,14 @@ enum ENUM_RF_AUTOTEST_STATE {
  *******************************************************************************
  */
 
-uint32_t rftestSetATInfo(struct ADAPTER *prAdapter,
+uint32_t rftestSetATInfo(IN struct ADAPTER *prAdapter,
 		uint32_t u4FuncIndex, uint32_t u4FuncData);
 
-uint32_t rftestQueryATInfo(struct ADAPTER *prAdapter,
+uint32_t rftestQueryATInfo(IN struct ADAPTER *prAdapter,
 		uint32_t u4FuncIndex, uint32_t u4FuncData,
-		void *pvQueryBuffer, uint32_t u4QueryBufferLen);
+		OUT void *pvQueryBuffer, IN uint32_t u4QueryBufferLen);
+
+uint32_t rftestSetFrequency(IN struct ADAPTER *prAdapter,
+		IN uint32_t u4FreqInKHz, IN uint32_t *pu4SetInfoLen);
 
 #endif /* _RFTEST_H */

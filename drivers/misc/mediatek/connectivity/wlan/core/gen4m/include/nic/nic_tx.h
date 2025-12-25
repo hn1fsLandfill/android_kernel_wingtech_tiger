@@ -92,17 +92,17 @@
 
 /* Maximum buffer count for individual HIF TCQ */
 #define NIC_TX_PAGE_COUNT_TC0 \
-	(NIC_TX_BUFF_COUNT_TC0 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC0 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_PAGE_COUNT_TC1 \
-	(NIC_TX_BUFF_COUNT_TC1 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC1 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_PAGE_COUNT_TC2 \
-	(NIC_TX_BUFF_COUNT_TC2 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC2 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_PAGE_COUNT_TC3 \
-	(NIC_TX_BUFF_COUNT_TC3 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC3 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_PAGE_COUNT_TC4 \
-	(NIC_TX_BUFF_COUNT_TC4 * nicTxGetMaxCmdPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC4 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_PAGE_COUNT_TC5 \
-	(NIC_TX_BUFF_COUNT_TC5 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_BUFF_COUNT_TC5 * nicTxGetMaxPageCntPerFrame(prAdapter))
 
 #define NIC_TX_BUFF_COUNT_TC0           HIF_TX_BUFF_COUNT_TC0
 #define NIC_TX_BUFF_COUNT_TC1           HIF_TX_BUFF_COUNT_TC1
@@ -134,17 +134,17 @@
 						NIC_TX_INIT_BUFF_COUNT_TC5)
 
 #define NIC_TX_INIT_PAGE_COUNT_TC0 \
-	(NIC_TX_INIT_BUFF_COUNT_TC0 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC0 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_INIT_PAGE_COUNT_TC1 \
-	(NIC_TX_INIT_BUFF_COUNT_TC1 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC1 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_INIT_PAGE_COUNT_TC2 \
-	(NIC_TX_INIT_BUFF_COUNT_TC2 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC2 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_INIT_PAGE_COUNT_TC3 \
-	(NIC_TX_INIT_BUFF_COUNT_TC3 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC3 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_INIT_PAGE_COUNT_TC4 \
-	(NIC_TX_INIT_BUFF_COUNT_TC4 * nicTxGetMaxCmdPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC4 * nicTxGetMaxPageCntPerFrame(prAdapter))
 #define NIC_TX_INIT_PAGE_COUNT_TC5 \
-	(NIC_TX_INIT_BUFF_COUNT_TC5 * nicTxGetMaxDataPageCntPerFrame(prAdapter))
+	(NIC_TX_INIT_BUFF_COUNT_TC5 * nicTxGetMaxPageCntPerFrame(prAdapter))
 
 #endif
 
@@ -197,36 +197,9 @@
 /* Warning!! To use MAC header padding, every Tx packet must be decomposed */
 #define NIC_TX_DESC_HEADER_PADDING_LENGTH       0	/* in unit of bytes */
 
-/*
- * Bit[1]: padding mode selection
- * 1'b0: pad the dummy bytes in the tail of header
- * 1'b1: pad the dummy bytes in the head of header
- * Bit[0]: padding 2 byte length
-*/
-#define NIC_TX_DESC_HEADER_PADDING_TAIL_NO_PAD    0
-#define NIC_TX_DESC_HEADER_PADDING_TAIL_PAD       1
-#define NIC_TX_DESC_HEADER_PADDING_HEAD_NO_PAD    2
-#define NIC_TX_DESC_HEADER_PADDING_PAD_HEAD_PAD   3
-
 #define NIC_TX_DESC_PID_RESERVED                0
 #define NIC_TX_DESC_DRIVER_PID_MIN              1
 #define NIC_TX_DESC_DRIVER_PID_MAX              127
-
-#if CFG_SUPPORT_SEPARATE_TXS_PID_POOL
-#define NIC_TX_DESC_DRIVER_PID_DATA_MIN         1
-#define NIC_TX_DESC_DRIVER_PID_DATA_MAX         31
-#define NIC_TX_DESC_DRIVER_PID_MGMT_MIN         32
-#define NIC_TX_DESC_DRIVER_PID_MGMT_MAX         127
-
-#define IS_TXS_DATA_PID(_ucPID) \
-	((_ucPID) >= NIC_TX_DESC_DRIVER_PID_DATA_MIN && \
-	 (_ucPID) <= NIC_TX_DESC_DRIVER_PID_DATA_MAX)
-#endif
-
-#define IS_TXS_STATELESS_DATA_TYPE(_ucType) \
-	((_ucType) == ENUM_PKT_ICMP || (_ucType) == ENUM_PKT_ICMPV6 || \
-	 (_ucType) == ENUM_PKT_ARP || (_ucType) == ENUM_PKT_DHCP || \
-	 (_ucType) == ENUM_PKT_DNS)
 
 #define NIC_TX_DATA_DEFAULT_RETRY_COUNT_LIMIT   30
 #define NIC_TX_MGMT_DEFAULT_RETRY_COUNT_LIMIT   30
@@ -238,14 +211,12 @@
 #define NIC_TX_AC_VI_REMAINING_TX_TIME	TX_DESC_TX_TIME_NO_LIMIT
 #define NIC_TX_MGMT_REMAINING_TX_TIME		2000
 
-#define NIC_TX_BMC_REMAINING_TX_TIME        2000	/* in unit of ms */
-
 #define NIC_TX_CRITICAL_DATA_TID                7
 /*802.1d Voice Traffic,use AC_VO */
 #define NIC_TX_PRIORITY_DATA_TID                6
 
 /*Customization: sk_buff mark for special packet that need raise priority */
-/*#define NIC_TX_SKB_PRIORITY_MARK1	0x5a*/ /* customer special value*/
+#define NIC_TX_SKB_PRIORITY_MARK1	0x5a /* customer special value*/
 #define NIC_TX_SKB_PRIORITY_MARK_BIT	31 /*Mediatek define, 0x80000000*/
 #define NIC_TX_SKB_DUP_DETECT_MARK_BIT	30 /*Mediatek define, 0x40000000*/
 
@@ -488,17 +459,6 @@ enum ENUM_HIF_TX_INDEX {
 	HIF_TX_NUM
 };
 
-#if (CFG_TX_RSRC_WMM_ENHANCE == 1)
-#define HIF_TX_AC3X_INDEX HIF_TX_RSV0_INDEX
-#endif
-
-enum ENUM_TXD_LEN_PAGE {
-	TXD_LEN_1_PAGE,
-	TXD_LEN_2_PAGE,
-	TXD_LEN_3_PAGE,
-	TXD_LEN_4_PAGE,
-};
-
 /* LMAC Tx queue index */
 enum ENUM_MAC_TXQ_INDEX {
 	MAC_TXQ_AC0_INDEX = 0,
@@ -546,6 +506,8 @@ enum ENUM_MCU_Q_INDEX {
 	MCU_Q_NUM
 };
 
+#define TX_PORT_NUM (TC_NUM)
+
 #define BMC_TC_INDEX TC1_INDEX
 
 /* per-Network Tc Resource index */
@@ -571,10 +533,6 @@ enum ENUM_TX_STATISTIC_COUNTER {
 	TX_AP_BORADCAST_DROP,
 	TX_INVALID_MSDUINFO_COUNT,
 	TX_DROP_PID_COUNT,
-	TX_IN_COUNT,
-	TX_MSDUINFO_COUNT,
-	TX_DIRECT_DEQUEUE_COUNT,
-	TX_DIRECT_MSDUINFO_COUNT,
 	TX_STATISTIC_COUNTER_NUM
 };
 
@@ -635,9 +593,7 @@ enum ENUM_MSDU_OPTION {
 };
 
 enum ENUM_MSDU_CONTROL_FLAG {
-	MSDU_CONTROL_FLAG_FORCE_TX = BIT(0),
-	MSDU_CONTROL_FLAG_NON_TX_LINK = BIT(1),
-	MSDU_CONTROL_FLAG_HIDE_INFO = BIT(2),
+	MSDU_CONTROL_FLAG_FORCE_TX = BIT(0)
 };
 
 enum ENUM_MSDU_RATE_MODE {
@@ -648,15 +604,6 @@ enum ENUM_MSDU_RATE_MODE {
 	MSDU_RATE_MODE_MANUAL_CR,
 	MSDU_RATE_MODE_LOWEST_RATE
 };
-
-#if CFG_SUPPORT_MLR
-enum ENUM_MSDU_FRAG_POS {
-	MSDU_FRAG_POS_NONE = 0,
-	MSDU_FRAG_POS_FIRST,
-	MSDU_FRAG_POS_MIDDLE,
-	MSDU_FRAG_POS_LAST
-};
-#endif
 
 enum ENUM_DATA_RATE_MODE {
 	DATA_RATE_MODE_AUTO = 0,
@@ -679,9 +626,6 @@ struct TX_TCQ_STATUS {
 	uint32_t au4FreeBufferCount[TC_NUM];
 	uint32_t au4MaxNumOfBuffer[TC_NUM];
 
-	uint32_t au4PseCtrlEnMap;
-	uint32_t au4PleCtrlEnMap;
-
 	/*
 	 * PLE part
 	 */
@@ -700,10 +644,6 @@ struct TX_TCQ_STATUS {
 	/* buffer count */
 	uint32_t au4FreeBufferCount_PLE[TC_NUM];
 	uint32_t au4MaxNumOfBuffer_PLE[TC_NUM];
-
-#if (CFG_TX_RSRC_WMM_ENHANCE == 1)
-	uint8_t ucNextHifWmmIdx;
-#endif
 };
 
 struct TX_TCQ_ADJUST {
@@ -714,7 +654,7 @@ struct TX_CTRL {
 	uint32_t u4TxCachedSize;
 	uint8_t *pucTxCached;
 
-	uint32_t u4DataPageSize;
+	uint32_t u4PageSize;
 
 	uint32_t u4TotalPageNum;
 
@@ -752,10 +692,7 @@ struct TX_CTRL {
 	/* enable/disable TX resource control */
 	u_int8_t fgIsTxResourceCtrl;
 	/* page counts for a wifi frame */
-	uint32_t u4MaxDataPageCntPerFrame;
-
-	/* page counts for a inband cmd */
-	uint32_t u4MaxCmdPageCntPerFrame;
+	uint32_t u4MaxPageCntPerFrame;
 
 	/* Store SysTime of Last TxDone successfully */
 	uint32_t u4LastTxTime[MAX_BSSID_NUM];
@@ -765,7 +702,7 @@ enum ENUM_TX_PACKET_TYPE {
 	TX_PACKET_TYPE_DATA = 0,
 	TX_PACKET_TYPE_MGMT,
 	/* TX_PACKET_TYPE_1X, */
-	TX_PACKET_TYPE_NUM
+	X_PACKET_TYPE_NUM
 };
 
 enum ENUM_TX_PACKET_SRC {
@@ -777,12 +714,12 @@ enum ENUM_TX_PACKET_SRC {
 };
 
 /* TX Call Back Function  */
-typedef uint32_t(*PFN_TX_DONE_HANDLER) (struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+typedef uint32_t(*PFN_TX_DONE_HANDLER) (IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-typedef void(*PFN_HIF_TX_MSDU_DONE_CB) (struct ADAPTER
-	*prAdapter, struct MSDU_INFO *prMsduInfo);
+typedef void(*PFN_HIF_TX_MSDU_DONE_CB) (IN struct ADAPTER
+	*prAdapter, IN struct MSDU_INFO *prMsduInfo);
 
 #if CFG_ENABLE_PKT_LIFETIME_PROFILE
 struct PKT_PROFILE {
@@ -839,10 +776,7 @@ enum ENUM_EAPOL_KEY_TYPE_T {
 
 struct MSDU_INFO {
 	struct QUE_ENTRY rQueEntry;
-	void *prHead;	/* Pointer to buffer */
 	void *prPacket;	/* Pointer to packet buffer */
-	void *prTxP; /* Pointer to Tx payload*/
-	uint8_t fgIsPacketSkb;
 
 	enum ENUM_TX_PACKET_SRC eSrc;	/* specify OS/FORWARD packet */
 	uint8_t ucUserPriority;	/* QoS parameter, convert to TID */
@@ -859,12 +793,7 @@ struct MSDU_INFO {
 	/* TRUE: 802.1x frame - Non-Protected */
 	u_int8_t fgIs802_1x_NonProtected;
 	u_int8_t fgIs802_11;	/* TRUE: 802.11 header is present */
-	/*
-	 * fgIs802_3:
-	 * TRUE: 802.3 frame (length following Source Address)
-	 * FALSE: Ethernet II Frame (Ethertype following SA)
-	 */
-	u_int8_t fgIs802_3;
+	u_int8_t fgIs802_3;	/* TRUE: 802.3 frame */
 	u_int8_t fgIsVlanExists;	/* TRUE: VLAN tag is exists */
 
 	/* Special Option */
@@ -879,7 +808,7 @@ struct MSDU_INFO {
 
 	/* Fixed Rate Option */
 	uint8_t ucRateMode;	/* Rate mode: AUTO, MANUAL_DESC, MANUAL_CR */
-	/* The rate option, rate code, GI, etc. Rate Index for CONNAC3 */
+	/* The rate option, rate code, GI, etc... */
 	uint32_t u4FixedRateOption;
 
 	/* There is a valid Tx descriptor for this packet */
@@ -919,9 +848,10 @@ struct MSDU_INFO {
 	uint8_t ucTID;
 #endif
 
+#if CFG_SUPPORT_MULTITHREAD
 	/* Compose TxDesc in main_thread and place here */
-	uint8_t *aucTxDescBuffer;
-
+	uint8_t aucTxDescBuffer[NIC_TX_DESC_AND_PADDING_LENGTH];
+#endif
 
 #if CFG_SUPPORT_NAN
 	uint8_t ucTxToNafQueFlag;
@@ -936,42 +866,18 @@ struct MSDU_INFO {
 	uint8_t ucTarQueue;
 #endif
 	uint8_t fgMgmtUseDataQ;
-	/* Record allocate size in nicAllocMgmtPktForDataQ()
-	 * without SKB shared info size, used for kalBuildSkb().
-	 */
-	uint32_t u4MgmtLength;
-	uint8_t fgNullUseDataQ;
 
 #if CFG_SUPPORT_DROP_INVALID_MSDUINFO
 	/* sanity drop flag */
 	u_int8_t fgDrop;
 #endif /* CFG_SUPPORT_DROP_INVALID_MSDUINFO */
-
-#if CFG_SUPPORT_TX_MGMT_USE_DATAQ
-	uint64_t u8Cookie;
-#endif
-
-#if CFG_SUPPORT_MLR
-	/* fragment position */
-	enum ENUM_MSDU_FRAG_POS eFragPos;
-#endif
-	struct EVENT_TX_DONE *prTxDone; /* logging TX Done info */
 };
 
 #define HIF_PKT_FLAGS_CT_INFO_APPLY_TXD            BIT(0)
-#define HIF_PKT_FLAGS_COPY_HOST_TXD_ALL            BIT(1)
+#define HIF_PKT_FLAGS_COPY_HOST_TXD_ALL		BIT(1)
 #define HIF_PKT_FLAGS_CT_INFO_MGN_FRAME            BIT(2)
 #define HIF_PKT_FLAGS_CT_INFO_NONE_CIPHER_FRAME    BIT(3)
 #define HIF_PKT_FLAGS_CT_INFO_HSR2_TX              BIT(4)
-#define HIF_PKT_FLAGS_CT_INFO_CTXD                 BIT(6)
-#define HIF_PKT_FLAGS_CT_INFO_FR_HOST              BIT(7)
-#define HIF_PKT_FLAGS_CT_INFO_DIS_TX_DLY           BIT(9)
-#define HIF_PKT_FLAGS_CT_INFO_FORCE_SW_PATH        BIT(10)
-#define HIF_PKT_FLAGS_CT_INFO_APPLY_OVERRIDE       BIT(11)
-#define HIF_PKT_FLAGS_CT_INFO_IS_PRIOR             BIT(12)
-#define HIF_PKT_FLAGS_CT_INFO_STA_APPLY_OVERRIDE   BIT(13)
-#define HIF_PKT_FLAGS_CT_INFO_TXS2M                BIT(14)
-#define HIF_PKT_FLAGS_CT_INFO_MAWD_OFLD            BIT(15)
 
 #define MAX_BUF_NUM_PER_PKT	6
 
@@ -1072,8 +978,8 @@ struct TX_TC_TRAFFIC_SETTING {
 	uint8_t ucTxCountLimit;
 };
 
-typedef void (*PFN_TX_DATA_DONE_CB) (struct GLUE_INFO *prGlueInfo,
-	struct QUE *prQue);
+typedef void (*PFN_TX_DATA_DONE_CB) (IN struct GLUE_INFO *prGlueInfo,
+	IN struct QUE *prQue);
 
 struct tx_resource_info {
 	/* PSE */
@@ -1102,19 +1008,19 @@ struct tx_resource_info {
 	uint8_t  ucPpTxAddCnt;/* in unit of byte */
 
 	/* update resource callback */
-	void (*txResourceInit)(struct ADAPTER *prAdapter);
+	void (*txResourceInit)(IN struct ADAPTER *prAdapter);
 };
 
 struct TX_DESC_OPS_T {
-	void (*fillNicAppend)(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo,
-		uint8_t *prTxDescBuffer);
-	void (*fillHifAppend)(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo, uint16_t u4MsduId,
-		dma_addr_t rDmaAddr, uint32_t u4Idx, u_int8_t fgIsLast,
-		uint8_t *pucBuffer);
-	void (*fillTxByteCount)(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo,
+	void (*fillNicAppend)(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo,
+		OUT uint8_t *prTxDescBuffer);
+	void (*fillHifAppend)(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo, IN uint16_t u4MsduId,
+		IN dma_addr_t rDmaAddr, IN uint32_t u4Idx, IN u_int8_t fgIsLast,
+		OUT uint8_t *pucBuffer);
+	void (*fillTxByteCount)(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo,
 		void *prTxDesc);
 
 	/* TXD Handle APIs */
@@ -1132,14 +1038,12 @@ struct TX_DESC_OPS_T {
 #if (CFG_TCP_IP_CHKSUM_OFFLOAD == 1)
 	void (*nic_txd_chksum_op)(
 		void *prTxDesc,
-		uint8_t ucChksumFlag,
-		struct MSDU_INFO *prMsduInfo);
+		uint8_t ucChksumFlag);
 #endif /* CFG_TCP_IP_CHKSUM_OFFLOAD == 1 */
 	void (*nic_txd_header_format_op)(
 		void *prTxDesc,
 		struct MSDU_INFO *prMsduInfo);
 	void (*nic_txd_fill_by_pkt_option)(
-		struct ADAPTER *prAdapter,
 		struct MSDU_INFO *prMsduInfo,
 		void *prTxD);
 	void (*nic_txd_compose)(
@@ -1148,6 +1052,11 @@ struct TX_DESC_OPS_T {
 		u_int32_t u4TxDescLength,
 		u_int8_t fgIsTemplate,
 		u_int8_t *prTxDescBuffer);
+	void (*nic_txd_compose_security_frame)(
+		struct ADAPTER *prAdapter,
+		struct CMD_INFO *prCmdInfo,
+		uint8_t *prTxDescBuffer,
+		uint8_t *pucTxDescLength);
 	void (*nic_txd_set_pkt_fixed_rate_option_full)(
 		struct MSDU_INFO *prMsduInfo,
 		uint16_t u2RateCode,
@@ -1253,6 +1162,7 @@ do { \
  *------------------------------------------------------------------------------
  */
 #define TX_SET_MMPDU            nicTxSetMngPacket
+#define TX_SET_DATA_PACKET      nicTxSetDataPacket
 
 /*------------------------------------------------------------------------------
  * MACRO for HW_MAC_TX_DESC_T
@@ -1824,7 +1734,7 @@ do { \
 	TX_DESC_SPE_EXT_IDX_MASK, TX_DESC_SPE_EXT_IDX_OFFSET)
 
 #define HAL_MAC_TX_DESC_IS_HW_AMSDU(_prHwMacTxDesc) \
-	((_prHwMacTxDesc)->u2PseFid & TX_DESC_HW_AMSDU)
+	(((_prHwMacTxDesc)->u2PseFid & TX_DESC_HW_AMSDU)?TRUE:FALSE)
 #define HAL_MAC_TX_DESC_SET_HW_AMSDU(_prHwMacTxDesc) \
 	((_prHwMacTxDesc)->u2PseFid |= TX_DESC_HW_AMSDU)
 #define HAL_MAC_TX_DESC_UNSET_HW_AMSDU(_prHwMacTxDesc) \
@@ -1862,188 +1772,188 @@ do { \
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-void nicTxInitialize(struct ADAPTER *prAdapter);
+void nicTxInitialize(IN struct ADAPTER *prAdapter);
 
-uint32_t nicTxAcquireResource(struct ADAPTER *prAdapter,
-	uint8_t ucTC, uint32_t u4PageCount,
-	u_int8_t fgReqLock);
+uint32_t nicTxAcquireResource(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTC, IN uint32_t u4PageCount,
+	IN u_int8_t fgReqLock);
 
-uint32_t nicTxPollingResource(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
+uint32_t nicTxPollingResource(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTC);
 
-u_int8_t nicTxReleaseResource(struct ADAPTER *prAdapter,
-	uint8_t ucTc, uint32_t u4PageCount,
-	u_int8_t fgReqLock, u_int8_t fgPLE);
+u_int8_t nicTxReleaseResource(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTc, IN uint32_t u4PageCount,
+	IN u_int8_t fgReqLock, IN u_int8_t fgPLE);
 
-void nicTxReleaseMsduResource(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead);
+void nicTxReleaseMsduResource(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfoListHead);
 
-uint32_t nicTxResetResource(struct ADAPTER *prAdapter);
+uint32_t nicTxResetResource(IN struct ADAPTER *prAdapter);
 
 #if defined(_HIF_SDIO)
-uint32_t nicTxGetAdjustableResourceCnt(struct ADAPTER *prAdapter);
+uint32_t nicTxGetAdjustableResourceCnt(IN struct ADAPTER *prAdapter);
 #endif
 
-uint16_t nicTxGetResource(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
+uint16_t nicTxGetResource(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTC);
 
-uint8_t nicTxGetFrameResourceType(uint8_t eFrameType,
-	struct MSDU_INFO *prMsduInfo);
+uint8_t nicTxGetFrameResourceType(IN uint8_t eFrameType,
+	IN struct MSDU_INFO *prMsduInfo);
 
-uint8_t nicTxGetCmdResourceType(struct CMD_INFO *prCmdInfo);
+uint8_t nicTxGetCmdResourceType(IN struct CMD_INFO *prCmdInfo);
 
-u_int8_t nicTxSanityCheckResource(struct ADAPTER *prAdapter);
+u_int8_t nicTxSanityCheckResource(IN struct ADAPTER *prAdapter);
 
-void nicTxFillDesc(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo, uint8_t *prTxDescBuffer,
-	uint32_t *pu4TxDescLength);
+void nicTxFillDesc(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo, OUT uint8_t *prTxDescBuffer,
+	OUT uint32_t *pu4TxDescLength);
 
-void nicTxFillDataDesc(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
+void nicTxFillDataDesc(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo);
 
-uint32_t nicTxMsduInfoList(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead);
+void nicTxComposeSecurityFrameDesc(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo,
+	OUT uint8_t *prTxDescBuffer, OUT uint8_t *pucTxDescLength);
 
-uint8_t nicTxGetTxQByTc(struct ADAPTER *prAdapter, uint8_t ucTc);
-uint8_t nicTxGetTxDestPortIdxByTc(uint8_t ucTc);
-uint8_t nicTxGetTxDestQIdxByTc(uint8_t ucTc);
-uint32_t nicTxGetRemainingTxTimeByTc(uint8_t ucTc);
-uint8_t nicTxGetTxCountLimitByTc(uint8_t ucTc);
-uint8_t nicTxDescLengthByTc(uint8_t ucTc);
+uint32_t nicTxMsduInfoList(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfoListHead);
+
+uint8_t nicTxGetTxQByTc(IN struct ADAPTER *prAdapter, IN uint8_t ucTc);
+uint8_t nicTxGetTxDestPortIdxByTc(IN uint8_t ucTc);
+uint8_t nicTxGetTxDestQIdxByTc(IN uint8_t ucTc);
+uint32_t nicTxGetRemainingTxTimeByTc(IN uint8_t ucTc);
+uint8_t nicTxGetTxCountLimitByTc(IN uint8_t ucTc);
 #if CFG_SUPPORT_MULTITHREAD
-uint32_t nicTxMsduInfoListMthread(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead);
+uint32_t nicTxMsduInfoListMthread(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfoListHead);
 
-uint32_t nicTxMsduQueueMthread(struct ADAPTER *prAdapter);
+uint32_t nicTxMsduQueueMthread(IN struct ADAPTER *prAdapter);
 
 void nicTxMsduQueueByPrio(struct ADAPTER *prAdapter);
 void nicTxMsduQueueByRR(struct ADAPTER *prAdapter);
 
-uint32_t nicTxGetMsduPendingCnt(struct ADAPTER *prAdapter);
+uint32_t nicTxGetMsduPendingCnt(IN struct ADAPTER *prAdapter);
 #endif
 
-uint32_t nicTxMsduQueue(struct ADAPTER *prAdapter,
+uint32_t nicTxMsduQueue(IN struct ADAPTER *prAdapter,
 	uint8_t ucPortIdx, struct QUE *prQue);
 
-uint32_t nicTxCmd(struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo, uint8_t ucTC);
+uint32_t nicTxCmd(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint8_t ucTC);
 
-void nicTxRelease(struct ADAPTER *prAdapter,
-	u_int8_t fgProcTxDoneHandler);
+void nicTxRelease(IN struct ADAPTER *prAdapter,
+	IN u_int8_t fgProcTxDoneHandler);
 
-void nicProcessTxInterrupt(struct ADAPTER *prAdapter);
+void nicProcessTxInterrupt(IN struct ADAPTER *prAdapter);
 
-void nicTxFreeMsduInfoPacket(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead);
+void nicTxFreeMsduInfoPacket(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfoListHead);
 
-void nicTxFreeMsduInfoPacketEx(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead,
-	u_int8_t fgDrop);
-
-void nicTxReturnMsduInfo(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfoListHead);
+void nicTxReturnMsduInfo(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfoListHead);
 
 void nicTxInitPktPID(
-	struct ADAPTER *prAdapter,
-	uint8_t ucWlanIndex
+	IN struct ADAPTER *prAdapter,
+	IN uint8_t ucWlanIndex
 );
 
-u_int8_t nicTxFillMsduInfo(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo, void *prNdisPacket);
+u_int8_t nicTxFillMsduInfo(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo, IN void *prNdisPacket);
 
-uint32_t nicTxAdjustTcq(struct ADAPTER *prAdapter);
+uint32_t nicTxAdjustTcq(IN struct ADAPTER *prAdapter);
 
-uint32_t nicTxFlush(struct ADAPTER *prAdapter);
+uint32_t nicTxFlush(IN struct ADAPTER *prAdapter);
 
 #if CFG_ENABLE_FW_DOWNLOAD
-uint32_t nicTxInitCmd(struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo, uint16_t u2Port);
+uint32_t nicTxInitCmd(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo, IN uint16_t u2Port);
 
-uint32_t nicTxInitResetResource(struct ADAPTER *prAdapter);
+uint32_t nicTxInitResetResource(IN struct ADAPTER *prAdapter);
 #endif
 
-u_int8_t nicTxProcessCmdDataPacket(struct ADAPTER *prAdapter,
-			       struct MSDU_INFO *prMsduInfo);
+u_int8_t nicTxProcessCmdDataPacket(IN struct ADAPTER *prAdapter,
+			       IN struct MSDU_INFO *prMsduInfo);
 
-uint32_t nicTxEnqueueMsdu(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
+uint32_t nicTxEnqueueMsdu(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo);
 
-struct MSDU_INFO *nicAllocMgmtPktForDataQ(struct ADAPTER *prAdapter,
-	uint32_t u4Length);
+uint8_t nicTxGetWlanIdx(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIdx, IN uint8_t ucStaRecIdx);
 
-#if (CFG_TX_MGMT_BY_DATA_Q == 1)
-uint32_t nicTxMgmtDirectTxMsduMthread(struct ADAPTER *prAdapter);
+u_int8_t nicTxIsMgmtResourceEnough(IN struct ADAPTER *prAdapter);
 
-void nicTxClearMgmtDirectTxQ(struct ADAPTER *prAdapter);
-#endif /* CFG_TX_MGMT_BY_DATA_Q == 1 */
+uint32_t nicTxGetFreeCmdCount(IN struct ADAPTER *prAdapter);
 
-uint8_t nicTxGetWlanIdx(struct ADAPTER *prAdapter,
-	uint8_t ucBssIdx, uint8_t ucStaRecIdx);
+uint32_t nicTxGetPageCount(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4FrameLength, IN u_int8_t fgIncludeDesc);
 
-u_int8_t nicTxIsMgmtResourceEnough(struct ADAPTER *prAdapter);
+uint32_t nicTxGetCmdPageCount(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo);
 
-uint32_t nicTxGetFreeCmdCount(struct ADAPTER *prAdapter);
+uint32_t nicTxGenerateDescTemplate(IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec);
 
-uint32_t nicTxGetDataPageCount(struct ADAPTER *prAdapter,
-	uint32_t u4FrameLength, u_int8_t fgIncludeDesc);
+void nicTxFreeDescTemplate(IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec);
 
-uint32_t nicTxGetCmdPageCount(struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo);
+void nicTxSetHwAmsduDescTemplate(IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec,
+	IN uint8_t ucTid, IN u_int8_t fgSet);
 
-uint32_t nicTxGenerateDescTemplate(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec);
+void nicTxFreePacket(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo, IN u_int8_t fgDrop);
 
-void nicTxFreeDescTemplate(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec);
+void nicTxSetMngPacket(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN uint8_t ucBssIndex,
+	IN uint8_t ucStaRecIndex,
+	IN uint8_t ucMacHeaderLength,
+	IN uint16_t u2FrameLength,
+	IN PFN_TX_DONE_HANDLER pfTxDoneHandler,
+	IN uint8_t ucRateMode);
 
-void nicTxSetHwAmsduDescTemplate(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec,
-	uint8_t ucTid, u_int8_t fgSet);
-
-void nicTxFreePacket(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo, u_int8_t fgDrop);
-
-void nicTxSetMngPacket(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	uint8_t ucBssIndex,
-	uint8_t ucStaRecIndex,
-	uint8_t ucMacHeaderLength,
-	uint16_t u2FrameLength,
-	PFN_TX_DONE_HANDLER pfTxDoneHandler,
-	uint8_t ucRateMode);
+void nicTxSetDataPacket(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN uint8_t ucBssIndex,
+	IN uint8_t ucStaRecIndex,
+	IN uint8_t ucMacHeaderLength,
+	IN uint16_t u2FrameLength,
+	IN PFN_TX_DONE_HANDLER pfTxDoneHandler,
+	IN uint8_t ucRateMode,
+	IN enum ENUM_TX_PACKET_SRC eSrc, IN uint8_t ucTID,
+	IN u_int8_t fgIs802_11Frame, IN u_int8_t fgIs1xFrame);
 
 void nicTxFillDescByPktOption(
-	struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	void *prTxDesc);
+	IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN void *prTxDesc);
 
-void nicTxConfigPktOption(struct MSDU_INFO *prMsduInfo,
-	uint32_t u4OptionMask, u_int8_t fgSetOption);
+void nicTxConfigPktOption(IN struct MSDU_INFO *prMsduInfo,
+	IN uint32_t u4OptionMask, IN u_int8_t fgSetOption);
 
 void nicTxFillDescByPktControl(struct MSDU_INFO *prMsduInfo,
 	void *prTxDesc);
 
-void nicTxConfigPktControlFlag(struct MSDU_INFO *prMsduInfo,
-	uint8_t ucControlFlagMask, u_int8_t fgSetFlag);
+void nicTxConfigPktControlFlag(IN struct MSDU_INFO *prMsduInfo,
+	IN uint8_t ucControlFlagMask, IN u_int8_t fgSetFlag);
 
-void nicTxSetPktLifeTime(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	uint32_t u4TxLifeTimeInMs);
+void nicTxSetPktLifeTime(IN struct MSDU_INFO *prMsduInfo,
+	IN uint32_t u4TxLifeTimeInMs);
 
-void nicTxSetPktRetryLimit(struct MSDU_INFO *prMsduInfo,
-	uint8_t ucRetryLimit);
+void nicTxSetPktRetryLimit(IN struct MSDU_INFO *prMsduInfo,
+	IN uint8_t ucRetryLimit);
 
-void nicTxSetForceRts(struct MSDU_INFO *prMsduInfo,
-	int8_t fgForceRts);
+void nicTxSetForceRts(IN struct MSDU_INFO *prMsduInfo,
+	IN int8_t fgForceRts);
 
-void nicTxSetPktPowerOffset(struct MSDU_INFO *prMsduInfo,
-	int8_t cPowerOffset);
+void nicTxSetPktPowerOffset(IN struct MSDU_INFO *prMsduInfo,
+	IN int8_t cPowerOffset);
 
-void nicTxSetPktSequenceNumber(struct MSDU_INFO *prMsduInfo,
-	uint16_t u2SN);
+void nicTxSetPktSequenceNumber(IN struct MSDU_INFO *prMsduInfo,
+	IN uint16_t u2SN);
 
-void nicTxSetPktMacTxQue(struct MSDU_INFO *prMsduInfo,
-	uint8_t ucMacTxQue);
+void nicTxSetPktMacTxQue(IN struct MSDU_INFO *prMsduInfo,
+	IN uint8_t ucMacTxQue);
 
 void nicTxSetPktFixedRateOptionFull(
 	struct ADAPTER *prAdapter,
@@ -2064,34 +1974,34 @@ void nicTxSetPktFixedRateOption(
 	u_int8_t fgShortGI,
 	u_int8_t fgDynamicBwRts);
 
-void nicTxSetPktLowestFixedRate(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo);
+void nicTxSetPktLowestFixedRate(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo);
 
-void nicTxSetPktMoreData(struct MSDU_INFO *prCurrentMsduInfo,
-	u_int8_t fgSetMoreDataBit);
+void nicTxSetPktMoreData(IN struct MSDU_INFO *prCurrentMsduInfo,
+	IN u_int8_t fgSetMoreDataBit);
 
-void nicTxSetPktEOSP(struct MSDU_INFO *prCurrentMsduInfo,
-	u_int8_t fgSetEOSPBit);
+void nicTxSetPktEOSP(IN struct MSDU_INFO *prCurrentMsduInfo,
+	IN u_int8_t fgSetEOSPBit);
 
-uint8_t nicTxAssignPID(struct ADAPTER *prAdapter,
-	uint8_t ucWlanIndex, enum ENUM_TX_PACKET_TYPE type);
+uint8_t nicTxAssignPID(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucWlanIndex);
 
 uint32_t
-nicTxDummyTxDone(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo,
-	enum ENUM_TX_RESULT_CODE rTxDoneStatus);
+nicTxDummyTxDone(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo,
+	IN enum ENUM_TX_RESULT_CODE rTxDoneStatus);
 
-void nicTxUpdateBssDefaultRate(struct BSS_INFO *prBssInfo);
+void nicTxUpdateBssDefaultRate(IN struct BSS_INFO *prBssInfo);
 
-void nicTxUpdateStaRecDefaultRate(struct ADAPTER *prAdapter,
-	struct STA_RECORD *prStaRec);
+void nicTxUpdateStaRecDefaultRate(IN struct ADAPTER *prAdapter,
+	IN struct STA_RECORD *prStaRec);
 
-void nicTxPrintMetRTP(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo, void *prPacket,
-	uint32_t u4PacketLen, u_int8_t bFreeSkb);
+void nicTxPrintMetRTP(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo, IN void *prPacket,
+	IN uint32_t u4PacketLen, IN u_int8_t bFreeSkb);
 
-void nicTxProcessTxDoneEvent(struct ADAPTER *prAdapter,
-	struct WIFI_EVENT *prEvent);
+void nicTxProcessTxDoneEvent(IN struct ADAPTER *prAdapter,
+	IN struct WIFI_EVENT *prEvent);
 
 void nicTxChangeDataPortByAc(
 	struct ADAPTER *prAdapter,
@@ -2103,79 +2013,52 @@ void nicTxHandleRoamingDone(struct ADAPTER *prAdapter,
 			    struct STA_RECORD *prOldStaRec,
 			    struct STA_RECORD *prNewStaRec);
 
-void nicTxMsduDoneCb(struct GLUE_INFO *prGlueInfo, struct QUE *prQue);
+void nicTxMsduDoneCb(IN struct GLUE_INFO *prGlueInfo, IN struct QUE *prQue);
 
-void nicTxCancelSendingCmd(struct ADAPTER *prAdapter,
-	struct CMD_INFO *prCmdInfo);
-
-uint32_t nicTxGetMaxDataPageCntPerFrame(struct ADAPTER *prAdapter);
-uint32_t nicTxGetMaxCmdPageCntPerFrame(struct ADAPTER *prAdapter);
+void nicTxCancelSendingCmd(IN struct ADAPTER *prAdapter,
+	IN struct CMD_INFO *prCmdInfo);
+uint32_t nicTxGetMaxPageCntPerFrame(IN struct ADAPTER *prAdapter);
 
 /* TX Direct functions : BEGIN */
-void nicTxDirectStartCheckQTimer(struct ADAPTER *prAdapter);
-void nicTxDirectClearHifQ(struct ADAPTER *prAdapter);
-void nicTxDirectClearStaPsQ(struct ADAPTER *prAdapter,
+void nicTxDirectStartCheckQTimer(IN struct ADAPTER *prAdapter);
+void nicTxDirectClearSkbQ(IN struct ADAPTER *prAdapter);
+void nicTxDirectClearHifQ(IN struct ADAPTER *prAdapter);
+void nicTxDirectClearStaPsQ(IN struct ADAPTER *prAdapter,
 	uint8_t ucStaRecIndex);
-void nicTxDirectClearBssAbsentQ(struct ADAPTER *prAdapter,
+void nicTxDirectClearBssAbsentQ(IN struct ADAPTER *prAdapter,
 	uint8_t ucBssIndex);
-void nicTxDirectClearStaPendQ(struct ADAPTER *prAdapter,
-	uint8_t ucStaRecIndex);
-void nicTxDirectClearAllStaPsQ(struct ADAPTER *prAdapter);
-void nicTxDirectClearAllStaPendQ(struct ADAPTER *prAdapter);
-void nicTxDirectClearStaAcmQ(struct ADAPTER *prAdapter,
-	uint8_t ucStaRecIdx);
-void nicTxDirectClearAllStaAcmQ(struct ADAPTER *prAdapter);
-void nicTxDirectTimerCheckHifQ(struct ADAPTER *prAdapter);
+void nicTxDirectClearAllStaPsQ(IN struct ADAPTER *prAdapter);
 
-uint32_t nicTxDirectStartXmitMain(void *pvPacket,
-		struct MSDU_INFO *prMsduInfo,
-		struct ADAPTER *prAdapter,
-		uint8_t ucCheckTc, uint8_t ucStaRecIndex,
-		uint8_t ucBssIndex);
+#if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+void nicTxDirectTimerCheckSkbQ(struct timer_list *timer);
+void nicTxDirectTimerCheckHifQ(struct timer_list *timer);
+#else
+void nicTxDirectTimerCheckSkbQ(unsigned long data);
+void nicTxDirectTimerCheckHifQ(unsigned long data);
+#endif
 
-
+uint32_t nicTxDirectStartXmit(struct sk_buff *prSkb,
+	struct GLUE_INFO *prGlueInfo);
 /* TX Direct functions : END */
 
-uint32_t nicTxResourceGetPleFreeCount(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
-uint32_t nicTxResourceGetPseFreeCount(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
-u_int8_t nicTxResourceIsPleCtrlNeeded(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
-u_int8_t nicTxResourceIsPseCtrlNeeded(struct ADAPTER *prAdapter,
-	uint8_t ucTC);
-void nicTxResourceUpdate_v1(struct ADAPTER *prAdapter);
-void nicTxResourceUpdate_v2(struct ADAPTER *prAdapter);
+uint32_t nicTxResourceGetPleFreeCount(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTC);
+u_int8_t nicTxResourceIsPleCtrlNeeded(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucTC);
+void nicTxResourceUpdate_v1(IN struct ADAPTER *prAdapter);
 
-int32_t nicTxGetVectorInfo(char *pcCommand, int i4TotalLen,
-			struct TX_VECTOR_BBP_LATCH *prTxV);
+int32_t nicTxGetVectorInfo(IN char *pcCommand, IN int i4TotalLen,
+			IN struct TX_VECTOR_BBP_LATCH *prTxV);
 
-void nicHifTxMsduDoneCb(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo);
+void nicHifTxMsduDoneCb(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo);
 
-u_int8_t nicTxIsPrioPackets(struct ADAPTER *prAdapter,
-		struct MSDU_INFO *prMsduInfo);
-
-#if (CFG_TX_RSRC_WMM_ENHANCE == 1)
-#define NIC_TX_RES_IS_ACTIVE(__prAdapter, __u4TcIdx) \
-	(nicTxResourceIsPseCtrlNeeded(__prAdapter, __u4TcIdx) \
-	|| nicTxResourceIsPleCtrlNeeded(__prAdapter, __u4TcIdx))
-#else
-#define NIC_TX_RES_IS_ACTIVE(__prAdapter, __u4TcIdx) (TRUE)
-#endif
-uint8_t nicTxWmmTc2ResTc(struct ADAPTER *prAdapter,
-	uint8_t ucWmmSet, uint8_t ucWmmTC);
-uint8_t nicTxResTc2WmmTc(uint8_t ucResTC);
-uint8_t nicTxGetWmmIdxByTc(uint8_t ucTC);
-uint8_t nicTxGetAcIdxByTc(uint8_t ucTC);
+u_int8_t nicTxIsPrioPackets(IN struct ADAPTER *prAdapter,
+		IN struct MSDU_INFO *prMsduInfo);
 
 /*******************************************************************************
  *                              F U N C T I O N S
  *******************************************************************************
  */
-
-u_int8_t isNetAbsent(struct ADAPTER *prAdapter, struct BSS_INFO *prBssInfo);
-void nicTxForceAmsduForCert(struct ADAPTER *prAdapter,
-				u_int8_t *prTxDescBuffer);
 
 #endif /* _NIC_TX_H */

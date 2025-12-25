@@ -121,10 +121,10 @@
  */
 /*----------------------------------------------------------------------------*/
 void
-nicRxAddP2pDevice(struct ADAPTER *prAdapter,
-		struct EVENT_P2P_DEV_DISCOVER_RESULT *prP2pResult,
-		uint8_t *pucRxIEBuf,
-		uint16_t u2RxIELength)
+nicRxAddP2pDevice(IN struct ADAPTER *prAdapter,
+		IN struct EVENT_P2P_DEV_DISCOVER_RESULT *prP2pResult,
+		IN uint8_t *pucRxIEBuf,
+		IN uint16_t u2RxIELength)
 {
 	struct P2P_INFO *prP2pInfo = (struct P2P_INFO *) NULL;
 	struct EVENT_P2P_DEV_DISCOVER_RESULT *prTargetResult =
@@ -171,26 +171,26 @@ nicRxAddP2pDevice(struct ADAPTER *prAdapter,
 				ASSERT(pucIeBuf == NULL);
 				pucIeBuf = prP2pInfo->pucCurrIePtr;
 
-				if (((uintptr_t) prP2pInfo->pucCurrIePtr
-					+ (uintptr_t) u2RxIELength) >
-				    (uintptr_t)&
+				if (((unsigned long) prP2pInfo->pucCurrIePtr
+					+ (unsigned long) u2RxIELength) >
+				    (unsigned long)&
 				    prP2pInfo->aucCommIePool
 				    [CFG_MAX_COMMON_IE_BUF_LEN]) {
 
 					/* Common Buffer is no enough. */
 					u2RxIELength =
-					    (uint16_t) ((uintptr_t)
+					    (uint16_t) ((unsigned long)
 					    &prP2pInfo->aucCommIePool
 					    [CFG_MAX_COMMON_IE_BUF_LEN] -
-						(uintptr_t)
+						(unsigned long)
 						prP2pInfo->pucCurrIePtr);
 				}
 
 				/* Step to next buffer address. */
 				prP2pInfo->pucCurrIePtr =
-				    (uint8_t *) ((uintptr_t)
+				    (uint8_t *) ((unsigned long)
 					prP2pInfo->pucCurrIePtr +
-					(uintptr_t) u2RxIELength);
+					(unsigned long) u2RxIELength);
 			}
 
 			/* Restore buffer pointer. */
@@ -231,31 +231,37 @@ nicRxAddP2pDevice(struct ADAPTER *prAdapter,
 				(void *) prP2pResult,
 				sizeof(struct EVENT_P2P_DEV_DISCOVER_RESULT));
 
+			/* printk("DVC FND %d " MACSTR", " MACSTR "\n",
+			 * prP2pInfo->u4DeviceNum,
+			 * MAC2STR(prP2pResult->aucDeviceAddr),
+			 * MAC2STR(prTargetResult->aucDeviceAddr));
+			 */
+
 			if (u2RxIELength) {
 				prTargetResult->pucIeBuf =
 					prP2pInfo->pucCurrIePtr;
 
-				if (((uintptr_t) prP2pInfo->pucCurrIePtr
-					+ (uintptr_t) u2RxIELength) >
-				    (uintptr_t)
+				if (((unsigned long) prP2pInfo->pucCurrIePtr
+					+ (unsigned long) u2RxIELength) >
+				    (unsigned long)
 				    &prP2pInfo->aucCommIePool
 				    [CFG_MAX_COMMON_IE_BUF_LEN]) {
 
 					/* Common Buffer is no enough. */
 					u2IELength =
-						(uint16_t) ((uintptr_t)
+						(uint16_t) ((unsigned long)
 						&prP2pInfo->aucCommIePool
 						[CFG_MAX_COMMON_IE_BUF_LEN] -
-						(uintptr_t)
+						(unsigned long)
 						prP2pInfo->pucCurrIePtr);
 				} else {
 					u2IELength = u2RxIELength;
 				}
 
 				prP2pInfo->pucCurrIePtr =
-				    (uint8_t *) ((uintptr_t)
+				    (uint8_t *) ((unsigned long)
 				    prP2pInfo->pucCurrIePtr
-				    + (uintptr_t) u2IELength);
+				    + (unsigned long) u2IELength);
 
 				kalMemCopy((void *) prTargetResult->pucIeBuf,
 					(void *) pucRxIEBuf,

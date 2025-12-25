@@ -60,9 +60,6 @@
 #ifndef _MT66XX_REG_H
 #define _MT66XX_REG_H
 
-#include "gl_emi.h"
-#include "fw_log.h"
-
 /*******************************************************************************
  *                         C O M P I L E R   F L A G S
  *******************************************************************************
@@ -108,18 +105,6 @@ extern struct mt66xx_hif_driver_data mt66xx_driver_data_soc5_0;
 #ifdef SOC7_0
 extern struct mt66xx_hif_driver_data mt66xx_driver_data_soc7_0;
 #endif /* SOC7_0 */
-#ifdef BELLWETHER
-extern struct mt66xx_hif_driver_data mt66xx_driver_data_bellwether;
-#endif /* BELLWETHER */
-#ifdef MT6639
-extern struct mt66xx_hif_driver_data mt66xx_driver_data_mt6639;
-#endif /* MT6639 */
-#ifdef MT6655
-extern struct mt66xx_hif_driver_data mt66xx_driver_data_mt6655;
-#endif /* MT6655 */
-#ifdef MT7990
-extern struct mt66xx_hif_driver_data mt66xx_driver_data_mt7990;
-#endif /* MT7990 */
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -142,7 +127,7 @@ extern struct mt66xx_hif_driver_data mt66xx_driver_data_mt7990;
 #define GET_RESC_CID(p)      (((p) & RESC_CID_MASK) >> 28)
 
 #define TOP_FVR              (TOP_CFG_BASE + 0x1004)
-#define FW_VER_MASK          (0xff)
+#define FW_VER_MASK          (0xffff)
 #define GET_FW_VER(p)        (((p) & FW_VER_MASK))
 
 #define TOP_HCR              (TOP_CFG_BASE + 0x1008)
@@ -705,41 +690,6 @@ union WPDMA_INT_STA_STRUCT {
 		uint32_t reserved31:1;
 	} field_conn2x_single;
 
-	struct {
-		uint32_t wfdma0_rx_done_0:1;
-		uint32_t wfdma0_rx_done_1:1;
-		uint32_t wfdma0_rx_done_2:1;
-		uint32_t wfdma0_rx_done_3:1;
-		uint32_t wfdma0_tx_done_0:1;
-		uint32_t wfdma0_tx_done_1:1;
-		uint32_t wfdma0_tx_done_2:1;
-		uint32_t wfdma0_tx_done_3:1;
-		uint32_t wfdma0_tx_done_4:1;
-		uint32_t wfdma0_tx_done_5:1;
-		uint32_t wfdma0_tx_done_6:1;
-		uint32_t reserved11:1;
-		uint32_t wfdma0_rx_done_7:1;
-		uint32_t wfdma0_rx_done_8:1;
-		uint32_t wfdma0_rx_done_9:1;
-		uint32_t wfdma0_rx_done_10:1;
-		uint32_t wfdma0_tx_done_21:1;
-		uint32_t wfdma0_tx_done_22:1;
-		uint32_t wfdma0_tx_done_23:1;
-		uint32_t wfdma0_rx_done_6:1;
-		uint32_t wfdma0_rx_coherent:1;
-		uint32_t wfdma0_tx_coherent:1;
-		uint32_t wfdma0_rx_done_4:1;
-		uint32_t wfdma0_rx_done_5:1;
-		uint32_t wpdma2host0_err_int_en:1;
-		uint32_t wfdma0_tx_done_20:1;
-		uint32_t wfdma0_tx_done_16:1;
-		uint32_t wfdma0_tx_done_17:1;
-		uint32_t wfdma0_subsys_int_en:1;
-		uint32_t wfdma0_mcu2host_sw_int_en:1;
-		uint32_t wfdma0_tx_done_18:1;
-		uint32_t wfdma0_tx_done_19:1;
-	} field_conn3x;
-
 	uint32_t word;
 };
 
@@ -869,453 +819,7 @@ union WPDMA_INT_MASK {
 		uint32_t wfdma0_tx_done_18:1;
 		uint32_t reserved31:1;
 	} field_conn2x_single;
-
-	struct {
-		uint32_t wfdma0_rx_done_0:1;
-		uint32_t wfdma0_rx_done_1:1;
-		uint32_t wfdma0_rx_done_2:1;
-		uint32_t wfdma0_rx_done_3:1;
-		uint32_t wfdma0_tx_done_0:1;
-		uint32_t wfdma0_tx_done_1:1;
-		uint32_t wfdma0_tx_done_2:1;
-		uint32_t wfdma0_tx_done_3:1;
-		uint32_t wfdma0_tx_done_4:1;
-		uint32_t wfdma0_tx_done_5:1;
-		uint32_t wfdma0_tx_done_6:1;
-		uint32_t reserved11:1;
-		uint32_t wfdma0_rx_done_7:1;
-		uint32_t wfdma0_rx_done_8:1;
-		uint32_t wfdma0_rx_done_9:1;
-		uint32_t wfdma0_rx_done_10:1;
-		uint32_t wfdma0_tx_done_21:1;
-		uint32_t wfdma0_tx_done_22:1;
-		uint32_t wfdma0_tx_done_23:1;
-		uint32_t wfdma0_rx_done_6:1;
-		uint32_t wfdma0_rx_coherent:1;
-		uint32_t wfdma0_tx_coherent:1;
-		uint32_t wfdma0_rx_done_4:1;
-		uint32_t wfdma0_rx_done_5:1;
-		uint32_t wpdma2host0_err_int_en:1;
-		uint32_t wfdma0_tx_done_20:1;
-		uint32_t wfdma0_tx_done_16:1;
-		uint32_t wfdma0_tx_done_17:1;
-		uint32_t wfdma0_subsys_int_en:1;
-		uint32_t wfdma0_mcu2host_sw_int_en:1;
-		uint32_t wfdma0_tx_done_18:1;
-		uint32_t wfdma0_tx_done_19:1;
-	} field_conn3x;
-
 	uint32_t word;
-};
-
-/* WPDMA_RST_PTR */
-union WPDMA_RST_IDX_STRUCT {
-	struct {
-		uint32_t RST_DTX_IDX0:1;
-		uint32_t RST_DTX_IDX1:1;
-		uint32_t rsv_2_15:14;
-		uint32_t RST_DRX_IDX0:1;
-		uint32_t RST_DRX_IDX1:1;
-		uint32_t rsv_18_31:14;
-	} field;
-
-	uint32_t word;
-};
-
-/* WPDMA_DELAY_INT_CFG */
-union DELAY_INT_CFG_STRUCT {
-	struct {
-		uint32_t RXMAX_PTIME:8;
-		uint32_t RXMAX_PINT:7;
-		uint32_t RXDLY_INT_EN:1;
-		uint32_t TXMAX_PTIME:8;
-		uint32_t TXMAX_PINT:7;
-		uint32_t TXDLY_INT_EN:1;
-	} field;
-
-	uint32_t word;
-};
-
-/* RTC_TOP_MISC2 */
-#define TOP_MISC2_CR4_INIT_DONE			BIT(18)
-#define TOP_MISC2_N9_INIT_DONE			BIT(17)
-#define TOP_MISC2_FW_READY				BIT(16)
-#define WLAN_READY_BITS					BITS(16, 18)
-
-/* HIF_SYS_REV */
-#define PCIE_HIF_SYS_PROJ				BITS(16, 31)
-#define PCIE_HIF_SYS_REV				BITS(0, 15)
-
-/* CFG_PCIE_LPCR_HOST */
-#define PCIE_LPCR_AP_HOST_OWNER_STATE_SYNC	BIT(2)
-#define PCIE_LPCR_HOST_CLR_OWN			BIT(1)
-#define PCIE_LPCR_HOST_SET_OWN			BIT(0)
-
-/* CFG_PCIE_LPCR_FW */
-#define PCIE_LPCR_FW_CLR_OWN			BIT(0)
-
-/* WPDMA_INT_STA */
-#define WPDMA_FW_CLR_OWN_INT			BIT(31)
-#define WPDMA_TX_DONE_INT15				BIT(19)
-#define WPDMA_TX_DONE_INT3				BIT(7)
-#define WPDMA_TX_DONE_INT2				BIT(6)
-#define WPDMA_TX_DONE_INT1				BIT(5)
-#define WPDMA_TX_DONE_INT0				BIT(4)
-#define WPDMA_RX_DONE_INT3				BIT(3)
-#define WPDMA_RX_DONE_INT2				BIT(2)
-#define WPDMA_RX_DONE_INT1				BIT(1)
-#define WPDMA_RX_DONE_INT0				BIT(0)
-
-#else
-#define WIFI_CFG_SW_SYNC0			    0
-#define WIFI_CFG_SYNC0_RDY_OFFSET       0
-#endif
-
-/* 4 CHIP ID Register */
-#define MCR_WCIR                            0x0000
-
-/* 4 HIF Low Power Control  Register */
-#define MCR_WHLPCR                          0x0004
-
-/* 4 Control  Status Register */
-#define MCR_WSDIOCSR                        0x0008
-
-/* 4 HIF Control Register */
-#define MCR_WHCR                            0x000C
-
-/* 4 HIF Interrupt Status  Register */
-#define MCR_WHISR                           0x0010
-
-/* 4 HIF Interrupt Enable  Register */
-#define MCR_WHIER                           0x0014
-
-/* 4 Abnormal Status Register */
-#define MCR_WASR                            0x0020
-
-/* 4 WLAN Software Interrupt Control Register */
-#define MCR_WSICR                           0x0024
-
-/* 4 WLAN TX Data Register 1 */
-#define MCR_WTDR1                           0x0034
-
-/* 4 WLAN RX Data Register 0 */
-#define MCR_WRDR0                           0x0050
-
-/* 4 WLAN RX Data Register 1 */
-#define MCR_WRDR1                           0x0054
-
-/* 4 Host to Device Send Mailbox 0 Register */
-#define MCR_H2DSM0R                         0x0070
-
-/* 4 Host to Device Send Mailbox 1 Register */
-#define MCR_H2DSM1R                         0x0074
-
-/* 4 Host to Device Send Mailbox 2 Register */
-#define MCR_H2DSM2R                         0x0160
-
-/* 4 Device to Host Receive Mailbox 0 Register */
-#define MCR_D2HRM0R                         0x0078
-
-/* 4 Device to Host Receive Mailbox 1 Register */
-#define MCR_D2HRM1R                         0x007c
-
-/* 4 Device to Host Receive Mailbox 2 Register */
-#define MCR_D2HRM2R                         0x0080
-
-/* 4 WLAN RX Packet Length Register */
-#define MCR_WRPLR                           0x0090
-
-/* 4 Test Mode Data Port */
-#define MCR_WTMDR                           0x00b0
-
-/* 4 Test Mode Control Register */
-#define MCR_WTMCR                           0x00b4
-
-/* 4 Test Mode Data Pattern Control Register #0 */
-#define MCR_WTMDPCR0                        0x00b8
-
-/* 4 Test Mode Data Pattern Control Register #1 */
-#define MCR_WTMDPCR1                        0x00bc
-
-/* 4 WLAN Packet Length Report Control Register */
-#define MCR_WPLRCR                          0x00d4
-
-/* 4 WLAN Snapshot Register */
-#define MCR_WSR                             0x00D8
-
-/* 4 Clock Pad Macro IO Control Register */
-#define MCR_CLKIOCR                         0x0100
-
-/* 4 Command Pad Macro IO Control Register */
-#define MCR_CMDIOCR                         0x0104
-
-/* 4 Data 0 Pad Macro IO Control Register */
-#define MCR_DAT0IOCR                        0x0108
-
-/* 4 Data 1 Pad Macro IO Control Register */
-#define MCR_DAT1IOCR                        0x010C
-
-/* 4 Data 2 Pad Macro IO Control Register */
-#define MCR_DAT2IOCR                        0x0110
-
-/* 4 Data 3 Pad Macro IO Control Register */
-#define MCR_DAT3IOCR                        0x0114
-
-/* 4 Clock Pad Macro Delay Chain Control Register */
-#define MCR_CLKDLYCR                        0x0118
-
-/* 4 Command Pad Macro Delay Chain Control Register */
-#define MCR_CMDDLYCR                        0x011C
-
-/* 4 SDIO Output Data Delay Chain Control Register */
-#define MCR_ODATDLYCR                       0x0120
-
-/* 4 SDIO Input Data Delay Chain Control Register 1 */
-#define MCR_IDATDLYCR1                      0x0124
-
-/* 4 SDIO Input Data Delay Chain Control Register 2 */
-#define MCR_IDATDLYCR2                      0x0128
-
-/* 4 SDIO Input Data Latch Time Control Register */
-#define MCR_ILCHCR                          0x012C
-
-/* 4 WLAN TXQ Count Register 0 */
-#define MCR_WTQCR0                          0x0130
-
-/* 4 WLAN TXQ Count Register 1 */
-#define MCR_WTQCR1                          0x0134
-
-/* 4 WLAN TXQ Count Register 2 */
-#define MCR_WTQCR2                          0x0138
-
-/* 4 WLAN TXQ Count Register 3 */
-#define MCR_WTQCR3                          0x013C
-
-/* 4 WLAN TXQ Count Register 4 */
-#define MCR_WTQCR4                          0x0140
-
-/* 4 WLAN TXQ Count Register 5 */
-#define MCR_WTQCR5                          0x0144
-
-/* 4 WLAN TXQ Count Register 6 */
-#define MCR_WTQCR6                          0x0148
-
-/* 4 WLAN TXQ Count Register 7 */
-#define MCR_WTQCR7                          0x014C
-
-#if (CFG_SDIO_INTR_ENHANCE_FORMAT == 2)
-/* 4 WLAN TXQ Count Register 8 */
-#define MCR_WTQCR8                          0x0190
-
-/* 4 WLAN TXQ Count Register 9 */
-#define MCR_WTQCR9                          0x0194
-
-/* 4 WLAN TXQ Count Register 10 */
-#define MCR_WTQCR10                         0x0198
-
-/* 4 WLAN TXQ Count Register 11 */
-#define MCR_WTQCR11                         0x019C
-
-/* 4 WLAN TXQ Count Register 12 */
-#define MCR_WTQCR12                         0x01A0
-
-/* 4 WLAN TXQ Count Register 13 */
-#define MCR_WTQCR13                         0x01A4
-
-/* 4 WLAN TXQ Count Register 14 */
-#define MCR_WTQCR14                         0x01A8
-
-/* 4 WLAN TXQ Count Register 15 */
-#define MCR_WTQCR15                         0x01AC
-#endif
-
-/* WLAN/Common PC value Debug registre */
-#define MCR_SWPCDBGR				0x0154
-
-/* #if CFG_SDIO_INTR_ENHANCE */
-#if defined(_HIF_SDIO)
-
-#if (CFG_SDIO_INTR_ENHANCE_FORMAT == 1)
-#define SDIO_TX_RESOURCE_NUM		16
-#define SDIO_TX_RESOURCE_REG_NUM	8	/* SDIO_TX_RESOURCE_NUM >> 1 */
-#define SDIO_RX0_AGG_NUM		16
-#define SDIO_RX1_AGG_NUM		16
-
-#define SDIO_RX_STATUS_REPORT_LEN \
-	((SDIO_RX0_AGG_NUM + SDIO_RX1_AGG_NUM + 2) >> 1)
-
-#elif (CFG_SDIO_INTR_ENHANCE_FORMAT == 2)
-#define SDIO_TX_RESOURCE_NUM		32
-#define SDIO_TX_RESOURCE_REG_NUM	16	/* SDIO_TX_RESOURCE_NUM >> 1 */
-#define SDIO_RX0_AGG_NUM		16
-#define SDIO_RX1_AGG_NUM		128
-
-#define SDIO_RX_STATUS_REPORT_LEN \
-	((SDIO_RX0_AGG_NUM + SDIO_RX1_AGG_NUM + 2) >> 1)
-#endif
-
-
-struct ENHANCE_MODE_DATA_STRUCT {
-	uint32_t u4WHISR;
-	union {
-		uint16_t auTQCnt[SDIO_TX_RESOURCE_NUM];
-		uint32_t au4WTSR[SDIO_TX_RESOURCE_REG_NUM];
-	} rTxInfo;
-	union {
-		struct {
-			uint16_t u2NumValidRx0Len;
-			uint16_t u2NumValidRx1Len;
-			uint16_t au2Rx0Len[SDIO_RX0_AGG_NUM];
-			uint16_t au2Rx1Len[SDIO_RX1_AGG_NUM];
-		} u;
-		uint32_t au4RxStatusRaw[SDIO_RX_STATUS_REPORT_LEN];
-	} rRxInfo;
-	uint32_t u4RcvMailbox0;
-	uint32_t u4RcvMailbox1;
-};
-#endif
-
-/* 2 Definition in each register */
-/* 3 WCIR 0x0000 */
-#define WCIR_WLAN_READY                 BIT(21)
-#define WCIR_POR_INDICATOR              BIT(20)
-#define WCIR_REVISION_ID                BITS(16, 19)
-#define WCIR_CHIP_ID                    BITS(0, 15)
-
-#define MTK_CHIP_REV                    0x00006632
-#define MTK_CHIP_MP_REVERSION_ID        0x0
-
-/* 3 WHLPCR 0x0004 */
-#define WHLPCR_FW_OWN_REQ_CLR           BIT(9)
-#define WHLPCR_FW_OWN_REQ_SET           BIT(8)
-#define WHLPCR_IS_DRIVER_OWN            BIT(8)
-#define WHLPCR_INT_EN_CLR               BIT(1)
-#define WHLPCR_INT_EN_SET               BIT(0)
-
-/* 3 WSDIOCSR 0x0008 */
-#define WSDIOCSR_DB_CMD7_RESELECT_DIS   BIT(4)
-#define WSDIOCSR_DB_WR_BUSY_EN          BIT(3)
-#define WSDIOCSR_DB_RD_BUSY_EN          BIT(2)
-#define WSDIOCSR_SDIO_INT_CTL           BIT(1)
-#define WSDIOCSR_SDIO_RE_INIT_EN        BIT(0)
-
-/* 3 WHCR 0x000C */
-#define WHCR_RX_ENHANCE_MODE_EN         BIT(16)
-#define WHCR_WF_RST_DONE                BIT(15)
-#define WHCR_MAX_HIF_RX_LEN_NUM         BITS(8, 14)
-#define WHCR_SDIO_WF_PATH_RSTB          BIT(6)
-#define WHCR_WF_WHOLE_PATH_RSTB         BIT(5)
-#define WHCR_RPT_OWN_RX_PACKET_LEN      BIT(3)
-#define WHCR_RECV_MAILBOX_RD_CLR_EN     BIT(2)
-#define WHCR_W_INT_CLR_CTRL             BIT(1)
-#define WHCR_MCU_DBG_EN                 BIT(0)
-#define WHCR_OFFSET_MAX_HIF_RX_LEN_NUM  8
-
-/* 3 WHISR 0x0010 */
-#define WHISR_D2H_SW_INT                BITS(8, 31)
-#define WHISR_D2H_SW_ASSERT_INFO_INT    BIT(31)
-#define WHISR_D2H_WKUP_BY_RX_PACKET		BIT(30)
-#define WHISR_D2H_SW_RD_MAILBOX_INT     BIT(29)
-#define WHISR_FW_OWN_BACK_INT           BIT(7)
-#define WHISR_WDT_INT                   BIT(5)
-#define WHISR_ABNORMAL_INT              BIT(6)
-#define WHISR_RX1_DONE_INT              BIT(2)
-#define WHISR_RX0_DONE_INT              BIT(1)
-#define WHISR_TX_DONE_INT               BIT(0)
-
-/* 3 WHIER 0x0014 */
-#define WHIER_D2H_SW_INT                BITS(8, 31)
-#define WHIER_FW_OWN_BACK_INT_EN        BIT(7)
-#define WHIER_ABNORMAL_INT_EN           BIT(6)
-#define WHIER_WF_WDT_INT_EN             BIT(5)
-#define WHIER_RX1_DONE_INT_EN           BIT(2)
-#define WHIER_RX0_DONE_INT_EN           BIT(1)
-#define WHIER_TX_DONE_INT_EN            BIT(0)
-
-
-#if CFG_CHIP_RESET_SUPPORT
-#define WHIER_DEFAULT                   (WHIER_RX0_DONE_INT_EN    | \
-					 WHIER_RX1_DONE_INT_EN    | \
-					 WHIER_TX_DONE_INT_EN     | \
-					 WHIER_ABNORMAL_INT_EN    | \
-					 WHIER_WF_WDT_INT_EN      | \
-					 WHIER_D2H_SW_INT           \
-					 )
-#else
-#define WHIER_DEFAULT                   (WHIER_RX0_DONE_INT_EN    | \
-					 WHIER_RX1_DONE_INT_EN    | \
-					 WHIER_TX_DONE_INT_EN     | \
-					 WHIER_ABNORMAL_INT_EN    | \
-					 WHIER_D2H_SW_INT           \
-					 )
-#endif
-
-/* 3 WASR 0x0020 */
-#define WASR_FW_OWN_INVALID_ACCESS      BIT(16)
-#define WASR_RX1_UNDER_FLOW             BIT(9)
-#define WASR_RX0_UNDER_FLOW             BIT(8)
-#define WASR_JTAG_EVENT_INT             BIT(2)
-#define WASR_TX1_OVER_FLOW              BIT(1)
-
-/* 3 WSICR 0x0024 */
-#define WSICR_H2D_SW_INT_SET            BITS(16, 31)
-
-/* 3 WRPLR 0x0090 */
-#define WRPLR_RX1_PACKET_LENGTH         BITS(16, 31)
-#define WRPLR_RX0_PACKET_LENGTH         BITS(0, 15)
-
-/* 3 WTMCR 0x00b4 */
-#define WMTCR_TEST_MODE_FW_OWN          BIT(24)
-#define WMTCR_PRBS_INIT_VAL             BITS(16, 23)
-#define WMTCR_TEST_MODE_STATUS          BIT(8)
-#define WMTCR_TEST_MODE_SELECT          BITS(0, 1)
-
-
-
-/* Support features */
-/* Options for VLAN-over-ethernet pkt to/from 802.11 LLC VLAN pkt.
- * This should depend on the configurations of HW-header-translation.
- */
-#define FEAT_BITS_LLC_VLAN_TX           BIT(0)
-#define FEAT_BITS_LLC_VLAN_RX           BIT(1)
-
-/* Support features API */
-#define FEAT_SUP_LLC_VLAN_TX(__chip_info) \
-	((__chip_info)->features & FEAT_BITS_LLC_VLAN_TX)
-#define FEAT_SUP_LLC_VLAN_RX(__chip_info) \
-	((__chip_info)->features & FEAT_BITS_LLC_VLAN_RX)
-
-/*******************************************************************************
- *                             D A T A   T Y P E S
- *******************************************************************************
- */
-
-enum ENUM_WIFI_FUNC {
-	WIFI_FUNC_INIT_DONE = BIT(0),
-	WIFI_FUNC_N9_DONE = BIT(1),
-	WIFI_FUNC_NO_CR4_READY_BITS = BITS(0, 1),
-	WIFI_FUNC_CR4_READY = BIT(2),
-	WIFI_FUNC_READY_BITS = BITS(0, 2),
-	WIFI_FUNC_DUMMY_REQ = BIT(3)
-};
-
-enum enum_mt66xx_chip {
-	MT66XX_CHIP_6632 = 0,
-	MT66XX_CHIP_7666,
-	MT66XX_CHIP_7668,
-	MT66XX_CHIP_NUM
-};
-
-enum enum_workAround {
-	WORKAROUND_MT7663_BRINGUP_20171205 = 0,
-	WORKAROUND_NUM
-};
-
-enum ENUM_CHIP_CAPABILITY {
-	CHIP_CAPA_FW_LOG_TIME_SYNC,
-	CHIP_CAPA_FW_LOG_TIME_SYNC_BY_CCIF,
-	CHIP_CAPA_XTAL_TRIM,
-	CHIP_CAPA_NUM
 };
 
 /* WPDMA_GLO_CFG */
@@ -1426,52 +930,362 @@ union WPDMA_GLO_CFG_STRUCT {
 		uint32_t rx_2b_offset:1;
 	} field_conn2x;
 
+	uint32_t word;
+};
+
+/* WPDMA_RST_PTR */
+union WPDMA_RST_IDX_STRUCT {
 	struct {
-		uint32_t tx_dma_en:1;
-		uint32_t tx_dma_busy:1;
-		uint32_t rx_dma_en:1;
-		uint32_t rx_dma_busy:1;
-		uint32_t pdma_bt_size:2;
-		uint32_t tx_wb_ddone:1;
-		uint32_t big_endian:1;
-		uint32_t dmad_32b_en:1;
-		uint32_t bypass_dmashdl_txring:1;
-		uint32_t csr_wfdma_dummy_reg:1;
-		uint32_t csr_axi_bufrdy_byp:1;
-		uint32_t fifo_little_endian:1;
-		uint32_t csr_rx_wb_ddone:1;
-		uint32_t csr_pp_hif_txp_active_en:1;
-		uint32_t csr_disp_base_ptr_chain_en:1;
-		uint32_t csr_lbk_rx_q_sel:4;
-		uint32_t csr_lbk_rx_q_sel_en:1;
-		uint32_t omit_rx_info_pfet2:1;
-		uint32_t rx_scatter_gather_mode:1;
-		uint32_t reserved23:1;
-		uint32_t csr_sw_rst:1;
-		uint32_t force_tx_eof:1;
-		uint32_t pdma_addr_ext_en:1;
-		uint32_t omit_rx_info:1;
-		uint32_t omit_tx_info:1;
-		uint32_t byte_swap:1;
-		uint32_t clk_gate_dis:1;
-		uint32_t rx_2b_offset:1;
-	} field_conn3x;
+		uint32_t RST_DTX_IDX0:1;
+		uint32_t RST_DTX_IDX1:1;
+		uint32_t rsv_2_15:14;
+		uint32_t RST_DRX_IDX0:1;
+		uint32_t RST_DRX_IDX1:1;
+		uint32_t rsv_18_31:14;
+	} field;
 
 	uint32_t word;
 };
 
-struct thermal_sensor_info {
-	const char name[16];
-	const enum THERMAL_TEMP_TYPE type;
-	const uint8_t sendor_idx;
-	void *tzd;
-	uint32_t last_query_time;
-	int32_t last_query_temp;
+/* WPDMA_DELAY_INT_CFG */
+union DELAY_INT_CFG_STRUCT {
+	struct {
+		uint32_t RXMAX_PTIME:8;
+		uint32_t RXMAX_PINT:7;
+		uint32_t RXDLY_INT_EN:1;
+		uint32_t TXMAX_PTIME:8;
+		uint32_t TXMAX_PINT:7;
+		uint32_t TXDLY_INT_EN:1;
+	} field;
+
+	uint32_t word;
 };
 
-struct thermal_info {
-	const uint32_t sensor_num;
-	struct thermal_sensor_info *sensor_info;
+/* RTC_TOP_MISC2 */
+#define TOP_MISC2_CR4_INIT_DONE			BIT(18)
+#define TOP_MISC2_N9_INIT_DONE			BIT(17)
+#define TOP_MISC2_FW_READY				BIT(16)
+#define WLAN_READY_BITS					BITS(16, 18)
+
+/* HIF_SYS_REV */
+#define PCIE_HIF_SYS_PROJ				BITS(16, 31)
+#define PCIE_HIF_SYS_REV				BITS(0, 15)
+
+/* CFG_PCIE_LPCR_HOST */
+#define PCIE_LPCR_AP_HOST_OWNER_STATE_SYNC	BIT(2)
+#define PCIE_LPCR_HOST_CLR_OWN			BIT(1)
+#define PCIE_LPCR_HOST_SET_OWN			BIT(0)
+
+/* CFG_PCIE_LPCR_FW */
+#define PCIE_LPCR_FW_CLR_OWN			BIT(0)
+
+/* WPDMA_INT_STA */
+#define WPDMA_FW_CLR_OWN_INT			BIT(31)
+#define WPDMA_TX_DONE_INT15				BIT(19)
+#define WPDMA_TX_DONE_INT3				BIT(7)
+#define WPDMA_TX_DONE_INT2				BIT(6)
+#define WPDMA_TX_DONE_INT1				BIT(5)
+#define WPDMA_TX_DONE_INT0				BIT(4)
+#define WPDMA_RX_DONE_INT3				BIT(3)
+#define WPDMA_RX_DONE_INT2				BIT(2)
+#define WPDMA_RX_DONE_INT1				BIT(1)
+#define WPDMA_RX_DONE_INT0				BIT(0)
+
+#else
+#define WIFI_CFG_SW_SYNC0			    0
+#define WIFI_CFG_SYNC0_RDY_OFFSET       0
+#endif
+
+/* 4 CHIP ID Register */
+#define MCR_WCIR                            0x0000
+
+/* 4 HIF Low Power Control  Register */
+#define MCR_WHLPCR                          0x0004
+
+/* 4 Control  Status Register */
+#define MCR_WSDIOCSR                        0x0008
+
+/* 4 HIF Control Register */
+#define MCR_WHCR                            0x000C
+
+/* 4 HIF Interrupt Status  Register */
+#define MCR_WHISR                           0x0010
+
+/* 4 HIF Interrupt Enable  Register */
+#define MCR_WHIER                           0x0014
+
+/* 4 Abnormal Status Register */
+#define MCR_WASR                            0x0020
+
+/* 4 WLAN Software Interrupt Control Register */
+#define MCR_WSICR                           0x0024
+
+/* 4 WLAN TX Data Register 1 */
+#define MCR_WTDR1                           0x0034
+
+/* 4 WLAN RX Data Register 0 */
+#define MCR_WRDR0                           0x0050
+
+/* 4 WLAN RX Data Register 1 */
+#define MCR_WRDR1                           0x0054
+
+/* 4 Host to Device Send Mailbox 0 Register */
+#define MCR_H2DSM0R                         0x0070
+
+/* 4 Host to Device Send Mailbox 1 Register */
+#define MCR_H2DSM1R                         0x0074
+
+/* 4 Device to Host Receive Mailbox 0 Register */
+#define MCR_D2HRM0R                         0x0078
+
+/* 4 Device to Host Receive Mailbox 1 Register */
+#define MCR_D2HRM1R                         0x007c
+
+/* 4 Device to Host Receive Mailbox 2 Register */
+#define MCR_D2HRM2R                         0x0080
+
+/* 4 WLAN RX Packet Length Register */
+#define MCR_WRPLR                           0x0090
+
+/* 4 Test Mode Data Port */
+#define MCR_WTMDR                           0x00b0
+
+/* 4 Test Mode Control Register */
+#define MCR_WTMCR                           0x00b4
+
+/* 4 Test Mode Data Pattern Control Register #0 */
+#define MCR_WTMDPCR0                        0x00b8
+
+/* 4 Test Mode Data Pattern Control Register #1 */
+#define MCR_WTMDPCR1                        0x00bc
+
+/* 4 WLAN Packet Length Report Control Register */
+#define MCR_WPLRCR                          0x00d4
+
+/* 4 WLAN Snapshot Register */
+#define MCR_WSR                             0x00D8
+
+/* 4 Clock Pad Macro IO Control Register */
+#define MCR_CLKIOCR                         0x0100
+
+/* 4 Command Pad Macro IO Control Register */
+#define MCR_CMDIOCR                         0x0104
+
+/* 4 Data 0 Pad Macro IO Control Register */
+#define MCR_DAT0IOCR                        0x0108
+
+/* 4 Data 1 Pad Macro IO Control Register */
+#define MCR_DAT1IOCR                        0x010C
+
+/* 4 Data 2 Pad Macro IO Control Register */
+#define MCR_DAT2IOCR                        0x0110
+
+/* 4 Data 3 Pad Macro IO Control Register */
+#define MCR_DAT3IOCR                        0x0114
+
+/* 4 Clock Pad Macro Delay Chain Control Register */
+#define MCR_CLKDLYCR                        0x0118
+
+/* 4 Command Pad Macro Delay Chain Control Register */
+#define MCR_CMDDLYCR                        0x011C
+
+/* 4 SDIO Output Data Delay Chain Control Register */
+#define MCR_ODATDLYCR                       0x0120
+
+/* 4 SDIO Input Data Delay Chain Control Register 1 */
+#define MCR_IDATDLYCR1                      0x0124
+
+/* 4 SDIO Input Data Delay Chain Control Register 2 */
+#define MCR_IDATDLYCR2                      0x0128
+
+/* 4 SDIO Input Data Latch Time Control Register */
+#define MCR_ILCHCR                          0x012C
+
+/* 4 WLAN TXQ Count Register 0 */
+#define MCR_WTQCR0                          0x0130
+
+/* 4 WLAN TXQ Count Register 1 */
+#define MCR_WTQCR1                          0x0134
+
+/* 4 WLAN TXQ Count Register 2 */
+#define MCR_WTQCR2                          0x0138
+
+/* 4 WLAN TXQ Count Register 3 */
+#define MCR_WTQCR3                          0x013C
+
+/* 4 WLAN TXQ Count Register 4 */
+#define MCR_WTQCR4                          0x0140
+
+/* 4 WLAN TXQ Count Register 5 */
+#define MCR_WTQCR5                          0x0144
+
+/* 4 WLAN TXQ Count Register 6 */
+#define MCR_WTQCR6                          0x0148
+
+/* 4 WLAN TXQ Count Register 7 */
+#define MCR_WTQCR7                          0x014C
+
+/* WLAN/Common PC value Debug registre */
+#define MCR_SWPCDBGR				0x0154
+
+/* #if CFG_SDIO_INTR_ENHANCE */
+struct ENHANCE_MODE_DATA_STRUCT {
+	uint32_t u4WHISR;
+	union {
+		struct {
+			uint16_t u2TQ0Cnt;
+			uint16_t u2TQ1Cnt;
+			uint16_t u2TQ2Cnt;
+			uint16_t u2TQ3Cnt;
+			uint16_t u2TQ4Cnt;
+			uint16_t u2TQ5Cnt;
+			uint16_t u2TQ6Cnt;
+			uint16_t u2TQ7Cnt;
+			uint16_t u2TQ8Cnt;
+			uint16_t u2TQ9Cnt;
+			uint16_t u2TQ10Cnt;
+			uint16_t u2TQ11Cnt;
+			uint16_t u2TQ12Cnt;
+			uint16_t u2TQ13Cnt;
+			uint16_t u2TQ14Cnt;
+			uint16_t u2TQ15Cnt;
+		} u;
+		uint32_t au4WTSR[8];
+	} rTxInfo;
+	union {
+		struct {
+			uint16_t u2NumValidRx0Len;
+			uint16_t u2NumValidRx1Len;
+			uint16_t au2Rx0Len[16];
+			uint16_t au2Rx1Len[16];
+		} u;
+		uint32_t au4RxStatusRaw[17];
+	} rRxInfo;
+	uint32_t u4RcvMailbox0;
+	uint32_t u4RcvMailbox1;
+};
+/* #endif *//* ENHANCE_MODE_DATA_STRUCT_T */
+
+/* 2 Definition in each register */
+/* 3 WCIR 0x0000 */
+#define WCIR_WLAN_READY                 BIT(21)
+#define WCIR_POR_INDICATOR              BIT(20)
+#define WCIR_REVISION_ID                BITS(16, 19)
+#define WCIR_CHIP_ID                    BITS(0, 15)
+
+#define MTK_CHIP_REV                    0x00006632
+#define MTK_CHIP_MP_REVERSION_ID        0x0
+
+/* 3 WHLPCR 0x0004 */
+#define WHLPCR_FW_OWN_REQ_CLR           BIT(9)
+#define WHLPCR_FW_OWN_REQ_SET           BIT(8)
+#define WHLPCR_IS_DRIVER_OWN            BIT(8)
+#define WHLPCR_INT_EN_CLR               BIT(1)
+#define WHLPCR_INT_EN_SET               BIT(0)
+
+/* 3 WSDIOCSR 0x0008 */
+#define WSDIOCSR_DB_CMD7_RESELECT_DIS   BIT(4)
+#define WSDIOCSR_DB_WR_BUSY_EN          BIT(3)
+#define WSDIOCSR_DB_RD_BUSY_EN          BIT(2)
+#define WSDIOCSR_SDIO_INT_CTL           BIT(1)
+#define WSDIOCSR_SDIO_RE_INIT_EN        BIT(0)
+
+/* 3 WHCR 0x000C */
+#define WHCR_RX_ENHANCE_MODE_EN         BIT(16)
+#define WHCR_MAX_HIF_RX_LEN_NUM         BITS(8, 13)
+#define WHCR_RPT_OWN_RX_PACKET_LEN      BIT(3)
+#define WHCR_RECV_MAILBOX_RD_CLR_EN     BIT(2)
+#define WHCR_W_INT_CLR_CTRL             BIT(1)
+#define WHCR_MCU_DBG_EN                 BIT(0)
+#define WHCR_OFFSET_MAX_HIF_RX_LEN_NUM  8
+
+/* 3 WHISR 0x0010 */
+#define WHISR_D2H_SW_INT                BITS(8, 31)
+#define WHISR_D2H_SW_ASSERT_INFO_INT    BIT(31)
+#define WHISR_D2H_WKUP_BY_RX_PACKET		BIT(30)
+#define WHISR_D2H_SW_RD_MAILBOX_INT     BIT(29)
+#define WHISR_FW_OWN_BACK_INT           BIT(7)
+#define WHISR_ABNORMAL_INT              BIT(6)
+#define WHISR_RX1_DONE_INT              BIT(2)
+#define WHISR_RX0_DONE_INT              BIT(1)
+#define WHISR_TX_DONE_INT               BIT(0)
+
+/* 3 WHIER 0x0014 */
+#define WHIER_D2H_SW_INT                BITS(8, 31)
+#define WHIER_FW_OWN_BACK_INT_EN        BIT(7)
+#define WHIER_ABNORMAL_INT_EN           BIT(6)
+#define WHIER_RX1_DONE_INT_EN           BIT(2)
+#define WHIER_RX0_DONE_INT_EN           BIT(1)
+#define WHIER_TX_DONE_INT_EN            BIT(0)
+#define WHIER_DEFAULT                   (WHIER_RX0_DONE_INT_EN    | \
+					 WHIER_RX1_DONE_INT_EN    | \
+					 WHIER_TX_DONE_INT_EN     | \
+					 WHIER_ABNORMAL_INT_EN    | \
+					 WHIER_D2H_SW_INT           \
+					 )
+
+/* 3 WASR 0x0020 */
+#define WASR_FW_OWN_INVALID_ACCESS      BIT(16)
+#define WASR_RX1_UNDER_FLOW             BIT(9)
+#define WASR_RX0_UNDER_FLOW             BIT(8)
+#define WASR_TX1_OVER_FLOW              BIT(1)
+
+/* 3 WSICR 0x0024 */
+#define WSICR_H2D_SW_INT_SET            BITS(16, 31)
+
+/* 3 WRPLR 0x0090 */
+#define WRPLR_RX1_PACKET_LENGTH         BITS(16, 31)
+#define WRPLR_RX0_PACKET_LENGTH         BITS(0, 15)
+
+/* 3 WTMCR 0x00b4 */
+#define WMTCR_TEST_MODE_FW_OWN          BIT(24)
+#define WMTCR_PRBS_INIT_VAL             BITS(16, 23)
+#define WMTCR_TEST_MODE_STATUS          BIT(8)
+#define WMTCR_TEST_MODE_SELECT          BITS(0, 1)
+
+
+
+/* Support features */
+/* Options for VLAN-over-ethernet pkt to/from 802.11 LLC VLAN pkt.
+ * This should depend on the configurations of HW-header-translation.
+ */
+#define FEAT_BITS_LLC_VLAN_TX           BIT(0)
+#define FEAT_BITS_LLC_VLAN_RX           BIT(1)
+
+/* Support features API */
+#define FEAT_SUP_LLC_VLAN_TX(__chip_info) \
+	((__chip_info)->features & FEAT_BITS_LLC_VLAN_TX)
+#define FEAT_SUP_LLC_VLAN_RX(__chip_info) \
+	((__chip_info)->features & FEAT_BITS_LLC_VLAN_RX)
+
+/*******************************************************************************
+ *                             D A T A   T Y P E S
+ *******************************************************************************
+ */
+
+enum ENUM_WIFI_FUNC {
+	WIFI_FUNC_INIT_DONE = BIT(0),
+	WIFI_FUNC_N9_DONE = BIT(1),
+	WIFI_FUNC_NO_CR4_READY_BITS = BITS(0, 1),
+	WIFI_FUNC_CR4_READY = BIT(2),
+	WIFI_FUNC_READY_BITS = BITS(0, 2),
+	WIFI_FUNC_DUMMY_REQ = BIT(3)
+};
+
+enum enum_mt66xx_chip {
+	MT66XX_CHIP_6632 = 0,
+	MT66XX_CHIP_7666,
+	MT66XX_CHIP_7668,
+	MT66XX_CHIP_NUM
+};
+
+enum enum_workAround {
+	WORKAROUND_MT7663_BRINGUP_20171205 = 0,
+	WORKAROUND_NUM
+};
+
+enum ENUM_CHIP_CAPABILITY {
+	CHIP_CAPA_FW_LOG_TIME_SYNC
 };
 
 struct mt66xx_chip_info {
@@ -1484,10 +1298,6 @@ struct mt66xx_chip_info {
 #endif
 	struct CHIP_DBG_OPS *prDebugOps;
 
-#if (CFG_MTK_DRIVER_OWN_DELAY == 1)
-	void *pcie_pcie;
-#endif
-
 	const unsigned int chip_id;	/* chip id */
 	const unsigned int should_verify_chip_id;	/* verify chip id */
 	const unsigned int sw_sync0;	/* sw_sync0 address */
@@ -1496,18 +1306,7 @@ struct mt66xx_chip_info {
 	const unsigned int patch_addr;	/* patch download start address */
 	const unsigned int is_support_cr4;	/* support CR4 */
 	const unsigned int is_support_wacpu;	/* support WA-CPU */
-#if (CFG_SUPPORT_HOST_OFFLOAD == 1)
-	const u_int8_t is_support_mawd;		/* support MAWD */
-	const u_int8_t is_support_mawd_tx;	/* support MAWD Tx */
-	const u_int8_t is_support_sdo;		/* support SDO */
-	const u_int8_t is_support_rro;		/* support RRO */
-#endif /* CFG_SUPPORT_HOST_OFFLOAD == 1 */
-	const u_int8_t is_en_wfdma_no_mmio_read;
-#if CFG_MTK_WIFI_EN_SW_EMI_READ
-	const u_int8_t is_en_sw_emi_read;
-#endif
-	unsigned int txd_append_size;	/* hw mac txd append */
-	const unsigned int hif_txd_append_size; /* hif txd append size */
+	const unsigned int txd_append_size;	/* hw mac txd append */
 	const unsigned int rxd_size;	        /* hw mac rxd size */
 	const unsigned int init_evt_rxd_size;	/* init event rxd size */
 	const unsigned int pse_header_length;	/* NIC_TX_PSE_HEADER_LENGTH */
@@ -1525,13 +1324,10 @@ struct mt66xx_chip_info {
 	const unsigned int em_interface_version;
 	const unsigned int cmd_max_pkt_size;
 	const bool isSupportMddpAOR;
-	const bool isSupportMddpSHM;
 
 	const struct ECO_INFO *eco_info;	/* chip version table */
 	uint8_t eco_ver;	/* chip version */
 	uint8_t ucPacketFormat;
-
-	uint32_t u4MinTxLen; /* Length after 802.3/Ethernet II header */
 
 	uint16_t u2TxInitCmdPort;
 	uint16_t u2TxFwDlPort;
@@ -1549,44 +1345,29 @@ struct mt66xx_chip_info {
 	uint32_t u4ChipIpConfig;
 	uint16_t u2ADieChipVersion;
 	void *CSRBaseAddress;
-	uint32_t u4CsrOffset;
-	void *HostCSRBaseAddress;
-	uint32_t u4HostCsrOffset;
-	uint32_t u4HostCsrSize;
 
-	void (*asicCapInit)(struct ADAPTER *prAdapter);
-	void (*asicEnableFWDownload)(struct ADAPTER *prAdapter,
-		u_int8_t fgEnable);
-	void (*asicFillInitCmdTxd)(struct ADAPTER *prAdapter,
-		struct WIFI_CMD_INFO *prCmdInfo,
-		uint16_t *pu2BufInfoLen, uint8_t *pucSeqNum,
-		void **pCmdBuf);
-	void (*asicFillCmdTxd)(struct ADAPTER *prAdapter,
-		struct WIFI_CMD_INFO *prCmdInfo,
-		uint8_t *pucSeqNum, void **pCmdBuf);
-
-#ifdef CFG_SUPPORT_UNIFIED_COMMAND
-	uint16_t u2UniCmdTxHdrSize;
-	void (*asicFillUniCmdTxd)(struct ADAPTER *prAdapter,
-		struct WIFI_UNI_CMD_INFO *prCmdInfo,
-		uint8_t *pucSeqNum, void **pCmdBuf);
-#endif
-
-	uint32_t (*asicGetChipID)(struct ADAPTER *prAdapter);
-	void (*fillHifTxDesc)(uint8_t **pDest, uint16_t *pInfoBufLen,
-		uint8_t ucPacketType);
-	uint32_t (*downloadBufferBin)(struct ADAPTER *prAdapter);
-	uint32_t (*constructBufferBinFileName)(struct ADAPTER *prAdapter,
-		uint8_t *aucEeprom);
-	void (*asicRxProcessRxvforMSP)(struct ADAPTER *prAdapter,
-		struct SW_RFB *prRetSwRfb);
+	void (*asicCapInit)(IN struct ADAPTER *prAdapter);
+	void (*asicEnableFWDownload)(IN struct ADAPTER *prAdapter,
+		IN u_int8_t fgEnable);
+	void (*asicFillInitCmdTxd)(IN struct ADAPTER *prAdapter,
+		IN struct WIFI_CMD_INFO *prCmdInfo,
+		OUT uint16_t *pu2BufInfoLen, OUT uint8_t *pucSeqNum,
+		OUT void **pCmdBuf);
+	void (*asicFillCmdTxd)(IN struct ADAPTER *prAdapter,
+		IN struct WIFI_CMD_INFO *prCmdInfo,
+		OUT uint8_t *pucSeqNum, OUT void **pCmdBuf);
+	uint32_t (*asicGetChipID)(IN struct ADAPTER *prAdapter);
+	void (*fillHifTxDesc)(IN uint8_t **pDest, IN uint16_t *pInfoBufLen);
+	uint32_t (*downloadBufferBin)(IN struct ADAPTER *prAdapter);
+	void (*asicRxProcessRxvforMSP)(IN struct ADAPTER *prAdapter,
+		IN OUT struct SW_RFB *prRetSwRfb);
 	uint8_t (*asicRxGetRcpiValueFromRxv)(
-		uint8_t ucRcpiMode,
-		struct SW_RFB *prSwRfb);
+		IN uint8_t ucRcpiMode,
+		IN struct SW_RFB *prSwRfb);
 	void (*asicRxPerfIndProcessRXV)(
-		struct ADAPTER *prAdapter,
-		struct SW_RFB *prSwRfb,
-		uint8_t ucBssIndex);
+		IN struct ADAPTER *prAdapter,
+		IN struct SW_RFB *prSwRfb,
+		IN uint8_t ucBssIndex);
 
 	const uint32_t features;	/* feature bits */
 	u_int8_t is_support_hw_amsdu;
@@ -1598,71 +1379,48 @@ struct mt66xx_chip_info {
 	u_int8_t is_support_asic_lp;
 	u_int8_t is_support_wfdma1;
 	u_int8_t is_support_dma_shdl;
+	u_int8_t get_rxv_from_rxrpt;
 	u_int8_t rx_event_port;
 #if defined(_HIF_USB)
-	void (*asicUsbInit)(struct ADAPTER *prAdapter,
-			    struct mt66xx_chip_info *prChipInfo);
-	void (*asicUsbInit_ic_specific)(struct ADAPTER *prAdapter,
-			    struct mt66xx_chip_info *prChipInfo);
+	void (*asicUsbInit)(IN struct ADAPTER *prAdapter,
+			    IN struct mt66xx_chip_info *prChipInfo);
+	void (*asicUsbInit_ic_specific)(IN struct ADAPTER *prAdapter,
+			    IN struct mt66xx_chip_info *prChipInfo);
 	uint32_t u4SerUsbMcuEventAddr;
 	uint32_t u4SerUsbHostAckAddr;
 #endif
-	void (*asicDumpSerDummyCR)(struct ADAPTER *prAdapter);
-	void (*asicWfdmaReInit)(struct ADAPTER *prAdapter);
-	void (*asicWfdmaReInit_handshakeInit)(struct ADAPTER *prAdapter);
+	void (*asicDumpSerDummyCR)(IN struct ADAPTER *prAdapter);
+	void (*asicWfdmaReInit)(IN struct ADAPTER *prAdapter);
+	void (*asicWfdmaReInit_handshakeInit)(IN struct ADAPTER *prAdapter);
 	void *pdev;
 	uint32_t group5_size;
-	void (*wlanCheckAsicCap)(struct ADAPTER *prAdapter);
+	void (*wlanCheckAsicCap)(IN struct ADAPTER *prAdapter);
 #if (CFG_CHIP_RESET_SUPPORT == 1) && (CFG_WMT_RESET_API_SUPPORT == 0)
 	u_int8_t (*rst_L0_notify_step2)(void);
 #endif
 	uint32_t u4LmacWtblDUAddr;
 	uint32_t u4UmacWtblDUAddr;
-	int (*trigger_fw_assert)(struct ADAPTER *prAdapter);
-	int (*coexpccifon)(struct ADAPTER *prAdapter);
-	int (*coexpccifoff)(struct ADAPTER *prAdapter);
+	int (*wmmcupwron)(void);
+	int (*wmmcupwroff)(void);
+	uint32_t (*pwrondownload)(IN struct ADAPTER *prAdapter,
+		IN uint8_t ucDownloadItem);
+	int (*triggerfwassert)(void);
+	int (*coexpccifon)(void);
+	int (*coexpccifoff)(void);
 	void (*coantSetWiFi)(void);
 	void (*coantSetMD)(void);
-	void (*coantVFE28En)(struct ADAPTER *prAdapter);
+	void (*coantVFE28En)(IN struct ADAPTER *prAdapter);
 	void (*coantVFE28Dis)(void);
-	u_int8_t (*get_sw_interrupt_status)(struct ADAPTER *prAdapter,
+	bool (*get_sw_interrupt_status)(struct ADAPTER *prAdapter,
 		uint32_t *status);
+	void (*dumpwfsyscpupcr)(IN struct ADAPTER *prAdapter);
+	uint8_t* (*getCalResult)(OUT uint32_t *prCalSize);
 	void (*calDebugCmd)(uint32_t cmd, uint32_t para);
-	uint32_t (*dmashdlQuotaDecision)(struct ADAPTER *prAdapter,
-		uint8_t ucWmmIndex);
 	u_int8_t is_support_nvram_fragment;
 	int (*checkbushang)(void *prAdapter,
 		uint8_t ucWfResetEnable);
-	uint32_t u4ADieVer;
+	void (*dumpBusHangCr)(IN struct ADAPTER *prAdapter);
 	uint64_t chip_capability;
-
-#if CFG_CHIP_RESET_SUPPORT
-	u_int8_t (*asicWfsysRst)(struct ADAPTER *prAdapter,
-				 u_int8_t fgAssertRst);
-	u_int8_t (*asicPollWfsysSwInitDone)(struct ADAPTER *prAdapter);
-#endif
-	void (*asicSerInit)(struct ADAPTER *prAdapter,
-			    const u_int8_t fgAtResetFlow);
-
-	/* If you want to explicitly specify the max AMPDU length exponent in
-	 * HE CAP IE instead of using default one specified by
-	 * prWifiVar->ucMaxAmpduLenExp, then you shall set
-	 * is_specify_he_cap_max_ampdu_len_exp TRUE, set 2.4G value and 5G/6G
-	 * value in uc2G4HeCapMaxAmpduLenExp and uc5GHeCapMaxAmpduLenExp
-	 * respectively.
-	 */
-	u_int8_t is_specify_he_cap_max_ampdu_len_exp;
-	uint8_t uc2G4HeCapMaxAmpduLenExp;
-	uint8_t uc5GHeCapMaxAmpduLenExp;    /* parameter for both 5G and 6G */
-
-	u_int8_t fgIsSupportL0p5Reset;
-	uint32_t (*queryPmicInfo)(struct ADAPTER *prAdapter);
-	struct CCIF_OPS *ccif_ops;
-	struct WLAN_PINCTRL_OPS *pinctrl_ops;
-	struct EMI_MEM_INFO rEmiInfo;
-	struct thermal_info thermal_info;
-	struct FW_LOG_INFO fw_log_info;
-	u_int8_t (*setCrypto)(struct ADAPTER *prAdapter);
 };
 
 struct mt66xx_hif_driver_data {

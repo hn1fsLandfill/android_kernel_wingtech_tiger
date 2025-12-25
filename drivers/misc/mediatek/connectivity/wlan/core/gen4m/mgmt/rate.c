@@ -179,18 +179,17 @@ const u_int8_t afgIsOFDMRate[RATE_NUM_SW] = {
 /*----------------------------------------------------------------------------*/
 void
 rateGetRateSetFromIEs(
-		      struct IE_SUPPORTED_RATE_IOT *prIeSupportedRate,
-		      struct IE_EXT_SUPPORTED_RATE *prIeExtSupportedRate,
-		      uint16_t *pu2OperationalRateSet,
-		      uint16_t *pu2BSSBasicRateSet,
-		      u_int8_t *pfgIsUnknownBSSBasicRate)
+		      IN struct IE_SUPPORTED_RATE_IOT *prIeSupportedRate,
+		      IN struct IE_EXT_SUPPORTED_RATE *prIeExtSupportedRate,
+		      OUT uint16_t *pu2OperationalRateSet,
+		      OUT uint16_t *pu2BSSBasicRateSet,
+		      OUT u_int8_t *pfgIsUnknownBSSBasicRate)
 {
 	uint16_t u2OperationalRateSet = 0;
 	uint16_t u2BSSBasicRateSet = 0;
 	u_int8_t fgIsUnknownBSSBasicRate = FALSE;
 	uint8_t ucRate;
-	uint8_t i;
-	uint32_t j;
+	uint32_t i, j;
 
 	if (prIeSupportedRate) {
 		/* NOTE(Kevin): Buffalo WHR-G54S's supported rate set
@@ -240,9 +239,7 @@ rateGetRateSetFromIEs(
 		/* ASSERT(prIeExtSupportedRate->ucLength
 		 *  <= ELEM_MAX_LEN_EXTENDED_SUP_RATES);
 		 */
-		if (prIeExtSupportedRate->ucLength >
-			ELEM_MAX_LEN_EXTENDED_SUP_RATES - 1)
-			return;
+
 		for (i = 0; i < prIeExtSupportedRate->ucLength; i++) {
 			ucRate =
 			    prIeExtSupportedRate->aucExtSupportedRates[i] &
@@ -299,10 +296,10 @@ rateGetRateSetFromIEs(
  */
 /*----------------------------------------------------------------------------*/
 void
-rateGetDataRatesFromRateSet(uint16_t u2OperationalRateSet,
-			    uint16_t u2BSSBasicRateSet,
-			    uint8_t *pucDataRates,
-			    uint8_t *pucDataRatesLen)
+rateGetDataRatesFromRateSet(IN uint16_t u2OperationalRateSet,
+			    IN uint16_t u2BSSBasicRateSet,
+			    OUT uint8_t *pucDataRates,
+			    OUT uint8_t *pucDataRatesLen)
 {
 	uint32_t i, j;
 
@@ -335,8 +332,8 @@ rateGetDataRatesFromRateSet(uint16_t u2OperationalRateSet,
  * \retval FALSE Highest Rate Index was not found
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t rateGetHighestRateIndexFromRateSet(uint16_t u2RateSet,
-					    uint8_t *pucHighestRateIndex)
+u_int8_t rateGetHighestRateIndexFromRateSet(IN uint16_t u2RateSet,
+					    OUT uint8_t *pucHighestRateIndex)
 {
 	int32_t i;
 
@@ -362,8 +359,8 @@ u_int8_t rateGetHighestRateIndexFromRateSet(uint16_t u2RateSet,
  * \retval FALSE Lowest Rate Index was not found
  */
 /*----------------------------------------------------------------------------*/
-u_int8_t rateGetLowestRateIndexFromRateSet(uint16_t u2RateSet,
-					   uint8_t *pucLowestRateIndex)
+u_int8_t rateGetLowestRateIndexFromRateSet(IN uint16_t u2RateSet,
+					   OUT uint8_t *pucLowestRateIndex)
 {
 	uint32_t i;
 

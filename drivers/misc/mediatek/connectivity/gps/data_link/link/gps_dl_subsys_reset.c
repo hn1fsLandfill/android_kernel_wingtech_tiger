@@ -15,15 +15,6 @@
 #include "conninfra.h"
 #endif
 
-#if GPS_DL_HAS_MCUDL
-#include "gps_mcudl_reset.h"
-#include "gps_mcudl_hal_mcu.h"
-#include "gps_mcudl_hal_ccif.h"
-#include "gps_mcudl_hal_user_fw_own_ctrl.h"
-#include "gps_mcudl_hw_mcu.h"
-#endif
-
-
 bool gps_dl_reset_level_is_none(enum gps_dl_link_id_enum link_id)
 {
 	struct gps_each_link *p = gps_dl_link_get(link_id);
@@ -128,10 +119,6 @@ enum GDL_RET_STATUS gps_dl_reset_level_set_and_trigger(
 			else
 				gps_dl_link_event_send(GPS_DL_EVT_LINK_RESET_GPS, link_id);
 		}
-
-		/* reduce log */
-		if (!need_wait[link_id])
-			continue;
 
 		GDL_LOGXE_STA(link_id,
 			"state change: %s -> %s, level = %d (%d -> %d), is_sent = %d, to_wait = %d",
@@ -252,15 +239,6 @@ int gps_dl_on_pre_connsys_reset(enum consys_drv_type drv, char *reason)
 		return -1;
 	}
 
-#if GPS_DL_HAS_MCUDL
-	ret_status = gps_mcudl_reset_level_set_and_trigger(GPS_DL_RESET_LEVEL_CONNSYS, true);
-
-	if (ret_status != GDL_OKAY) {
-		GDL_LOGE("mcudl status %s is not okay, return -1", gdl_ret_to_name(ret_status));
-		return -1;
-	}
-#endif
-
 	return 0;
 }
 
@@ -269,9 +247,6 @@ int gps_dl_on_post_connsys_reset(void)
 	GDL_LOGE("already in resetting = %d", gps_dl_connsys_is_resetting);
 	gps_dl_connsys_is_resetting = false;
 
-#if GPS_DL_HAS_MCUDL
-	gps_mcudl_handle_connsys_reset_done();
-#endif
 	gps_dl_handle_connsys_reset_done();
 	return 0;
 }
@@ -301,30 +276,6 @@ bool gps_dl_conninfra_is_readable(void)
 {
 #if GPS_DL_HAS_CONNINFRA_DRV
 	return (conninfra_reg_readable() != 0);
-#else
-	return true;
-#endif
-}
-
-/* Check hung_value directly to determine whether do register dump
- *  rather then from conninfra_reg_readable.
- *
- * Even conninfra_reg_readable()=0, we may want to do dump except
- *  there are certain bitmasks(such as SLP_PROT_ERR) in hung_value
- */
-bool gps_dl_conninfra_is_readable_by_hung_value(int hung_value)
-{
-#if GPS_DL_HAS_CONNINFRA_DRV
-	if (hung_value < 0)
-		return false;
-
-	if (hung_value & CONNINFRA_AP2CONN_RX_SLP_PROT_ERR)
-		return false;
-
-	if (hung_value & CONNINFRA_AP2CONN_TX_SLP_PROT_ERR)
-		return false;
-
-	return true;
 #else
 	return true;
 #endif
@@ -406,94 +357,6 @@ bool gps_dl_conninfra_is_okay_or_handle_it(int *p_hung_value, bool dump_on_hung_
 	return false;
 #else
 	return true;
-#endif
-}
-
-#if GPS_DL_HAS_MCUDL
-bool gps_mcudl_conninfra_is_okay_or_handle_it(void)
-{
-#if GPS_DL_HAS_CONNINFRA_DRV
-	int readable;
-	int hung_value = 0;
-	bool trigger = false;
-	int trigger_ret = 0;
-	bool check_again = false;
-	int check_cnt = 0;
-	bool is_fw_own;
-
-	is_fw_own = gps_mcudl_hal_force_conn_wake_if_fw_own_is_clear();
-	readable = conninfra_reg_readable();
-	if (is_fw_own)
-		GDL_LOGD("is_fw_own=%d, readable=%d", is_fw_own, readable);
-
-	if (readable) {
-		if (is_fw_own)
-			gps_mcudl_hw_conn_force_wake(false);
-		GDL_LOGD("readable = %d, okay", readable);
-		return true;
-	}
-
-	hung_value = conninfra_is_bus_hang();
-	do {
-		if ((hung_value & CONNINFRA_AP2CONN_RX_SLP_PROT_ERR) ||
-			(hung_value & CONNINFRA_AP2CONN_TX_SLP_PROT_ERR)) {
-			trigger = true;
-			trigger_ret = conninfra_trigger_whole_chip_rst(
-				CONNDRV_TYPE_GPS, "GPS detect hung - SLP_PROT_ERR");
-			break;
-		}
-
-		/* hung_value > 0, need to trigger reset
-		 * hung_value < 0, already in reset status
-		 * hung_value = 0, connsys may not in proper status (such as conn_top_off is in sleep)
-		 */
-		if (hung_value == 0 && check_cnt < 1) {
-			/* readable = 0 and hung_value = 0 may not be a stable state,
-			 * check again to double confirm
-			 */
-			gps_dl_hw_dump_host_csr_gps_info(false);
-			GDL_LOGE("cnt=%d, readable=%d, hung_value=0x%x",
-				check_cnt, readable, hung_value);
-			check_again = true;
-			check_cnt++;
-			continue;
-		}
-
-		if (hung_value >= 0) {
-			/* it's safe to cump gps host csr even hang value > 0
-			 */
-			gps_mcudl_hal_mcu_show_pc_log();
-			gps_mcudl_hal_mcu_show_status();
-			gps_mcudl_hal_ccif_show_status();
-			gps_dl_hw_dump_host_csr_gps_info(false);
-			if (gps_mcudl_hal_bg_is_readable(true))
-				gps_mcudl_hal_vndr_dump();
-			gps_dl_hw_dump_host_csr_gps_info(false);
-			trigger = true;
-			trigger_ret = conninfra_trigger_whole_chip_rst(
-				CONNDRV_TYPE_GPS, "GPS detect hung - MCU1");
-			break;
-		}
-
-		/* hung_vale < 0: alreay in connsys resetting
-		 * do nothing
-		 */
-		break;
-	} while (check_again);
-	GDL_LOGE("cnt=%d, readable=%d, hung_value=0x%x, trigger_reset=%d(%d)",
-		check_cnt, readable, hung_value, trigger, trigger_ret);
-	return false;
-#else
-	return true;
-#endif
-}
-#endif /* GPS_DL_HAS_MCUDL */
-
-void gps_dl_slp_prot_fail_and_dump(void)
-{
-#if GPS_DL_HAS_CONNINFRA_DRV
-	conninfra_is_bus_hang();
-	gps_dl_hw_dump_host_csr_gps_info(false);
 #endif
 }
 

@@ -78,27 +78,17 @@
  *******************************************************************************
  */
 /* Roaming Discovery interval, SCAN result need to be updated */
-#define ROAMING_DISCOVER_TIMEOUT_SEC		10	/* Seconds. */
-#define ROAMING_INACTIVE_TIMEOUT_SEC		10	/* Seconds. */
+#define ROAMING_DISCOVER_TIMEOUT_SEC                10	/* Seconds. */
+#define ROAMING_INACTIVE_TIMEOUT_SEC                10	/* Seconds. */
 #if CFG_SUPPORT_ROAMING_SKIP_ONE_AP
 #define ROAMING_ONE_AP_SKIP_TIMES		3
 #endif
-#define ROAMING_BTM_DELTA			0	/* % */
 
-#define ROAMING_RECOVER_RLM_SYNC		0
-#define ROAMING_RECOVER_BSS_UPDATE		1
-
+/* #define ROAMING_NO_SWING_RCPI_STEP                  5 //rcpi */
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
  */
-
-enum ROAM_TYPE {
-	ROAM_TYPE_RCPI,
-	ROAM_TYPE_PER,
-	ROAM_TYPE_NUM
-};
-
 enum ENUM_ROAMING_FAIL_REASON {
 	ROAMING_FAIL_REASON_CONNLIMIT = 0,
 	ROAMING_FAIL_REASON_NOCANDIDATE,
@@ -126,7 +116,7 @@ enum ENUM_ROAMING_REASON {
 	ROAMING_REASON_SAA_FAIL,
 	ROAMING_REASON_UPPER_LAYER_TRIGGER,
 	ROAMING_REASON_BTM,
-	ROAMING_REASON_REASSOC,
+	ROAMING_REASON_BTM_DISASSOC,
 	ROAMING_REASON_NUM
 };
 
@@ -181,8 +171,20 @@ struct ROAMING_EVENT_INFO {
 	uint8_t ucSupportStbc;
 };
 
+#if CFG_SUPPORT_802_11V_BTM_OFFLOAD
+struct ROAMING_SKIP_BTM {
+	uint8_t ucConsecutiveBtmCount;
+	OS_SYSTIME rFrstReqTime;
+};
+
+struct ROAMING_SKIP_PER {
+	uint8_t ucConsecutivePerCount;
+	OS_SYSTIME rFrstPerTime;
+};
+#endif
+
 struct ROAMING_INFO {
-	uint8_t fgIsEnableRoaming;
+	u_int8_t fgIsEnableRoaming;
 
 	enum ENUM_ROAMING_STATE eCurrentState;
 
@@ -191,20 +193,17 @@ struct ROAMING_INFO {
 	OS_SYSTIME rRoamingLastDecisionTime;
 #endif
 
-	uint8_t fgDrvRoamingAllow;
+	u_int8_t fgDrvRoamingAllow;
 	enum ENUM_ROAMING_REASON eReason;
 	uint8_t ucPER;
 	uint8_t ucRcpi;
 	uint8_t ucThreshold;
 	struct ROAMING_EVENT_INFO rEventInfo;
-	uint8_t ucRecoverBitmap;
-};
-
-struct ROAMING_IDLE_INFO {
-	uint16_t au2ChIdleTime2G4[14];
-	uint16_t au2ChIdleTime5G[25];
-#if (CFG_SUPPORT_WIFI_6G == 1)
-	uint16_t au2ChIdleTime6G[59];
+#if CFG_SUPPORT_802_11V_BTM_OFFLOAD
+	struct ROAMING_SKIP_BTM rSkipBtmInfo;
+	struct ROAMING_SKIP_PER rSkipPerInfo;
+	uint8_t fgDisallowBtmRoaming;
+	uint8_t fgDisallowPERRoaming;
 #endif
 };
 
@@ -228,55 +227,44 @@ struct ROAMING_IDLE_INFO {
  *                  F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
-void roamingFsmInit(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmInit(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmUninit(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmUninit(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmSendCmd(struct ADAPTER *prAdapter,
-	struct CMD_ROAMING_TRANSIT *prTransit);
+void roamingFsmSendCmd(IN struct ADAPTER *prAdapter,
+	IN struct CMD_ROAMING_TRANSIT *prTransit);
 
-void roamingFsmScanResultsUpdate(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmScanResultsUpdate(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmSteps(struct ADAPTER *prAdapter,
-	enum ENUM_ROAMING_STATE eNextState,
-	uint8_t ucBssIndex);
+void roamingFsmSteps(IN struct ADAPTER *prAdapter,
+	IN enum ENUM_ROAMING_STATE eNextState,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmRunEventStart(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmRunEventStart(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmRunEventDiscovery(struct ADAPTER *prAdapter,
-	struct CMD_ROAMING_TRANSIT *prTransit);
+void roamingFsmRunEventDiscovery(IN struct ADAPTER *prAdapter,
+	IN struct CMD_ROAMING_TRANSIT *prTransit);
 
-void roamingFsmRunEventRoam(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmRunEventRoam(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmRunEventFail(struct ADAPTER *prAdapter,
-	uint8_t ucReason,
-	uint8_t ucBssIndex);
+void roamingFsmRunEventFail(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucReason,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmRunEventAbort(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex);
+void roamingFsmRunEventAbort(IN struct ADAPTER *prAdapter,
+	IN uint8_t ucBssIndex);
 
-void roamingFsmNotifyEvent(struct ADAPTER *adapter, uint8_t bssIndex,
-	uint8_t ucFail, struct BSS_DESC *prBssDesc);
+void roamingFsmNotifyEvent(IN struct ADAPTER *adapter, IN uint8_t bssIndex,
+	IN uint8_t ucFail, IN struct BSS_DESC *prBssDesc);
 
-uint32_t roamingFsmProcessEvent(struct ADAPTER *prAdapter,
-	struct CMD_ROAMING_TRANSIT *prTransit);
-
-void roamingFsmSetRecoverBitmap(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex, uint8_t ucScenario);
-
-void roamingFsmDoRecover(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+uint32_t roamingFsmProcessEvent(IN struct ADAPTER *prAdapter,
+	IN struct CMD_ROAMING_TRANSIT *prTransit);
 
 uint8_t roamingFsmInDecision(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
-
-void roamingFillScanInfo(struct ADAPTER *ad, enum ENUM_BAND eBand,
-	uint8_t ucChNum, uint16_t u2IdleTime);
-
-uint16_t roamingGetChIdleSlot(struct ADAPTER *ad, enum ENUM_BAND eBand,
-	uint8_t ucChNum);
 
 #endif /* _ROAMING_FSM_H */

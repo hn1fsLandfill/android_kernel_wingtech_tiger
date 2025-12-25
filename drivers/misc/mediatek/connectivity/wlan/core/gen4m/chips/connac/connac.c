@@ -76,9 +76,6 @@
  *                              C O N S T A N T S
  *******************************************************************************
  */
-static uint32_t connac_McuInit(struct ADAPTER *prAdapter);
-static void connac_McuDeInit(struct ADAPTER *prAdapter);
-
 uint8_t *apucConnacFwName[] = {
 	(uint8_t *) CFG_FW_FILENAME "_soc1_0",
 	NULL
@@ -156,10 +153,11 @@ void connacConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 		/* Type 1. WIFI_RAM_CODE_soc1_0_1_1.bin */
 		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
 				CFG_FW_NAME_MAX_LEN,
-				"%s_%u%s_1.bin",
+				"%s_%u%s_%u.bin",
 				apucConnacFwName[ucIdx],
 				CFG_WIFI_IP_SET,
-				aucFlavor);
+				aucFlavor,
+				1);
 		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
 			(*pucNameIdx) += 1;
 		else
@@ -170,10 +168,11 @@ void connacConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
 		/* Type 2. WIFI_RAM_CODE_soc1_0_1_1 */
 		ret = kalSnprintf(*(apucName + (*pucNameIdx)),
 				CFG_FW_NAME_MAX_LEN,
-				"%s_%u%s_1",
+				"%s_%u%s_%u",
 				apucConnacFwName[ucIdx],
 				CFG_WIFI_IP_SET,
-				aucFlavor);
+				aucFlavor,
+				1);
 		if (ret >= 0 && ret < CFG_FW_NAME_MAX_LEN)
 			(*pucNameIdx) += 1;
 		else
@@ -236,11 +235,6 @@ struct BUS_INFO connac_bus_info = {
 	.tx_ring_cmd_idx = 15,
 	.tx_ring0_data_idx = 0,
 	.tx_ring1_data_idx = 0, /* no used */
-	.rx_data_ring_num = 1,
-	.rx_evt_ring_num = 1,
-	.rx_data_ring_size = 256,
-	.rx_evt_ring_size = 16,
-	.rx_data_ring_prealloc_size = 256,
 	.fw_own_clear_addr = WPDMA_INT_STA,
 	.fw_own_clear_bit = WPDMA_FW_CLR_OWN_INT,
 	.max_static_map_addr = 0x00040000,
@@ -262,11 +256,8 @@ struct BUS_INFO connac_bus_info = {
 	.tx_ring_ext_ctrl = asicPdmaTxRingExtCtrl,
 	.rx_ring_ext_ctrl = asicPdmaRxRingExtCtrl,
 	.hifRst = NULL,
-#if defined(_HIF_PCIE)
 	.initPcieInt = NULL,
-#endif
 	.DmaShdlInit = asicPcieDmaShdlInit,
-	.DmaShdlReInit = NULL,
 	.setDmaIntMask = asicPdmaIntMaskConfig,
 #endif /* _HIF_PCIE || _HIF_AXI */
 #if defined(_HIF_USB)
@@ -284,11 +275,6 @@ struct BUS_INFO connac_bus_info = {
 	.asicUsbEventEpDetected = NULL,
 	.asicUsbRxByteCount = NULL,
 	.DmaShdlInit = asicUsbDmaShdlInit,
-	.DmaShdlReInit = NULL,
-	.asicUdmaRxFlush = NULL,
-#if CFG_CHIP_RESET_SUPPORT
-	.asicUsbEpctlRstOpt = NULL,
-#endif
 #endif /* _HIF_USB */
 };
 
@@ -303,9 +289,6 @@ struct FWDL_OPS_T connac_fw_dl_ops = {
 	.getFwInfo = wlanGetConnacFwInfo,
 	.getFwDlInfo = asicGetFwDlInfo,
 	.phyAction = NULL,
-	.downloadEMI = wlanDownloadEMISection,
-	.mcu_init = connac_McuInit,
-	.mcu_deinit = connac_McuDeInit,
 };
 
 struct TX_DESC_OPS_T connacTxDescOps = {
@@ -350,11 +333,9 @@ struct CHIP_DBG_OPS connac_debug_ops = {
 	.showHifInfo = NULL,
 	.printHifDbgInfo = halPrintHifDbgInfo,
 	.show_stat_info = halShowStatInfo,
-#if CFG_SUPPORT_LINK_QUALITY_MONITOR
+#ifdef CFG_SUPPORT_LINK_QUALITY_MONITOR
 	.get_rx_rate_info = connac_get_rx_rate_info,
 #endif
-	.dumpPhyInfo = haldumpPhyInfo,
-	.show_mcu_debug_info = NULL,
 };
 
 struct mt66xx_chip_info mt66xx_chip_info_connac = {
@@ -402,26 +383,10 @@ struct mt66xx_chip_info mt66xx_chip_info_connac = {
 	.top_fvr = TOP_FVR,
 	.custom_oid_interface_version = MTK_CUSTOM_OID_INTERFACE_VERSION,
 	.em_interface_version = MTK_EM_INTERFACE_VERSION,
-#if CFG_MTK_ANDROID_WMT
-	.rEmiInfo = {
-		.type = EMI_ALLOC_TYPE_WMT,
-	},
-#endif
 };
 
 struct mt66xx_hif_driver_data mt66xx_driver_data_connac = {
 	.chip_info = &mt66xx_chip_info_connac,
 };
-
-static uint32_t connac_McuInit(struct ADAPTER *prAdapter)
-{
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(1);
-	return WLAN_STATUS_SUCCESS;
-}
-
-static void connac_McuDeInit(struct ADAPTER *prAdapter)
-{
-	mtk_wcn_consys_hw_wifi_paldo_ctrl(0);
-}
 
 #endif /* CONNAC */

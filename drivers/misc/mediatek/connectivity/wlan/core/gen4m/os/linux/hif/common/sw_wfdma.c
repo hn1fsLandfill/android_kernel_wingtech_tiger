@@ -73,6 +73,9 @@ void halSwWfdmaInit(struct GLUE_INFO *prGlueInfo)
 	struct BUS_INFO *prBusInfo;
 	struct SW_WFDMA_INFO *prSwWfdmaInfo;
 	uint32_t u4Value = 0;
+#if CFG_MTK_ANDROID_EMI
+	void __iomem *pucEmiBaseAddr = NULL;
+#endif
 
 	prChipInfo = prGlueInfo->prAdapter->chip_info;
 	prBusInfo = prChipInfo->bus_info;
@@ -81,7 +84,11 @@ void halSwWfdmaInit(struct GLUE_INFO *prGlueInfo)
 	if (!prSwWfdmaInfo->fgIsEnSwWfdma)
 		return;
 
-	prSwWfdmaInfo->u4PortIdx = TX_RING_CMD;
+#if CFG_TRI_TX_RING
+	prSwWfdmaInfo->u4PortIdx = TX_RING_CMD_IDX_4;
+#else
+	prSwWfdmaInfo->u4PortIdx = TX_RING_CMD_IDX_3;
+#endif
 
 	/* update sw wfdma emi offset */
 	if (prSwWfdmaInfo->u4EmiOffsetAddr) {
@@ -101,14 +108,40 @@ void halSwWfdmaInit(struct GLUE_INFO *prGlueInfo)
 #if CFG_MTK_ANDROID_EMI
 	if (prSwWfdmaInfo->pucIoremapAddr) {
 		DBGLOG(INIT, ERROR, "prDmad already remap\n");
+		prSwWfdmaInfo->prDmad =
+			(struct SW_WFDMAD *)(prSwWfdmaInfo->pucIoremapAddr);
+		halSwWfdmaReset(prSwWfdmaInfo);
 		return;
 	}
 
-	prSwWfdmaInfo->pucIoremapAddr =
-		emi_mem_get_vir_base(prGlueInfo->prAdapter->chip_info) +
-		emi_mem_offset_convert(prSwWfdmaInfo->u4EmiOffset);
+	if (!gConEmiPhyBaseFinal) {
+		DBGLOG(INIT, ERROR,
+		       "Consys emi memory address gConEmiPhyBaseFinal invalid\n");
+		return;
+	}
+
+	request_mem_region(
+		gConEmiPhyBaseFinal + prSwWfdmaInfo->u4EmiOffset,
+		SW_WFDMA_EMI_SIZE,
+		"WIFI-SW-WFDMA");
+	pucEmiBaseAddr = ioremap(
+		gConEmiPhyBaseFinal + prSwWfdmaInfo->u4EmiOffset,
+		SW_WFDMA_EMI_SIZE);
+
+	DBGLOG_LIMITED(INIT, INFO,
+		       "EmiPhyBase:0x%llx offset:0x%x, ioremap region 0x%lX @ 0x%p\n",
+		       (uint64_t)gConEmiPhyBaseFinal,
+		       prSwWfdmaInfo->u4EmiOffset,
+		       gConEmiSizeFinal, pucEmiBaseAddr);
+
+	if (!pucEmiBaseAddr) {
+		DBGLOG(INIT, ERROR, "ioremap_nocache failed\n");
+		return;
+	}
+
+	prSwWfdmaInfo->pucIoremapAddr = pucEmiBaseAddr;
 	prSwWfdmaInfo->prDmad =
-		(struct SW_WFDMAD *)prSwWfdmaInfo->pucIoremapAddr;
+		(struct SW_WFDMAD *)(pucEmiBaseAddr);
 	halSwWfdmaReset(prSwWfdmaInfo);
 #endif /* CFG_MTK_ANDROID_EMI */
 }
@@ -123,6 +156,19 @@ void halSwWfdmaUninit(struct GLUE_INFO *prGlueInfo)
 	prBusInfo = prChipInfo->bus_info;
 	prSwWfdmaInfo = &prBusInfo->rSwWfdmaInfo;
 
+#if CFG_MTK_ANDROID_EMI
+	if (!prSwWfdmaInfo->pucIoremapAddr) {
+		DBGLOG(INIT, ERROR, "prDmad not remap\n");
+		return;
+	}
+
+	DBGLOG_LIMITED(INIT, INFO, "iounmap 0x%p\n",
+		       prSwWfdmaInfo->pucIoremapAddr);
+	iounmap(prSwWfdmaInfo->pucIoremapAddr);
+	release_mem_region(
+		gConEmiPhyBase + prSwWfdmaInfo->u4EmiOffset,
+		SW_WFDMA_EMI_SIZE);
+#endif /* CFG_MTK_ANDROID_EMI */
 	prSwWfdmaInfo->pucIoremapAddr = NULL;
 	prSwWfdmaInfo->prDmad = NULL;
 }
@@ -149,8 +195,10 @@ void halSwWfdmaEn(struct GLUE_INFO *prGlueInfo, bool fgEn)
 
 void halSwWfdmaReset(struct SW_WFDMA_INFO *prSwWfdmaInfo)
 {
-	if (!prSwWfdmaInfo->prDmad)
+	if (!prSwWfdmaInfo->prDmad) {
+		DBGLOG(INIT, ERROR, "prSwWfdmaInfo->prDmad is NULL\n");
 		return;
+	}
 
 	prSwWfdmaInfo->u4CpuIdx = 0;
 	prSwWfdmaInfo->u4DmaIdx = 0;
@@ -158,6 +206,8 @@ void halSwWfdmaReset(struct SW_WFDMA_INFO *prSwWfdmaInfo)
 	prSwWfdmaInfo->prDmad->u4FwIdx = 0;
 	memset_io(prSwWfdmaInfo->prDmad->aucBuf, 0,
 		   SW_WFDMA_CMD_NUM * SW_WFDMA_CMD_PKT_SIZE);
+
+	DBGLOG(INIT, TRACE, "Reset SW WFDMA\n");
 }
 
 void halSwWfdmaBackup(struct GLUE_INFO *prGlueInfo)
@@ -292,6 +342,9 @@ bool halSwWfdmaIsFull(struct GLUE_INFO *prGlueInfo)
 
 bool halSwWfdmaWriteCmd(struct GLUE_INFO *prGlueInfo)
 {
+#define WAIT_FW_TOTAL_DELAY_MS 2048
+#define WAIT_FW_LOOP_DELAY_MIN_US 900
+#define WAIT_FW_LOOP_DELAY_MAX_US 1000
 	struct mt66xx_chip_info *prChipInfo;
 	struct BUS_INFO *prBusInfo;
 	struct GL_HIF_INFO *prHifInfo;
@@ -303,6 +356,8 @@ bool halSwWfdmaWriteCmd(struct GLUE_INFO *prGlueInfo)
 	struct CMD_INFO *prCmdInfo;
 	uint32_t u4Size;
 	void *prBuf;
+	uint32_t u4CurrTick = 0;
+	u_int8_t fgTimeout = FALSE;
 
 	prChipInfo = prGlueInfo->prAdapter->chip_info;
 	prBusInfo = prChipInfo->bus_info;
@@ -310,17 +365,38 @@ bool halSwWfdmaWriteCmd(struct GLUE_INFO *prGlueInfo)
 	prSwWfdmaInfo = &prBusInfo->rSwWfdmaInfo;
 	prSwWfDmad = prSwWfdmaInfo->prDmad;
 
-	prTxRing = &prHifInfo->TxRing[TX_RING_CMD];
+#if CFG_TRI_TX_RING
+	prTxRing = &prHifInfo->TxRing[TX_RING_CMD_IDX_4];
+#else
+	prTxRing = &prHifInfo->TxRing[TX_RING_CMD_IDX_3];
+#endif
 
-	if (!prSwWfdmaInfo->fgIsEnSwWfdma || !prSwWfDmad)
+	if (!prSwWfdmaInfo->fgIsEnSwWfdma || !prSwWfDmad) {
+		DBGLOG(HAL, TRACE, "SW WFDMA is not supported\n");
 		return false;
+	}
 
-	if (prSwWfdmaInfo->u4DmaIdx == prSwWfdmaInfo->u4CpuIdx)
+	if (prSwWfdmaInfo->u4DmaIdx == prSwWfdmaInfo->u4CpuIdx) {
+		DBGLOG(HAL, TRACE, "SW WFDMA is empty\n");
 		return false;
+	}
+
+	u4CurrTick = kalGetTimeTick();
 
 	while (prSwWfdmaInfo->u4DmaIdx != prSwWfdmaInfo->u4CpuIdx) {
-		if (halSwWfdmaIsFull(prGlueInfo))
-			break;
+		while (halSwWfdmaIsFull(prGlueInfo)) {
+			if (prGlueInfo->u4ReadyFlag == TRUE)
+				return true;
+
+			fgTimeout = ((kalGetTimeTick() - u4CurrTick) >
+				WAIT_FW_TOTAL_DELAY_MS) ? TRUE : FALSE;
+			if (fgTimeout) {
+				DBGLOG(HAL, TRACE, "Timeout, break\n");
+				return false;
+			}
+			kalUsleep_range(WAIT_FW_LOOP_DELAY_MIN_US,
+				WAIT_FW_LOOP_DELAY_MAX_US);
+		}
 
 		prBuf = (void *)prSwWfDmad->aucBuf[prSwWfDmad->u4DrvIdx];
 		pTxCell = &prTxRing->Cell[prSwWfdmaInfo->u4DmaIdx];
@@ -380,7 +456,11 @@ bool halSwWfdmaProcessDmaDone(struct GLUE_INFO *prGlueInfo)
 	if (!prSwWfdmaInfo->fgIsEnSwWfdma)
 		return false;
 
-	halWpdmaProcessCmdDmaDone(prGlueInfo, TX_RING_CMD);
+#if CFG_TRI_TX_RING
+	halWpdmaProcessCmdDmaDone(prGlueInfo, TX_RING_CMD_IDX_4);
+#else
+	halWpdmaProcessCmdDmaDone(prGlueInfo, TX_RING_CMD_IDX_3);
+#endif
 	return halSwWfdmaWriteCmd(prGlueInfo);
 }
 

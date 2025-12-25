@@ -162,54 +162,20 @@ void kal_virt_get_int_status(struct ADAPTER *ad, uint32_t *status)
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
 }
 
-void kal_virt_uhw_rd(struct ADAPTER *ad, uint32_t u4Offset, uint32_t *pu4Value,
-		     u_int8_t *pfgSts)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, ad, u4Offset, pu4Value,
-			   pfgSts);
-}
-
-void kal_virt_uhw_wr(struct ADAPTER *ad, uint32_t u4Offset, uint32_t u4Value,
-		     u_int8_t *pfgSts)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, ad, u4Offset, u4Value,
-			   pfgSts);
-}
-
-void kal_virt_cancel_tx_rx(struct ADAPTER *ad)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, ad);
-}
-
-void kal_virt_resume_tx_rx(struct ADAPTER *ad)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, ad);
-}
-
-uint32_t kal_virt_toggle_wfsys_rst(struct ADAPTER *ad)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, ad);
-}
-
 /* the following functions are defined in include/nic/hal.h
  * need to be implemented directly in os/hif
  */
-bool halHifSwInfoInit(struct ADAPTER *prAdapter)
+bool halHifSwInfoInit(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halHifSwInfoUnInit(struct GLUE_INFO *prGlueInfo)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void halPrintHifDbgInfo(struct ADAPTER *prAdapter)
+void halPrintHifDbgInfo(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint32_t halHifPowerOffWifi(struct ADAPTER *prAdapter)
+uint32_t halHifPowerOffWifi(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
@@ -225,82 +191,72 @@ uint32_t halDumpHifStatus(struct ADAPTER *prAdapter,
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint32_t halGetValidCoalescingBufSize(struct ADAPTER *prAdapter)
+uint32_t halGetValidCoalescingBufSize(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint32_t halAllocateIOBuffer(struct ADAPTER *prAdapter)
+uint32_t halAllocateIOBuffer(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint32_t halReleaseIOBuffer(struct ADAPTER *prAdapter)
+uint32_t halReleaseIOBuffer(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halDisableInterrupt(struct ADAPTER *prAdapter)
+void halDisableInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halEnableInterrupt(struct ADAPTER *prAdapter)
+void halEnableInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-u_int8_t halVerifyChipID(struct ADAPTER *prAdapter)
+u_int8_t halVerifyChipID(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halProcessAbnormalInterrupt(struct ADAPTER *prAdapter)
+void halProcessAbnormalInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halProcessSoftwareInterrupt(struct ADAPTER *prAdapter)
+void halProcessSoftwareInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halProcessRxInterrupt(struct ADAPTER *prAdapter)
+void halProcessRxInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halProcessTxInterrupt(struct ADAPTER *prAdapter)
+void halProcessTxInterrupt(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halSerHifReset(struct ADAPTER *prAdapter)
+void halSerHifReset(IN struct ADAPTER *prAdapter)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-u_int8_t halIsTxResourceControlEn(struct ADAPTER *prAdapter)
+u_int8_t halIsTxResourceControlEn(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint32_t halTxPollingResource(struct ADAPTER *prAdapter, uint8_t ucTC)
+uint32_t halTxPollingResource(IN struct ADAPTER *prAdapter, IN uint8_t ucTC)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-static uint32_t halGetHifTxPageSize(struct ADAPTER *prAdapter)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint32_t halGetHifTxDataPageSize(struct ADAPTER *prAdapter)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint32_t halGetHifTxCmdPageSize(struct ADAPTER *prAdapter)
+uint32_t halGetHifTxPageSize(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
@@ -311,25 +267,8 @@ u_int8_t halTxIsDataBufEnough(struct ADAPTER *prAdapter,
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-u_int8_t halTxIsBssCntFull(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-static uint32_t halTxGetPageCount(struct ADAPTER *prAdapter,
-	uint32_t u4FrameLength, u_int8_t fgIncludeDesc)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint32_t halTxGetDataPageCount(struct ADAPTER *prAdapter,
-	uint32_t u4FrameLength, u_int8_t fgIncludeDesc)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint32_t halTxGetCmdPageCount(struct ADAPTER *prAdapter,
-	uint32_t u4FrameLength, u_int8_t fgIncludeDesc)
+uint32_t halTxGetPageCount(IN struct ADAPTER *prAdapter,
+	IN uint32_t u4FrameLength, IN u_int8_t fgIncludeDesc)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
@@ -340,13 +279,13 @@ void halTxCancelSendingCmd(struct ADAPTER *prAdapter,
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halRxProcessMsduReport(struct ADAPTER *prAdapter,
-			    struct SW_RFB *prSwRfb)
+void halRxProcessMsduReport(IN struct ADAPTER *prAdapter,
+			    IN OUT struct SW_RFB *prSwRfb)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-u_int8_t halIsPendingRx(struct ADAPTER *prAdapter)
+u_int8_t halIsPendingRx(IN struct ADAPTER *prAdapter)
 {
 	/* TODO: check pending Rx
 	 * if previous Rx handling is break due to lack of SwRfb
@@ -362,18 +301,18 @@ halRxWaitResponse(struct ADAPTER *prAdapter, uint8_t ucPortIdx,
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-void halSetFWOwn(struct ADAPTER *prAdapter, u_int8_t fgEnableGlobalInt)
+void halSetFWOwn(IN struct ADAPTER *prAdapter, IN u_int8_t fgEnableGlobalInt)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-u_int8_t halSetDriverOwn(struct ADAPTER *prAdapter)
+u_int8_t halSetDriverOwn(IN struct ADAPTER *prAdapter)
 {
 	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
 
-uint8_t halTxRingDataSelect(struct ADAPTER *prAdapter,
-	struct MSDU_INFO *prMsduInfo)
+uint8_t halTxRingDataSelect(IN struct ADAPTER *prAdapter,
+	IN struct MSDU_INFO *prMsduInfo)
 {
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 }
@@ -387,99 +326,9 @@ uint8_t halTxRingDataSelect(struct ADAPTER *prAdapter,
 * @return (TRUE: suspend, reject the caller action. FALSE: not suspend)
 */
 /*----------------------------------------------------------------------------*/
-bool halIsHifStateSuspend(struct ADAPTER *prAdapter)
+bool halIsHifStateSuspend(IN struct ADAPTER *prAdapter)
 {
 	/* HIF owner should implement this function */
 	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
 	return FALSE;
-}
-
-void halUpdateHifConfig(struct ADAPTER *prAdapter)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-void halDumpHifStats(struct ADAPTER *prAdapter)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-void halUpdateBssTokenCnt(struct ADAPTER *prAdapter,
-	uint8_t ucBssIndex)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-#if (CFG_TX_HIF_CREDIT_FEATURE == 1)
-void halAdjustBssTxCredit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint32_t halGetBssTxCredit(struct ADAPTER *prAdapter, uint8_t ucBssIndex)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-};
-
-u_int8_t halTxIsBssCreditCntFull(uint32_t u4TxCredit)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-#endif
-
-u_int8_t halIsHifStateReady(struct GLUE_INFO *prGlueInfo,
-	uint8_t *pucState)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-u_int8_t halProcessToken(struct ADAPTER *prAdapter,
-	uint32_t u4Token,
-	struct QUE *prFreeQueue)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void halMsduReportStats(struct ADAPTER *prAdapter, uint32_t u4Token,
-	uint32_t u4MacLatency, uint32_t u4Stat)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__, prAdapter);
-}
-
-uint8_t halSetRxRingHwAddr(
-	struct RTMP_RX_RING *prRxRing,
-	struct BUS_INFO *prBusInfo,
-	uint32_t u4SwRingIdx)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-bool halWpdmaAllocRxRing(struct GLUE_INFO *prGlueInfo, uint32_t u4Num,
-			 uint32_t u4Size, uint32_t u4DescSize,
-			 uint32_t u4BufSize, bool fgAllocMem)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void halWpdmaProcessCmdDmaDone(struct GLUE_INFO *prGlueInfo,
-	uint16_t u2Port)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void halWpdmaProcessDataDmaDone(struct GLUE_INFO *prGlueInfo,
-	uint16_t u2Port)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-void halRxReceiveRFBs(struct ADAPTER *prAdapter, uint32_t u4Port,
-	uint8_t fgRxData)
-{
-	KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
-}
-
-u_int8_t halTxIsCmdBufEnough(struct ADAPTER *prAdapter)
-{
-	return KAL_NEED_IMPLEMENT(__FILE__, __func__, __LINE__);
 }

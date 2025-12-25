@@ -120,6 +120,7 @@
 #define WF_VDNR_EN_ADDR (CONN_INFRA_BRCM_BASE_ADDR + 0x6C)
 #define WFSYS_VERSION_ID_ADDR (WF_TOP_MISC_OFF_BASE_ADDR + 0x10)
 #define CONN_CFG_AP2WF_REMAP_1_ADDR (CONN_INFRA_CFG_BASE_ADDR + 0x0120)
+#define CONN_MCU_CONFG_HS_BASE 0x89040000
 #define WFSYS_VERSION_ID  0x20010000
 #define WF_DYNAMIC_BASE 0x18500000
 #define MCU_EMI_ENTRY_OFFSET 0x01DC
@@ -144,16 +145,10 @@
 #define WF_PP_TOP_DBG_CS_1_ADDR    (WF_PP_TOP_BASE + 0x00FC)
 #define WF_PP_TOP_DBG_CS_2_ADDR    (WF_PP_TOP_BASE + 0x0100)
 
-#define CONN_MCU_CONFG_HS_BASE 0x89040000
-#define CONN_MCU_CONFG_WF2AP_SW_IRQ_CTRL_ADDR \
-	(CONN_MCU_CONFG_HS_BASE + 0x00c0)
-#define CONN_MCU_CONFG_WF2AP_SW_IRQ_SET_ADDR \
-	(CONN_MCU_CONFG_HS_BASE + 0x00c4)
-#define CONN_MCU_CONFG_WF2AP_SW_IRQ_CLEAR_ADDR \
-	(CONN_MCU_CONFG_HS_BASE + 0x00c8)
-
-#define SOC3_0_PCIE2AP_REMAP_BASE_ADDR		0x50000
-#define SOC3_0_REMAP_BASE_ADDR			0x7c500000
+#if CFG_MTK_ANDROID_EMI
+extern phys_addr_t gConEmiPhyBaseFinal;
+extern unsigned long long gConEmiSizeFinal;
+#endif
 
 union soc3_0_WPDMA_INT_MASK {
 
@@ -220,16 +215,29 @@ union soc3_0_WPDMA_INT_MASK {
 ********************************************************************************
 */
 
+struct ROM_EMI_HEADER {
+	uint8_t ucDateTime[16];
+	uint8_t ucPLat[4];
+	uint16_t u2HwVer;
+	uint16_t u2SwVer;
+	uint32_t u4PatchAddr;
+	uint32_t u4PatchType;
+	uint32_t u4CRC[4];
+};
+
 /*******************************************************************************
 *                            P U B L I C   D A T A
 ********************************************************************************
 */
+extern struct platform_device *g_prPlatDev;
 #if (CFG_SUPPORT_CONNINFRA == 1)
 extern u_int8_t g_IsWfsysBusHang;
+extern struct completion g_triggerComp;
+extern u_int8_t fgIsResetting;
 extern u_int8_t g_fgRstRecover;
 #endif
 
-#if (CFG_WIFI_COREDUMP_SUPPORT == 1)
+#if (CFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT == 1)
 extern u_int8_t g_IsNeedWaitCoredump;
 #endif
 
@@ -257,30 +265,66 @@ void soc3_0_show_pse_info(
 	struct ADAPTER *prAdapter);
 
 void soc3_0_show_wfdma_info(
-	struct ADAPTER *prAdapter);
+	IN struct ADAPTER *prAdapter);
 
 void soc3_0_show_wfdma_info_by_type(
-	struct ADAPTER *prAdapter,
+	IN struct ADAPTER *prAdapter,
 	bool bShowWFDMA_type);
 
 void soc3_0_show_wfdma_info_by_type_without_adapter(
 	bool bIsHostDMA);
 
 void soc3_0_show_wfdma_dbg_probe_info(
-	struct ADAPTER *prAdapter,
-	enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
+	IN struct ADAPTER *prAdapter,
+	IN enum _ENUM_WFDMA_TYPE_T enum_wfdma_type);
 
 void soc3_0_DumpWFDMACr(struct ADAPTER *prAdapter);
 
 void soc3_0_show_dmashdl_info(
-	struct ADAPTER *prAdapter);
+	IN struct ADAPTER *prAdapter);
 void soc3_0_dump_mac_info(
-	struct ADAPTER *prAdapter);
+	IN struct ADAPTER *prAdapter);
 void soc3_0EnableInterrupt(
 	struct ADAPTER *prAdapter);
 
 void soc3_0EnableInterrupt(
 	struct ADAPTER *prAdapter);
+extern void kalConstructDefaultFirmwarePrio(
+				struct GLUE_INFO	*prGlueInfo,
+				uint8_t **apucNameTable,
+				uint8_t **apucName,
+				uint8_t *pucNameIdx,
+				uint8_t ucMaxNameIdx);
+
+extern uint32_t kalFirmwareOpen(
+				IN struct GLUE_INFO *prGlueInfo,
+				IN uint8_t **apucNameTable);
+
+
+extern uint32_t kalFirmwareSize(
+				IN struct GLUE_INFO *prGlueInfo,
+				OUT uint32_t *pu4Size);
+
+extern uint32_t kalFirmwareLoad(
+			IN struct GLUE_INFO *prGlueInfo,
+			OUT void *prBuf, IN uint32_t u4Offset,
+			OUT uint32_t *pu4Size);
+
+extern uint32_t kalFirmwareClose(
+			IN struct GLUE_INFO *prGlueInfo);
+
+extern void wlanWakeLockInit(
+	struct GLUE_INFO *prGlueInfo);
+
+extern void wlanWakeLockUninit(
+	struct GLUE_INFO *prGlueInfo);
+
+extern struct wireless_dev *wlanNetCreate(
+		void *pvData,
+		void *pvDriverData);
+
+extern void wlanNetDestroy(
+	struct wireless_dev *prWdev);
 
 /*******************************************************************************
 *                              F U N C T I O N S
@@ -290,21 +334,46 @@ void soc3_0EnableInterrupt(
 void soc3_0_DumpWfsyscpupcr(struct ADAPTER *prAdapter);
 void soc3_0_WfdmaAxiCtrl(struct ADAPTER *prAdapter);
 
-int soc3_0_Trigger_fw_assert(struct ADAPTER *prAdapter);
+int hifWmmcuPwrOn(void);
+int hifWmmcuPwrOff(void);
+int soc3_0_Trigger_fw_assert(void);
 int soc3_0_CheckBusHang(void *adapter,
 	uint8_t ucWfResetEnable);
 void soc3_0_DumpBusHangCr(struct ADAPTER *prAdapter);
 
 void wlanCoAntWiFi(void);
 void wlanCoAntMD(void);
-void wlanCoAntVFE28En(struct ADAPTER *prAdapter);
+void wlanCoAntVFE28En(IN struct ADAPTER *prAdapter);
 void wlanCoAntVFE28Dis(void);
 
 #if (CFG_SUPPORT_CONNINFRA == 1)
-int wlanConnacPccifon(struct ADAPTER *prAdapter);
-int wlanConnacPccifoff(struct ADAPTER *prAdapter);
+int wlanConnacPccifon(void);
+int wlanConnacPccifoff(void);
+extern void update_driver_reset_status(uint8_t fgIsResetting);
+extern int32_t get_wifi_process_status(void);
+extern int32_t get_wifi_powered_status(void);
+extern void update_pre_cal_status(uint8_t fgIsPreCal);
+extern int8_t get_pre_cal_status(void);
 #endif
 void soc3_0_DumpWfsysdebugflag(void);
+#if (CFG_POWER_ON_DOWNLOAD_EMI_ROM_PATCH == 1)
+void soc3_0_ConstructFirmwarePrio(struct GLUE_INFO *prGlueInfo,
+	uint8_t **apucNameTable, uint8_t **apucName,
+	uint8_t *pucNameIdx, uint8_t ucMaxNameIdx);
+void *
+soc3_0_kalFirmwareImageMapping(IN struct GLUE_INFO *prGlueInfo,
+			OUT void **ppvMapFileBuf, OUT uint32_t *pu4FileLength,
+			IN enum ENUM_IMG_DL_IDX_T eDlIdx);
+uint32_t soc3_0_wlanImageSectionDownloadStage(
+	IN struct ADAPTER *prAdapter, IN void *pvFwImageMapFile,
+	IN uint32_t u4FwImageFileLength, IN uint8_t ucSectionNumber,
+	IN enum ENUM_IMG_DL_IDX_T eDlIdx);
+uint32_t soc3_0_wlanPowerOnDownload(
+	IN struct ADAPTER *prAdapter,
+	IN uint8_t ucDownloadItem);
+int32_t soc3_0_wlanPowerOnInit(
+	enum ENUM_WLAN_POWER_ON_DOWNLOAD eDownloadItem);
+#endif
 
 void soc3_0_icapRiseVcoreClockRate(void);
 void soc3_0_icapDownVcoreClockRate(void);

@@ -23,14 +23,18 @@ KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
   $(info build-in mode!)
   $(info _MTK_BT_CHIP = $(_MTK_BT_CHIP))
+  # _MTK_BT_CHIP comes from conninfra setting
+  BT_PLATFORM = $(patsubst MTK_CONSYS_MT%,%,$(strip $(_MTK_BT_CHIP)))
 endif
 
 
 $(info $(LOG_TAG) TARGET_BUILD_VARIANT = $(TARGET_BUILD_VARIANT))
 ifeq ("$(TARGET_BUILD_VARIANT)","user")
     ccflags-y += -D FW_LOG_DEFAULT_ON=0
+    ccflags-y += -D BUILD_QA_DBG=0
 else
     ccflags-y += -D FW_LOG_DEFAULT_ON=1
+    ccflags-y += -D BUILD_QA_DBG=1
 endif
 
 
@@ -49,14 +53,7 @@ ccflags-y += -D CHIP_IF_BTIF
 ccflags-y += -D USE_DEVICE_NODE=1
 
 # Customized fw update feature
-#ifndef OPLUS_FEATURE_BT_FW_SAU_MTK
-#Add for fw sau
-#ccflags-y += -D CUSTOMER_FW_UPDATE=0
-
-#else /* OPLUS_FEATURE_BT_FW_SAU_MTK */
-ccflags-y += -D CUSTOMER_FW_UPDATE=1
-ccflags-y += -D OPLUS_FEATURE_BT_FW_SAU_MTK=1
-#endif /* OPLUS_FEATURE_BT_FW_SAU_MTK */
+ccflags-y += -D CUSTOMER_FW_UPDATE=0
 
 # pm_qos control
 ccflags-y += -D PM_QOS_CONTROL=0

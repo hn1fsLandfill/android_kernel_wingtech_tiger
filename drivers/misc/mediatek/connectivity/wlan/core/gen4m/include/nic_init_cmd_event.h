@@ -130,7 +130,6 @@
 #endif
 
 enum ENUM_INIT_CMD_ID {
-	/* 0 means firmware download */
 	INIT_CMD_ID_DOWNLOAD_CONFIG = 1,
 	INIT_CMD_ID_WIFI_START,
 	INIT_CMD_ID_ACCESS_REG,
@@ -142,21 +141,11 @@ enum ENUM_INIT_CMD_ID {
 	INIT_CMD_ID_LOG_TIME_SYNC,
 
 	INIT_CMD_ID_PATCH_SEMAPHORE_CONTROL = 0x10,
-	INIT_CMD_ID_BT_PATCH_SEMAPHORE_CONTROL = 0x11,
-	INIT_CMD_ID_ZB_PATCH_SEMAPHORE_CONTROL = 0x12,
-	INIT_CMD_ID_CO_PATCH_DOWNLOAD_CONFIG = 0x13,
 	INIT_CMD_ID_HIF_LOOPBACK = 0x20,
-	INIT_CMD_ID_LOG_BUF_CTRL = 0x21,
-	INIT_CMD_ID_QUERY_INFO = 0x22,
-	INIT_CMD_ID_EMI_FW_DOWNLOAD_CONFIG = 0x23,
-	INIT_CMD_ID_EMI_FW_TRIGGER_AXI_DMA = 0x24,
 
 #if (CFG_DOWNLOAD_DYN_MEMORY_MAP == 1)
 	INIT_CMD_ID_DYN_MEM_MAP_PATCH_FINISH = 0x40,
 	INIT_CMD_ID_DYN_MEM_MAP_FW_FINISH = 0x41,
-#endif
-#if CFG_WLAN_LK_FWDL_SUPPORT
-	INIT_CMD_ID_FW_IMAGE_START = 0x42,
 #endif
 
 #if CFG_SUPPORT_COMPRESSION_FW_OPTION
@@ -170,11 +159,7 @@ enum ENUM_INIT_EVENT_ID {
 	INIT_EVENT_ID_ACCESS_REG,
 	INIT_EVENT_ID_PENDING_ERROR,
 	INIT_EVENT_ID_PATCH_SEMA_CTRL,
-	INIT_EVENT_ID_PHY_ACTION,
-	INIT_EVENT_ID_BT_PATCH_SEMA_CTRL = 6,
-	INIT_EVENT_ID_ZB_PATCH_SEMA_CTRL = 7,
-	INIT_EVENT_ID_LOG_BUF_CTRL,
-	INIT_EVENT_ID_QUERY_INFO_RESULT,
+	INIT_EVENT_ID_PHY_ACTION
 };
 
 enum ENUM_INIT_PATCH_STATUS {
@@ -182,13 +167,6 @@ enum ENUM_INIT_PATCH_STATUS {
 	PATCH_STATUS_NO_NEED_TO_PATCH,	/* patch is DL & ready */
 	PATCH_STATUS_GET_SEMA_NEED_PATCH,	/* get SEMA, need patch */
 	PATCH_STATUS_RELEASE_SEMA	/* release SEMA */
-};
-
-enum _PATCH_FNSH_TYPE {
-	PATCH_FNSH_TYPE_WF = 0,
-	PATCH_FNSH_TYPE_BT = 1,
-	PATCH_FNSH_TYPE_WF_MD = 2, /* flowwing is BT PATCH download flow */
-	PATCH_FNSH_TYPE_ZB = 3
 };
 
 /*******************************************************************************
@@ -212,27 +190,11 @@ struct INIT_CMD_DOWNLOAD_CONFIG {
 	uint32_t u4DataMode;
 };
 
-struct INIT_CMD_CO_DOWNLOAD_CONFIG {
-	uint32_t u4Address;
-	uint32_t u4Length;
-	uint32_t u4DataMode;
-	uint32_t u4SecInfo;
-	uint32_t u4BinType;
-};
-
 #define START_OVERRIDE_START_ADDRESS    BIT(0)
 #define START_DELAY_CALIBRATION         BIT(1)
 #define START_WORKING_PDA_OPTION        BIT(2)
 #define START_CRC_CHECK                 BIT(3)
 #define CHANGE_DECOMPRESSION_TMP_ADDRESS    BIT(4)
-
-#define WIFI_FW_DOWNLOAD_SUCCESS            0
-#define WIFI_FW_DOWNLOAD_INVALID_PARAM      1
-#define WIFI_FW_DOWNLOAD_INVALID_CRC        2
-#define WIFI_FW_DOWNLOAD_DECRYPTION_FAIL    3
-#define WIFI_FW_DOWNLOAD_UNKNOWN_CMD        4
-#define WIFI_FW_DOWNLOAD_TIMEOUT            5
-#define WIFI_FW_DOWNLOAD_SEC_BOOT_CHK_FAIL  6
 
 #if CFG_SUPPORT_COMPRESSION_FW_OPTION
 #define WIFI_FW_DECOMPRESSION_FAILED        0xFF
@@ -264,38 +226,8 @@ struct INIT_CMD_PATCH_SEMA_CONTROL {
 
 struct INIT_CMD_PATCH_FINISH {
 	uint8_t ucCheckCrc;
-#if CFG_SUPPORT_WIFI_DL_BT_PATCH || CFG_SUPPORT_WIFI_DL_ZB_PATCH
-	uint8_t ucType;
-	uint8_t aucReserved[2];
-#else
 	uint8_t aucReserved[3];
-#endif
 };
-
-#if CFG_SUPPORT_WIFI_DL_BT_PATCH
-struct INIT_CMD_BT_PATCH_SEMA_CTRL {
-	uint8_t ucGetSemaphore;
-	uint8_t aucReserved[3];
-	uint32_t u4Addr;
-	uint8_t aucReserved1[4];
-};
-
-struct INIT_EVENT_BT_PATCH_SEMA_CTRL_T {
-	uint8_t ucStatus; /* refer to enum ENUM_INIT_PATCH_STATUS */
-	uint8_t ucReserved[3];
-	uint32_t u4RemapAddr;
-	uint8_t ucReserved1[4];
-};
-#endif /* CFG_SUPPORT_WIFI_DL_BT_PATCH */
-
-#if CFG_SUPPORT_WIFI_DL_ZB_PATCH
-struct INIT_CMD_ZB_PATCH_SEMA_CTRL {
-	uint8_t ucGetSemaphore;
-	uint8_t aucReserved[3];
-	uint32_t u4Addr;
-	uint32_t u4SecInfo; /* Only this field is different to BT's */
-};
-#endif /* CFG_SUPPORT_WIFI_DL_ZB_PATCH */
 
 struct INIT_CMD_ACCESS_REG {
 	uint8_t ucSetQuery;
@@ -323,9 +255,7 @@ enum ENUM_HAL_PHY_ACTION_STATUS {
 
 struct INIT_CMD_PHY_ACTION_CAL {
 	uint8_t ucCmd;
-	uint8_t ucCalSaveResult;
-	uint8_t ucSkipCal;
-	uint8_t aucReserved[1];
+	uint8_t aucReserved[3];
 };
 
 struct INIT_EVENT_PHY_ACTION_RSP {
@@ -368,85 +298,6 @@ struct INIT_HIF_RX_HEADER {
 struct INIT_EVENT_ACCESS_REG {
 	uint32_t u4Address;
 	uint32_t u4Data;
-};
-
-enum FW_LOG_CMD_CTRL_TYPE {
-	FW_LOG_CTRL_CMD_GET_BASE_ADDR,
-	FW_LOG_CTRL_CMD_UPDATE_MCU_READ,
-	FW_LOG_CTRL_CMD_UPDATE_WIFI_READ,
-	FW_LOG_CTRL_CMD_UPDATE_BT_READ,
-	FW_LOG_CTRL_CMD_UPDATE_GPS_READ,
-	FW_LOG_CTRL_CMD_NUM
-};
-
-struct INIT_CMD_LOG_BUF_CTRL {
-	uint32_t u4Address_MCU;
-	uint32_t u4Address_WIFI;
-	uint32_t u4Address_BT;
-	uint32_t u4Address_GPS;
-	/*
-	 * BIT[0]:Log buffer control block base address
-	 * BIT[1~4]: Update MCU/WiFi/BT/GPS read pointer
-	 */
-	uint8_t ucType;
-	uint8_t aucReserved[3];
-};
-
-struct INIT_WIFI_EVENT_LOG_BUF_CTRL {
-	/*
-	 * BIT[0]:Log buffer control block base address
-	 * BIT[1~4]: Update MCU/WiFi/BT/GPS read pointer
-	 */
-	uint8_t ucType;
-	uint8_t ucStatus;
-	uint8_t aucReserved[2];
-	uint32_t u4Address;
-	uint32_t u4Reserved;
-};
-
-enum INIT_CMD_QUERY_TYPE {
-	INIT_CMD_QUERY_TYPE_PMIC_INFO = 0,
-	INIT_CMD_QUERY_TYPE_FWDL_EMI_SIZE,
-	INIT_CMD_QUERY_TYPE_NUM
-};
-
-struct INIT_CMD_QUERY_INFO {
-	uint32_t u4QueryBitmap;
-	uint8_t aucReserved[4];
-};
-
-struct INIT_EVENT_QUERY_INFO {
-	uint16_t u2TotalElementNum;
-	uint16_t u2Length;
-	uint8_t aucTlvBuffer[0];
-};
-
-struct INIT_EVENT_TLV_GENERAL {
-	uint16_t u2Tag;
-	uint16_t u2Length;
-	uint8_t aucBuffer[0];
-};
-
-struct INIT_EVENT_QUERY_INFO_PMIC {
-	uint32_t u4PmicId;
-	uint32_t u4Length;
-	uint8_t aucPMICCoreDumpbuf[0];
-};
-
-struct INIT_EVENT_QUERY_INFO_FWDL_EMI_SIZE {
-	uint32_t u4Length;
-};
-
-struct INIT_CMD_EMI_FW_DOWNLOAD_CONFIG {
-	uint32_t u4Address;
-	uint32_t u4Length;
-	uint32_t u4DataMode;
-};
-
-struct INIT_CMD_EMI_FW_TRIGGER_AXI_DMA {
-	uint32_t u4DownloadSize;
-	uint8_t ucDoneBit;
-	uint8_t aucReserved[3];
 };
 
 /*******************************************************************************

@@ -56,6 +56,7 @@
 #endif
 #endif
 #include <linux/proc_fs.h>
+#include <linux/thermal.h>
 #include <mtk_wcn_cmb_stub.h>
 #include "osal_typedef.h"
 #include "osal.h"
@@ -120,7 +121,6 @@
 #define WMT_IOCTL_FW_PATCH_UPDATE_RST	_IOR(WMT_IOC_MAGIC, 34, int)
 #define WMT_IOCTL_GET_VENDOR_PATCH_NUM		_IOW(WMT_IOC_MAGIC, 35, int)
 #define WMT_IOCTL_GET_VENDOR_PATCH_VERSION	_IOR(WMT_IOC_MAGIC, 36, char*)
-#define WMT_IOCTL_SET_VENDOR_PATCH_VERSION	_IOW(WMT_IOC_MAGIC, 37, char*)
 #define WMT_IOCTL_GET_CHECK_PATCH_STATUS	_IOR(WMT_IOC_MAGIC, 38, int)
 #define WMT_IOCTL_SET_CHECK_PATCH_STATUS	_IOW(WMT_IOC_MAGIC, 39, int)
 #define WMT_IOCTL_SET_ACTIVE_PATCH_VERSION	_IOR(WMT_IOC_MAGIC, 40, char*)
@@ -176,7 +176,7 @@ struct device *wmt_dev;
 
 /*LCM on/off ctrl for wmt varabile*/
 UINT32 hif_info;
-UINT8 gWmtClose;
+UINT8 gWmtClose = 1;
 static struct work_struct gPwrOnOffWork;
 static atomic_t g_es_lr_flag_for_quick_sleep = ATOMIC_INIT(1); /* for ctrl quick sleep flag */
 static atomic_t g_es_lr_flag_for_lpbk_onoff = ATOMIC_INIT(0); /* for ctrl lpbk on off */
@@ -623,6 +623,9 @@ LONG wmt_dev_tm_temp_query(VOID)
 	INT32 index = 0;
 	LONG return_temp = 0;
 	INT8 query_cond = 0;
+
+	if (gWmtClose != 0)
+		return THERMAL_TEMP_INVALID;
 
 	/* Let us work on the copied version of function static variables */
 	osal_lock_unsleepable_lock(&g_temp_query_spinlock);
@@ -1374,24 +1377,6 @@ LONG WMT_unlocked_ioctl(struct file *filp, UINT32 cmd, ULONG arg)
 	case WMT_IOCTL_GET_VENDOR_PATCH_NUM:
 		iRet = wmt_lib_get_vendor_patch_num();
 		break;
-	case WMT_IOCTL_SET_VENDOR_PATCH_VERSION:
-		do {
-			struct wmt_vendor_patch patch;
-
-			if (copy_from_user(&patch, (PVOID)arg,
-				sizeof(struct wmt_vendor_patch))) {
-				WMT_ERR_FUNC("copy_from_user failed at %d\n", __LINE__);
-				iRet = -EFAULT;
-				break;
-			}
-
-			iRet = wmt_lib_set_vendor_patch_version(&patch);
-			if (iRet) {
-				iRet = -EFAULT;
-				break;
-			}
-		} while (0);
-		break;
 	case WMT_IOCTL_GET_VENDOR_PATCH_VERSION:
 		do {
 			struct wmt_vendor_patch patch;
@@ -1719,7 +1704,9 @@ static INT32 WMT_init(VOID)
 #else
 	wmt_fb_notifier.notifier_call = wmt_fb_notifier_callback;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
 	ret = mtk_disp_notifier_register("wmt_driver", &wmt_fb_notifier);
+#endif
 #else
 	ret = fb_register_client(&wmt_fb_notifier);
 #endif
@@ -1781,7 +1768,9 @@ static VOID WMT_exit(VOID)
 	WMT_INFO_FUNC("unregister_early_suspend finished\n");
 #else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 10, 0))
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
 	mtk_disp_notifier_unregister(&wmt_fb_notifier);
+#endif
 #else
 	fb_unregister_client(&wmt_fb_notifier);
 #endif

@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-
 /*
  * Copyright (c) 2020 MediaTek Inc.
  */
 /*
- * Id: @(#) gl_nan.c@@
+ ** Id: @(#) gl_nan.c@@
  */
-/*
+
+/*! \file   gl_nan.c
  *    \brief  Main routines of Linux driver interface for Wi-Fi Aware
  *
  *    This file contains the main routines of Linux driver for MediaTek Inc.
@@ -110,24 +110,19 @@ const struct iw_handler_def mtk_p2p_wext_handler_def = {
  */
 
 /* Net Device Hooks */
-static int nanOpen(struct net_device *prDev);
+static int nanOpen(IN struct net_device *prDev);
 
-static int nanStop(struct net_device *prDev);
+static int nanStop(IN struct net_device *prDev);
 
-static struct net_device_stats *nanGetStats(struct net_device *prDev);
+static struct net_device_stats *nanGetStats(IN struct net_device *prDev);
 
-static void nanSetMulticastList(struct net_device *prDev);
+static void nanSetMulticastList(IN struct net_device *prDev);
 
-static netdev_tx_t nanHardStartXmit(struct sk_buff *prSkb,
-				    struct net_device *prDev);
+static netdev_tx_t nanHardStartXmit(IN struct sk_buff *prSkb,
+				    IN struct net_device *prDev);
 
 static int nanDoIOCTL(struct net_device *prDev, struct ifreq *prIFReq,
 		      int i4Cmd);
-
-#if KERNEL_VERSION(5, 15, 0) <= CFG80211_VERSION_CODE
-static int nanDoPrivIOCTL(struct net_device *prDev, struct ifreq *prIfReq,
-		void __user *prData, int i4Cmd);
-#endif
 
 /*----------------------------------------------------------------------------*/
 /*!
@@ -157,16 +152,13 @@ nanInit(struct net_device *prDev) {
  */
 /*----------------------------------------------------------------------------*/
 static void
-nanUninit(struct net_device *prDev) {}
+nanUninit(IN struct net_device *prDev) {}
 const struct net_device_ops nan_netdev_ops = {
 	.ndo_open = nanOpen,
 	.ndo_stop = nanStop,
 	.ndo_set_rx_mode = nanSetMulticastList,
 	.ndo_get_stats = nanGetStats,
 	.ndo_do_ioctl = nanDoIOCTL,
-#if KERNEL_VERSION(5, 15, 0) <= CFG80211_VERSION_CODE
-	.ndo_siocdevprivate = nanDoPrivIOCTL,
-#endif
 	.ndo_start_xmit = nanHardStartXmit,
 	.ndo_select_queue = wlanSelectQueue,
 	.ndo_init = nanInit,
@@ -189,7 +181,7 @@ const struct net_device_ops nan_netdev_ops = {
  */
 /*----------------------------------------------------------------------------*/
 unsigned char
-nanAllocInfo(struct GLUE_INFO *prGlueInfo, uint8_t ucRoleIdx)
+nanAllocInfo(IN struct GLUE_INFO *prGlueInfo, uint8_t ucRoleIdx)
 {
 	struct ADAPTER *prAdapter = NULL;
 	struct WIFI_VAR *prWifiVar = NULL;
@@ -314,9 +306,9 @@ nanNetRegister(struct GLUE_INFO *prGlueInfo,
 	    unsigned char fgIsRtnlLockAcquired)
 {
 	unsigned char fgDoRegister = FALSE;
+	unsigned char fgRollbackRtnlLock = FALSE;
 	unsigned char ret;
 	enum NAN_BSS_ROLE_INDEX eRole = NAN_BSS_INDEX_BAND0;
-	int32_t i4RetReg = 0;
 
 	GLUE_SPIN_LOCK_DECLARATION();
 
@@ -341,6 +333,11 @@ nanNetRegister(struct GLUE_INFO *prGlueInfo,
 	if (!fgDoRegister)
 		return TRUE;
 
+	if (fgIsRtnlLockAcquired && rtnl_is_locked()) {
+		fgRollbackRtnlLock = TRUE;
+		rtnl_unlock();
+	}
+
 	ret = TRUE;
 	/* net device initialize */
 	netif_carrier_off(
@@ -348,21 +345,10 @@ nanNetRegister(struct GLUE_INFO *prGlueInfo,
 	netif_tx_stop_all_queues(
 		prGlueInfo->aprNANDevInfo[eRole]->prDevHandler);
 
-	if (fgIsRtnlLockAcquired) {
-#if KERNEL_VERSION(5, 12, 0) <= CFG80211_VERSION_CODE
-		i4RetReg = cfg80211_register_netdevice(
-		    prGlueInfo->aprNANDevInfo[eRole]->prDevHandler);
-#else
-		i4RetReg = register_netdevice(
-		    prGlueInfo->aprNANDevInfo[eRole]->prDevHandler);
-#endif
-	} else {
-		i4RetReg = register_netdev(
-		    prGlueInfo->aprNANDevInfo[eRole]->prDevHandler);
-	}
-
 	/* register for net device */
-	if (i4RetReg < 0) {
+	if (register_netdev(
+		    prGlueInfo->aprNANDevInfo[eRole]->prDevHandler) <
+	    0) {
 		DBGLOG(INIT, WARN,
 		       "unable to register netdevice for nan\n");
 		/* trunk doesn't do free_netdev here */
@@ -386,10 +372,14 @@ nanNetRegister(struct GLUE_INFO *prGlueInfo,
 #endif
 				);
 		rtnl_unlock();
+
 		netif_carrier_on(
 			prGlueInfo->aprNANDevInfo[eRole]->prDevHandler);
 #endif
 	}
+
+	if (fgRollbackRtnlLock)
+		rtnl_lock();
 
 	return ret;
 }
@@ -399,6 +389,7 @@ nanNetUnregister(struct GLUE_INFO *prGlueInfo,
 	    unsigned char fgIsRtnlLockAcquired)
 {
 	unsigned char fgDoUnregister = FALSE;
+	unsigned char fgRollbackRtnlLock = FALSE;
 	struct ADAPTER *prAdapter = NULL;
 	struct _GL_NAN_INFO_T *prNANInfo = NULL;
 	uint8_t ucIdx = NAN_BSS_INDEX_BAND0;
@@ -427,6 +418,9 @@ nanNetUnregister(struct GLUE_INFO *prGlueInfo,
 	if (!fgDoUnregister)
 		return TRUE;
 
+	if (fgIsRtnlLockAcquired && rtnl_is_locked())
+		fgRollbackRtnlLock = TRUE;
+
 	prNANInfo = prGlueInfo->aprNANDevInfo[ucIdx];
 	if (prNANInfo == NULL)
 		return FALSE;
@@ -451,16 +445,13 @@ nanNetUnregister(struct GLUE_INFO *prGlueInfo,
 
 	netif_tx_stop_all_queues(prNANInfo->prDevHandler);
 
-	if (fgIsRtnlLockAcquired) {
-#if KERNEL_VERSION(5, 12, 0) <= CFG80211_VERSION_CODE
-		cfg80211_unregister_netdevice(prNANInfo->prDevHandler);
-#else
-		unregister_netdevice(prNANInfo->prDevHandler);
-#endif
-	} else
-		unregister_netdev(prNANInfo->prDevHandler);
+	if (fgRollbackRtnlLock)
+		rtnl_unlock();
 
+	unregister_netdev(prNANInfo->prDevHandler);
 	DBGLOG(INIT, INFO, "unregister nandev\n");
+	if (fgRollbackRtnlLock)
+		rtnl_lock();
 
 	prGlueInfo->prAdapter->rNanNetRegState =
 		ENUM_NET_REG_STATE_UNREGISTERED;
@@ -516,7 +507,7 @@ glSetupNAN(struct GLUE_INFO *prGlueInfo, struct wireless_dev *prNanWdev,
 	prNANInfo = prGlueInfo->aprNANDevInfo[u4Idx];
 
 	if (!prAdapter->fgEnable5GBand)
-		prNanWdev->wiphy->bands[KAL_BAND_5GHZ] = NULL;
+		prNanWdev->wiphy->bands[BAND_5G] = NULL;
 	/* setup netdev */
 	/* Point to shared glue structure */
 	prNetDevPriv = (struct NETDEV_PRIVATE_GLUE_INFO *)netdev_priv(prNanDev);
@@ -878,18 +869,21 @@ glUnregisterNAN(struct GLUE_INFO *prGlueInfo)
 	/* uninitialize NAN Scheduler */
 	nanSchedUninit(prAdapter);
 
-	/* 4 <1> Uninit NAN dev FSM */
-	/* Uninit NAN device FSM */
-	/* only do nanDevFsmUninit, when unregister all nan device */
+	/* 4 <1> Uninit NAN dev FSM
+	 * Uninit NAN device FSM
+	 * only do nanDevFsmUninit, when unregister all nan device
+	 */
 	nanDevFsmUninit(prGlueInfo->prAdapter, ucIdx);
 
 	/* 4 <3> Free Wiphy & netdev */
 	prNANInfo = prGlueInfo->aprNANDevInfo[ucIdx];
 	if (prNANInfo == NULL)
 		return TRUE;
+
 	{
 		/* don't unregister the dev that share with the AIS */
 		uint32_t u4Idx = 0;
+
 		for (u4Idx = 0; u4Idx < KAL_AIS_NUM; u4Idx++) {
 
 			if (gprWdev[u4Idx] &&
@@ -1022,7 +1016,7 @@ nanSetSuspendMode(struct GLUE_INFO *prGlueInfo, unsigned char fgEnable)
  */
 /*----------------------------------------------------------------------------*/
 static int
-nanOpen(struct net_device *prDev)
+nanOpen(IN struct net_device *prDev)
 {
 	/* P_GLUE_INFO_T prGlueInfo = NULL; */
 	/* P_ADAPTER_T prAdapter = NULL; */
@@ -1052,7 +1046,7 @@ nanOpen(struct net_device *prDev)
  */
 /*----------------------------------------------------------------------------*/
 static int
-nanStop(struct net_device *prDev)
+nanStop(IN struct net_device *prDev)
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct ADAPTER *prAdapter = NULL;
@@ -1117,13 +1111,13 @@ nanStop(struct net_device *prDev)
  */
 /*----------------------------------------------------------------------------*/
 struct net_device_stats *
-nanGetStats(struct net_device *prDev)
+nanGetStats(IN struct net_device *prDev)
 {
 	return (struct net_device_stats *)kalGetStats(prDev);
 } /* end of nanGetStats() */
 
 static void
-nanSetMulticastList(struct net_device *prDev)
+nanSetMulticastList(IN struct net_device *prDev)
 {
 	struct GLUE_INFO *prGlueInfo = (struct GLUE_INFO *)NULL;
 	uint8_t ucRoleIdx = NAN_BSS_INDEX_BAND0;
@@ -1141,7 +1135,9 @@ nanSetMulticastList(struct net_device *prDev)
 	/* TO-DO MulticastList Support */
 	if (g_aprNanMultiDev[ucRoleIdx].fgBMCFilterSet == FALSE) {
 		g_aprNanMultiDev[ucRoleIdx].fgBMCFilterSet = TRUE;
-		/* Mark HALT, notify main thread to finish current job */
+		/* Mark HALT, notify main thread to
+		 * finish current job
+		 */
 		set_bit(GLUE_FLAG_NAN_MULTICAST_BIT,
 			&prGlueInfo->ulFlag);
 		/* wake up main thread */
@@ -1162,7 +1158,7 @@ nanSetMulticastList(struct net_device *prDev)
  */
 /*----------------------------------------------------------------------------*/
 netdev_tx_t
-nanHardStartXmit(struct sk_buff *prSkb, struct net_device *prDev)
+nanHardStartXmit(IN struct sk_buff *prSkb, IN struct net_device *prDev)
 {
 	struct NETDEV_PRIVATE_GLUE_INFO *prNetDevPrivate =
 		(struct NETDEV_PRIVATE_GLUE_INFO *)NULL;
@@ -1393,15 +1389,6 @@ nanDoIOCTL(struct net_device *prDev, struct ifreq *prIfReq, int i4Cmd)
 	return ret;
 } /* end of p2pDoIOCTL() */
 
-#if KERNEL_VERSION(5, 15, 0) <= CFG80211_VERSION_CODE
-int nanDoPrivIOCTL(struct net_device *prDev, struct ifreq *prIfReq,
-		void __user *prData, int i4Cmd)
-{
-	return nanDoIOCTL(prDev, prIfReq, i4Cmd);
-}
-#endif
-
-
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief To report the private supported IOCTLs table to user space.
@@ -1417,9 +1404,9 @@ int nanDoPrivIOCTL(struct net_device *prDev, struct ifreq *prIfReq,
  */
 /*----------------------------------------------------------------------------*/
 int
-mtk_nan_wext_get_priv(struct net_device *prDev,
-		      struct iw_request_info *info,
-		      union iwreq_data *wrqu, char *extra)
+mtk_nan_wext_get_priv(IN struct net_device *prDev,
+		      IN struct iw_request_info *info,
+		      IN OUT union iwreq_data *wrqu, IN OUT char *extra)
 {
 	struct iw_point *prData = (struct iw_point *)&wrqu->data;
 	uint16_t u2BufferSize = 0;

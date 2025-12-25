@@ -32,13 +32,13 @@ static wait_queue_head_t wq;
 
 static int fw_log_wmt_open(struct inode *inode, struct file *file)
 {
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
 static int fw_log_wmt_close(struct inode *inode, struct file *file)
 {
-	pr_info("%s\n", __func__);
+	pr_debug("%s\n", __func__);
 	return 0;
 }
 
@@ -61,8 +61,6 @@ static ssize_t fw_log_wmt_write(struct file *filp, const char __user *buf,
 
 static unsigned int fw_log_wmt_poll(struct file *filp, poll_table *wait)
 {
-	pr_debug("%s\n", __func__);
-
 	poll_wait(filp, &wq, wait);
 	if (connsys_log_get_buf_size(CONNLOG_TYPE_MCU) > 0)
 		return POLLIN | POLLRDNORM;

@@ -24,17 +24,6 @@
  */
 
 /*******************************************************************************
-*			      D A T A	T Y P E S
-********************************************************************************
-*/
-enum ENUM_THERMAL_PROTECT_LEVEL {
-	THERMAL_PROTECT_LEVEL_0 = 0,
-	THERMAL_PROTECT_LEVEL_1,
-	THERMAL_PROTECT_LEVEL_2,
-	THERMAL_PROTECT_LEVEL_3
-};
-
-/*******************************************************************************
  *            F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
  */
@@ -49,24 +38,20 @@ enum ENUM_THERMAL_PROTECT_LEVEL {
 ********************************************************************************
 */
 
-#define THRM_PROT_CHECKTIME_PASSIVE	30
-#define THRM_PROT_CHECKTIME_AGGRESIVE	10
-
-#define THRM_PROT_DUTY_FORCE_50		50
-#define THRM_PROT_DUTY_NORMAL		100
-#define THRM_PROT_DUTY_MIN		20
-#define THRM_PROT_DUTY_LEVEL_OFFSET	5
-
+#define THRM_PROT_CHECKTIME_PASSIVE 30
+#define THRM_PROT_CHECKTIME_AGGRESIVE 10
+#define THRM_PROT_DUTY_FORCE_50 50
+#define THRM_PROT_DUTY_NORMAL 100
 
 /*******************************************************************************
  *            P R I V A T E  F U N C T I O N S
  *******************************************************************************
  */
 
-uint32_t thrmProtEnable(struct ADAPTER *prAdapter, uint8_t ucBand,
-			uint8_t ucProtType, uint8_t ucTrigType,
-			int32_t i4TrigTemp, int32_t i4RestoreTemp,
-			uint32_t u4CheckTime)
+uint32_t thrmProtEnable(IN struct ADAPTER *prAdapter, IN uint8_t ucBand,
+			IN uint8_t ucProtType, IN uint8_t ucTrigType,
+			IN int32_t i4TrigTemp, IN int32_t i4RestoreTemp,
+			IN uint32_t u4CheckTime)
 {
 	struct EXT_CMD_THERMAL_PROTECT_ENABLE *ext_cmd_buf;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
@@ -102,8 +87,8 @@ uint32_t thrmProtEnable(struct ADAPTER *prAdapter, uint8_t ucBand,
 	return rStatus;
 }
 
-uint32_t thrmProtDisable(struct ADAPTER *prAdapter, uint8_t ucBand,
-		uint8_t ucProtType, uint8_t ucTrigType)
+uint32_t thrmProtDisable(IN struct ADAPTER *prAdapter, IN uint8_t ucBand,
+		IN uint8_t ucProtType, IN uint8_t ucTrigType)
 {
 	struct EXT_CMD_THERMAL_PROTECT_DISABLE *ext_cmd_buf;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
@@ -135,8 +120,8 @@ uint32_t thrmProtDisable(struct ADAPTER *prAdapter, uint8_t ucBand,
 	return rStatus;
 }
 
-uint32_t thrmProtDutyCfg(struct ADAPTER *prAdapter, uint8_t ucBand,
-	uint8_t ucLevel, uint8_t ucDuty)
+uint32_t thrmProtDutyCfg(IN struct ADAPTER *prAdapter, IN uint8_t ucBand,
+	IN uint8_t ucLevel, IN uint8_t ucDuty)
 {
 	struct EXT_CMD_THERMAL_PROTECT_DUTY_CFG *ext_cmd_buf;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
@@ -169,8 +154,8 @@ uint32_t thrmProtDutyCfg(struct ADAPTER *prAdapter, uint8_t ucBand,
 	return rStatus;
 }
 
-uint32_t thrmProtStateAct(struct ADAPTER *prAdapter, uint8_t ucBand,
-	uint8_t ucProtType, uint8_t ucTrigType, uint8_t ucState)
+uint32_t thrmProtStateAct(IN struct ADAPTER *prAdapter, IN uint8_t ucBand,
+	IN uint8_t ucProtType, IN uint8_t ucTrigType, IN uint8_t ucState)
 {
 	struct EXT_CMD_THERMAL_PROTECT_STATE_ACT *ext_cmd_buf;
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
@@ -203,11 +188,37 @@ uint32_t thrmProtStateAct(struct ADAPTER *prAdapter, uint8_t ucBand,
 	return rStatus;
 }
 
-void thrmProtEventHandler(struct ADAPTER *prAdapter, uint8_t *prBuf)
+uint32_t thrmProtTempConfig(IN struct ADAPTER *prAdapter,
+			IN int32_t i4TrigTemp, IN int32_t i4RestoreTemp)
+{
+	prAdapter->rThrmProtCfg.i4TrigTemp = i4TrigTemp;
+	prAdapter->rThrmProtCfg.i4RestoreTemp = i4RestoreTemp;
+
+	if (prAdapter->rThrmProtCfg.ucLevel == CONN_PWR_THR_LV_5)
+		return WLAN_STATUS_SUCCESS;
+
+	if (prAdapter->rThrmProtCfg.ucMode > THERMAL_PROTECT_MODE_DISABLED) {
+		thrmProtDisable(prAdapter, ENUM_BAND_0,
+			THERMAL_PROTECT_TYPE_DUTY_CTRL,
+			THERMAL_PROTECT_HIGH_TRIG);
+	}
+
+	DBGLOG(NIC, INFO, "Enable thermal monitor, trigger: %d, restore: %d\n",
+					prAdapter->rThrmProtCfg.i4TrigTemp,
+					prAdapter->rThrmProtCfg.i4RestoreTemp);
+
+	return thrmProtEnable(prAdapter, ENUM_BAND_0,
+			THERMAL_PROTECT_TYPE_DUTY_CTRL,
+			THERMAL_PROTECT_HIGH_TRIG,
+			i4TrigTemp, i4RestoreTemp,
+			THRM_PROT_CHECKTIME_PASSIVE);
+}
+
+void thrmProtEventHandler(IN struct ADAPTER *prAdapter, IN uint8_t *prBuf)
 {
 	uint8_t ucEventId = (uint8_t) *(prBuf);
 
-	DBGLOG(NIC, TRACE, "Thermal protect event: %d\n", ucEventId);
+	DBGLOG(NIC, INFO, "Thermal protect event: %d\n", ucEventId);
 
 	switch (ucEventId) {
 	case THERMAL_PROTECT_EVENT_DUTY_NOTIFY:
@@ -216,157 +227,120 @@ void thrmProtEventHandler(struct ADAPTER *prAdapter, uint8_t *prBuf)
 
 		prEvent =
 			(struct EXT_EVENT_THERMAL_PROTECT_DUTY_NOTIFY *) prBuf;
-		DBGLOG(NIC, INFO,
-			"Duty Event, Band[%d] Level[%d], Duty[%d], Temp[%d]\n",
-			prEvent->u1BandIdx, prEvent->u1LevelIdx,
-			prEvent->u1DutyPercent, prEvent->i4Temp);
+		DBGLOG(NIC, INFO, "Duty Event, level: %d, duty: %d, temp: %d\n",
+			prEvent->u1LevelIdx, prEvent->u1DutyPercent,
+			prEvent->i4Temp);
 
-	}
+		if (prEvent->i4Temp > prAdapter->rThrmProtCfg.i4TrigTemp) {
+			connsysPowerTempUpdate(CONN_PWR_MSG_TEMP_TOO_HIGH,
+						prEvent->i4Temp);
+			/* Transit to aggressive monitor mode.*/
+			if (prAdapter->rThrmProtCfg.ucMode ==
+					THERMAL_PROTECT_MODE_PASSIVE) {
 
-	break;
+				thrmProtDisable(prAdapter, ENUM_BAND_0,
+					THERMAL_PROTECT_TYPE_DUTY_CTRL,
+					THERMAL_PROTECT_HIGH_TRIG);
 
-	case THERMAL_PROTECT_EVENT_RADIO_NOTIFY:
-	{
-		struct EXT_EVENT_THERMAL_PROTECT_RADIO_NOTIFY *prEvent;
+				thrmProtEnable(prAdapter, ENUM_BAND_0,
+					THERMAL_PROTECT_TYPE_DUTY_CTRL,
+					THERMAL_PROTECT_HIGH_TRIG,
+					prAdapter->rThrmProtCfg.i4TrigTemp,
+					prAdapter->rThrmProtCfg.i4RestoreTemp,
+					THRM_PROT_CHECKTIME_AGGRESIVE);
 
-		prEvent =
-			(struct EXT_EVENT_THERMAL_PROTECT_RADIO_NOTIFY *) prBuf;
+				prAdapter->rThrmProtCfg.ucMode =
+					THERMAL_PROTECT_MODE_AGGRESSIVE;
+			}
+		} else if (prAdapter->rThrmProtCfg.ucMode ==
+				THERMAL_PROTECT_MODE_AGGRESSIVE &&
+				prEvent->i4Temp <
+				prAdapter->rThrmProtCfg.i4RestoreTemp) {
 
-		DBGLOG(NIC, TRACE,
-			"Radio event, Band[%d] Level[%d] Temp[%d] Action[%d]\n",
-			prEvent->u1BandIdx, prEvent->u1LevelIdx,
-			prEvent->i4Temp, prEvent->eProtectActType);
-	}
-	break;
-	case THERMAL_PROTECT_EVENT_MECH_INFO:
-	{
-		struct EXT_EVENT_THERMAL_PROTECT_MECH_INFO *prEvent;
-		uint8_t i = 0;
+			connsysPowerTempUpdate(CONN_PWR_MSG_TEMP_RECOVERY,
+						prEvent->i4Temp);
 
-		prEvent =
-			(struct EXT_EVENT_THERMAL_PROTECT_MECH_INFO *) prBuf;
-		for (i = THERMAL_PROTECT_TYPE_NTX_CTRL;
-			i < THERMAL_PROTECT_TYPE_NUM; i++) {
+			thrmProtDisable(prAdapter, ENUM_BAND_0,
+						THERMAL_PROTECT_TYPE_DUTY_CTRL,
+						THERMAL_PROTECT_HIGH_TRIG);
 
-			DBGLOG(NIC, INFO,
-				"MechInfo[%d/%d/%d/%d/%d/%d/%d]",
-				prEvent->u1ProtectionType[i],
-				prEvent->u1TriggerType[i],
-				prEvent->i4TriggerTemp[i],
-				prEvent->i4RestoreTemp[i],
-				prEvent->u2RecheckTime[i],
-				prEvent->u1State[i],
-				prEvent->fgEnable[i]);
+			thrmProtEnable(prAdapter, ENUM_BAND_0,
+					THERMAL_PROTECT_TYPE_DUTY_CTRL,
+					THERMAL_PROTECT_HIGH_TRIG,
+					prAdapter->rThrmProtCfg.i4TrigTemp,
+					prAdapter->rThrmProtCfg.i4RestoreTemp,
+					THRM_PROT_CHECKTIME_PASSIVE);
+
+			prAdapter->rThrmProtCfg.ucMode =
+				THERMAL_PROTECT_MODE_PASSIVE;
+
 		}
-	}
 		break;
-	case THERMAL_PROTECT_EVENT_DUTY_INFO:
-	{
-		struct EXT_EVENT_THERMAL_PROTECT_DUTY_INFO *prEvent;
-
-		prEvent =
-			(struct EXT_EVENT_THERMAL_PROTECT_DUTY_INFO *) prBuf;
-
-		DBGLOG(NIC, INFO,
-			"Duty Info, Band[%d] Duty[%d/%d/%d/%d]\n",
-			prEvent->u1BandIdx, prEvent->u1Duty0, prEvent->u1Duty1,
-			prEvent->u1Duty2, prEvent->u1Duty3);
 	}
-		break;
 	default:
 		break;
 	}
 }
 
-void thrmProtUpdateDutyCfg(struct ADAPTER *prAdapter, uint8_t ucDuty)
+int thrmProtLvHandler(IN struct ADAPTER *prAdapter, IN uint8_t ucLevel)
 {
-	uint8_t i = 0, j = 0;
-
-	for (i = ENUM_BAND_0; i < ENUM_BAND_NUM; i++) {
-
-		thrmProtDisable(prAdapter, i,
-				THERMAL_PROTECT_TYPE_DUTY_CTRL,
-				THERMAL_PROTECT_HIGH_TRIG);
-
-		/* Init duty contorl */
-		for (j = 0; j <= THERMAL_PROTECT_LEVEL_3; j++) {
-			thrmProtDutyCfg(prAdapter, i, j,
-				ucDuty -
-				(j * THRM_PROT_DUTY_LEVEL_OFFSET));
-		}
-
-		thrmProtEnable(prAdapter, i,
-			THERMAL_PROTECT_TYPE_DUTY_CTRL,
-			THERMAL_PROTECT_HIGH_TRIG,
-			prAdapter->rWifiVar.i4ThrmCtrlTemp,
-			(prAdapter->rWifiVar.i4ThrmCtrlTemp -
-				THRM_PROT_RESTORE_TEMP_OFFSET),
-			THRM_PROT_CHECKTIME_PASSIVE);
-	}
-	prAdapter->rThrmProtCfg.ucCurrDutyCfg = ucDuty;
-}
-
-int thrmProtLvHandler(struct ADAPTER *prAdapter, uint8_t ucLevel)
-{
-	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
 	uint8_t ucOrigLevel;
-	uint8_t i = 0;
 
 	ucOrigLevel = prAdapter->rThrmProtCfg.ucLevel;
-
-	DBGLOG(NIC, INFO, "Lv[%d/%d] Duty[%d/%d]\n", ucLevel,
-		    ucOrigLevel, prAdapter->rThrmProtCfg.ucCurrDutyCfg,
-			prAdapter->rWifiVar.aucThrmLvTxDuty[ucLevel]);
-
 	prAdapter->rThrmProtCfg.ucLevel = ucLevel;
 
-	if (ucOrigLevel == CONN_PWR_THR_LV_MAX)
+	if (prAdapter->rThrmProtCfg.i4TrigTemp == 0)
 		return 0;
 
-	if (prAdapter->rThrmProtCfg.ucCurrDutyCfg == 0) {
-		DBGLOG(NIC, INFO, "Enable radio off control.\n");
-		for (i = ENUM_BAND_0; i < ENUM_BAND_NUM; i++) {
-			/* Init radio off control */
-			thrmProtEnable(prAdapter, i,
-				THERMAL_PROTECT_TYPE_RADIO_CTRL,
+	if (ucLevel == CONN_PWR_THR_LV_5) {
+		if (prAdapter->rThrmProtCfg.ucMode ==
+				THERMAL_PROTECT_MODE_FORCE_DUTY_50)
+			return 0;
+
+		/* Disable existing passive thermal monitor */
+		if (prAdapter->rThrmProtCfg.ucMode ==
+				THERMAL_PROTECT_MODE_PASSIVE)
+
+			thrmProtDisable(prAdapter, ENUM_BAND_0,
+					THERMAL_PROTECT_TYPE_DUTY_CTRL,
+					THERMAL_PROTECT_HIGH_TRIG);
+
+		/* Enable aggressive thermal monitor */
+		if (prAdapter->rThrmProtCfg.ucMode <
+				THERMAL_PROTECT_MODE_AGGRESSIVE)
+
+			thrmProtEnable(prAdapter, ENUM_BAND_0,
+				THERMAL_PROTECT_TYPE_DUTY_CTRL,
 				THERMAL_PROTECT_HIGH_TRIG,
-				prWifiVar->i4ThrmRadioOffTemp,
-				(prWifiVar->i4ThrmRadioOffTemp -
-				THRM_PROT_RESTORE_TEMP_OFFSET),
-				THRM_PROT_CHECKTIME_PASSIVE);
-		}
-	}
+				prAdapter->rThrmProtCfg.i4TrigTemp,
+				prAdapter->rThrmProtCfg.i4RestoreTemp,
+				THRM_PROT_CHECKTIME_AGGRESIVE);
 
+		prAdapter->rThrmProtCfg.ucMode =
+			THERMAL_PROTECT_MODE_FORCE_DUTY_50;
 
-	if (prAdapter->rWifiVar.aucThrmLvTxDuty[ucLevel] !=
-		prAdapter->rThrmProtCfg.ucCurrDutyCfg) {
+		thrmProtDutyCfg(prAdapter, ENUM_BAND_0, 3,
+					THRM_PROT_DUTY_FORCE_50);
 
-		if (prAdapter->rWifiVar.aucThrmLvTxDuty[ucLevel] >
-			THRM_PROT_DUTY_MIN)
-			DBGLOG(NIC, WARN, "Invalid level duty[%d]\n",
-				prAdapter->rWifiVar.aucThrmLvTxDuty[ucLevel]);
+		thrmProtStateAct(prAdapter, ENUM_BAND_0,
+					THERMAL_PROTECT_TYPE_DUTY_CTRL,
+					THERMAL_PROTECT_HIGH_TRIG, 3);
 
-		thrmProtUpdateDutyCfg(prAdapter,
-			prAdapter->rWifiVar.aucThrmLvTxDuty[ucLevel]);
+		DBGLOG(NIC, INFO, "Force enter thermal level 3, duty: %d\n",
+			THRM_PROT_DUTY_FORCE_50);
+	} else {
+		if (ucOrigLevel == CONN_PWR_THR_LV_5)
+			thrmProtDutyCfg(prAdapter, ENUM_BAND_0, 3,
+						THRM_PROT_DUTY_NORMAL);
 	}
 
 	return 0;
 }
 
-void thrmInit(struct ADAPTER *prAdapter)
+void thrmInit(IN struct ADAPTER *prAdapter)
 {
-	struct WIFI_VAR *prWifiVar = &prAdapter->rWifiVar;
-
-	DBGLOG(NIC, INFO, "Radio off temp[%d] Duty control temp[%d]\n",
-		prWifiVar->i4ThrmRadioOffTemp, prWifiVar->i4ThrmCtrlTemp);
-
-	prAdapter->rThrmProtCfg.ucLevel = CONN_PWR_THR_LV_MAX;
-
 	/* Register power level handler */
 	kalPwrLevelHdlrRegister(prAdapter, thrmProtLvHandler);
-
-	DBGLOG(NIC, INFO, "Duty[%d]\n",
-			prAdapter->rThrmProtCfg.ucCurrDutyCfg);
 }
 
 #endif

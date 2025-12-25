@@ -67,6 +67,10 @@
  *                    E X T E R N A L   R E F E R E N C E S
  *******************************************************************************
  */
+#if CFG_MTK_ANDROID_EMI
+extern phys_addr_t gConEmiPhyBaseFinal;
+extern unsigned long long gConEmiSizeFinal;
+#endif
 
 /*******************************************************************************
  *                              C O N S T A N T S
@@ -113,19 +117,7 @@
 #ifdef MAX_EEPROM_BUFFER_SIZE
 #undef MAX_EEPROM_BUFFER_SIZE
 #endif
-
-#ifdef BUFFER_BIN_PAGE_SIZE
-#undef BUFFER_BIN_PAGE_SIZE
-#endif
-
-#if defined MT7915 || defined MT7961
-#define MAX_EEPROM_BUFFER_SIZE	0xe00
-#define BUFFER_BIN_PAGE_SIZE 0x400
-#else
-//For Bellwether, Modify from 1200 to 6K and align to linux
-#define MAX_EEPROM_BUFFER_SIZE	6144 //6K
-#define BUFFER_BIN_PAGE_SIZE 0x400
-#endif
+#define MAX_EEPROM_BUFFER_SIZE	1200
 
 /*******************************************************************************
  *                    E X T E R N A L   R E F E R E N C E S
@@ -205,7 +197,6 @@ struct PARAM_RX_STAT {
 					 */
 };
 #else
-#if (CFG_SUPPORT_CONNAC3X == 0)
 struct PARAM_RX_STAT {
 	uint32_t MAC_FCS_Err;	/* b0 */
 	uint32_t MAC_Mdrdy;	/* b0 */
@@ -291,100 +282,10 @@ struct PARAM_RX_STAT {
 	uint32_t PER0;
 	uint32_t PER1;
 };
-#else
-struct TESTMODE_RX_STAT_BAND {
-	/* mac part */
-	uint32_t u4MacRxFcsErrCnt;
-	uint32_t u4MacRxLenMisMatch;
-	uint32_t u4MacRxFcsOkCnt;
-	uint32_t u4Reserved1[2];
-	uint32_t u4MacRxMdrdyCnt;
-
-	/* phy part */
-	uint32_t u4PhyRxFcsErrCntCck;
-	uint32_t u4PhyRxFcsErrCntOfdm;
-	uint32_t u4PhyRxPdCck;
-	uint32_t u4PhyRxPdOfdm;
-	uint32_t u4PhyRxSigErrCck;
-	uint32_t u4PhyRxSfdErrCck;
-	uint32_t u4PhyRxSigErrOfdm;
-	uint32_t u4PhyRxTagErrOfdm;
-	uint32_t u4PhyRxMdrdyCntCck;
-	uint32_t u4PhyRxMdrdyCntOfdm;
-};
-
-struct TESTMODE_RX_STAT_USER {
-	uint32_t u4FreqOffsetFromRx;
-	uint32_t u4Snr;
-	uint32_t u4FcsErrorCnt;
-};
-
-struct TESTMODE_RX_STAT_COMM {
-	uint32_t u4MacRxFifoFull;
-	uint32_t u4Reserved1[2];
-
-	uint32_t u4AciHitLow;
-	uint32_t u4AciHitHigh;
-};
-
-struct TESTMODE_RX_STAT_RXV {
-	uint32_t u4Rcpi;
-	uint32_t u4Rssi;
-	uint32_t u4Snr;
-	uint32_t u4AdcRssi;
-};
-
-struct TESTMODE_RX_STAT_RSSI {
-	uint32_t u4RssiIb;
-	uint32_t u4RssiWb;
-	uint32_t u4Reserved1[2];
-};
-
-struct TESTMODE_RX_STAT_BAND_EXT1 {
-	/* mac part */
-	uint32_t u4RxU2MMpduCnt;
-
-	/* phy part */
-	uint32_t u4Reserved[4];
-};
-
-struct TESTMODE_RX_STAT_COMM_EXT1 {
-	uint32_t u4DrvRxCnt;
-	uint32_t u4Sinr;
-	uint32_t u4MuRxCnt;
-	/* mac part */
-	uint32_t u4Reserved0[4];
-
-	/* phy part */
-	uint32_t u4EhtSigMcs;
-	uint32_t u4Reserved1[3];
-};
-
-struct TESTMODE_RX_STAT_USER_EXT1 {
-	uint32_t u4NeVarDbAllUser;
-	uint32_t u4Reserved1[3];
-};
-
-struct PARAM_RX_STAT {
-	struct TESTMODE_RX_STAT_BAND rInfoBand[UNI_TM_MAX_BAND_NUM];
-	struct TESTMODE_RX_STAT_BAND_EXT1 rInfoBandExt1[UNI_TM_MAX_BAND_NUM];
-	struct TESTMODE_RX_STAT_COMM rInfoComm[UNI_TM_MAX_BAND_NUM];
-	struct TESTMODE_RX_STAT_COMM_EXT1 rInfoCommExt1[UNI_TM_MAX_BAND_NUM];
-
-	/* rxv part */
-	struct TESTMODE_RX_STAT_RXV rInfoRXV[UNI_TM_MAX_ANT_NUM];
-
-	/* RSSI */
-	struct TESTMODE_RX_STAT_RSSI rInfoFagc[UNI_TM_MAX_ANT_NUM];
-	struct TESTMODE_RX_STAT_RSSI rInfoInst[UNI_TM_MAX_ANT_NUM];
-
-	/* User */
-	struct TESTMODE_RX_STAT_USER rInfoUser[UNI_TM_MAX_USER_NUM];
-	struct TESTMODE_RX_STAT_USER_EXT1 rInfoUserExt1[UNI_TM_MAX_USER_NUM];
-};
-#endif
 extern struct PARAM_RX_STAT g_HqaRxStat;
 #endif
+
+#define HQA_CMD_FRAME_DATA_SIZE	4096
 
 struct HQA_CMD_FRAME {
 	uint32_t MagicNo;
@@ -392,12 +293,12 @@ struct HQA_CMD_FRAME {
 	uint16_t Id;
 	uint16_t Length;
 	uint16_t Sequence;
-	uint8_t Data[4096];
+	uint8_t Data[HQA_CMD_FRAME_DATA_SIZE];
 } __KAL_ATTRIB_PACKED__;
 
 /* TODO: os-related, implement with correspoinding structure in OS */
 typedef int32_t(*HQA_CMD_HANDLER) (void *prNetDev,
-				   void *prIwReqData,
+				   IN void *prIwReqData,
 				   struct HQA_CMD_FRAME *HqaCmdFrame);
 
 struct HQA_CMD_TABLE {
@@ -406,7 +307,6 @@ struct HQA_CMD_TABLE {
 	uint32_t CmdOffset;
 };
 
-#if (CONFIG_WLAN_SERVICE == 1)
 struct PARAM_LIST_MODE_STATUS {
 	uint16_t    u2Status;
 	uint32_t    u4ExtId;
@@ -417,7 +317,7 @@ struct PARAM_LIST_MODE_STATUS {
 };
 
 extern struct list_mode_event g_HqaListModeStatus;
-#endif
+
 /*******************************************************************************
  *                   F U N C T I O N   D E C L A R A T I O N S
  *******************************************************************************
@@ -430,9 +330,9 @@ int HQA_CMDHandler(void *prNetDev,
 		   void *prIwReqData,
 		   struct HQA_CMD_FRAME *HqaCmdFrame);
 
-int priv_qa_agent(void *prNetDev,
-		  void *prIwReqInfo,
-		  void *prIwReqData, char *pcExtra);
+int priv_qa_agent(IN void *prNetDev,
+		  IN void *prIwReqInfo,
+		  IN void *prIwReqData, IN char *pcExtra);
 
 int32_t mt6632SetICapStart(struct GLUE_INFO *prGlueInfo,
 			   uint32_t u4Trigger, uint32_t u4RingCapEn,

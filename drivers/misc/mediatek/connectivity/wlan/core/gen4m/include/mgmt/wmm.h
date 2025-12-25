@@ -173,8 +173,8 @@ struct MSG_TS_OPERATE {
 
 extern uint8_t const aucUp2ACIMap[8];
 void wmmFillTsinfo(struct PARAM_QOS_TSINFO *prTsInfo, uint8_t *pucTsInfo);
-void wmmSetupTspecTimeOut(struct ADAPTER *prAdapter, uintptr_t ulParam);
-void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, uintptr_t ulParam,
+void wmmSetupTspecTimeOut(struct ADAPTER *prAdapter, unsigned long ulParam);
+void wmmStartTsmMeasurement(struct ADAPTER *prAdapter, unsigned long ulParam,
 	uint8_t ucBssIndex);
 void wmmRunEventTSOperate(struct ADAPTER *prAdapter, struct MSG_HDR *prMsgHdr);
 u_int8_t wmmParseQosAction(struct ADAPTER *prAdapter, struct SW_RFB *prSwRfb);
@@ -187,8 +187,8 @@ void wmmNotifyDisconnected(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 void wmmReSyncPsParamWithFw(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 void wmmComposeTsmRpt(struct ADAPTER *prAdapter, struct CMD_INFO *prCmdInfo,
 		      uint8_t *pucEventBuf);
-void wmmInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
-void wmmUnInit(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
+void wmmInit(IN struct ADAPTER *prAdapter);
+void wmmUnInit(IN struct ADAPTER *prAdapter);
 u_int8_t wmmTsmIsOngoing(struct ADAPTER *prAdapter, uint8_t ucBssIndex);
 void wmmRemoveAllTsmMeasurement(struct ADAPTER *prAdapter,
 	u_int8_t fgOnlyTriggered, uint8_t ucBssIndex);
@@ -197,9 +197,6 @@ uint8_t wmmCalculateUapsdSetting(struct ADAPTER *prAdapter,
 uint32_t wmmDumpActiveTspecs(struct ADAPTER *prAdapter, uint8_t *pucBuffer,
 	uint16_t u2BufferLenu, uint8_t ucBssIndex);
 #if CFG_SUPPORT_SOFT_ACM
-u_int8_t wmmAcmCanTx(struct ADAPTER *prAdapter,
-	struct BSS_INFO *prBssInfo, struct STA_RECORD *prStaRec,
-	uint8_t ucAc, uint16_t u2PktLen);
 u_int8_t wmmAcmCanDequeue(struct ADAPTER *prAdapter, uint8_t ucAc,
 	uint32_t u4PktTxTime, uint8_t ucBssIndex);
 void wmmAcmTxStatistic(struct ADAPTER *prAdapter, uint8_t ucAc,
