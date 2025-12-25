@@ -56,6 +56,8 @@
 /* The max erase timeout, used when host->max_busy_timeout isn't specified */
 #define MMC_ERASE_TIMEOUT_MS	(60 * 1000) /* 60 s */
 
+#define dbg_add_host_log(...)
+
 static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
 
 /*
