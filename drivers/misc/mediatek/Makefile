@@ -74,6 +74,10 @@ obj-$(CONFIG_MTK_CMDQ) += mdp/
 obj-$(CONFIG_MTK_CMDQ_TAB) += mdp/
 obj-$(CONFIG_MTK_VDEC_FMT) += vdec_fmt/
 obj-$(CONFIG_MTK_LCM) += lcm/
+
+subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/lcm/inc
+obj-y += lcm/sm5109.o
+
 obj-$(CONFIG_MTK_LCM) += ext_disp/
 ifeq (,$(filter $(CONFIG_MTK_PLATFORM_NAME), "mt6768" "mt6785"))
 obj-y += spi_slave_drv/
