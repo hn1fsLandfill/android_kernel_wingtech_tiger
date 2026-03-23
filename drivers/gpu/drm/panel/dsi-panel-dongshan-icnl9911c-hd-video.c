@@ -101,39 +101,6 @@ static void lcm_dcs_write(struct lcm *ctx, const void *data, size_t len)
 	}
 }
 
-#ifdef PANEL_SUPPORT_READBACK
-static int lcm_dcs_read(struct lcm *ctx, u8 cmd, void *data, size_t len)
-{
-	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
-	ssize_t ret;
-
-	if (ctx->error < 0) {
-		dev_err(ctx->dev, "%s: there is a error %zd before,now cmd (%#x)\n", __func__, ctx->error, cmd);
-		ctx->error = 0;
-	}
-
-	ret = mipi_dsi_dcs_read(dsi, cmd, data, len);
-	if (ret < 0) {
-		dev_err(ctx->dev, "error %d reading dcs seq:(%#x)\n", ret, cmd);
-		ctx->error = ret;
-	}
-
-	return ret;
-}
-
-static void lcm_panel_get_data(struct lcm *ctx)
-{
-	u8 buffer[3] = {0};
-	static int ret;
-
-	if (ret == 0) {
-		ret = lcm_dcs_read(ctx,  0x0A, buffer, 1);
-		dev_info(ctx->dev, "return %d data(0x%08x) to dsi engine\n",
-			 ret, buffer[0] | (buffer[1] << 8));
-	}
-}
-#endif
-
 #if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
 static struct regulator *disp_bias_pos;
 static struct regulator *disp_bias_neg;
@@ -234,6 +201,15 @@ static void kernel_vref_reg_update(struct lcm *ctx)
 
 static void lcm_panel_init(struct lcm *ctx)
 {
+    struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+    struct device *dev = &dsi->dev;
+    
+    u8 dcs_f6_val;
+    u8 write_buf[2];
+    ssize_t ret;
+
+	pr_info("%s\n", __func__);
+
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -248,31 +224,81 @@ static void lcm_panel_init(struct lcm *ctx)
 	mdelay(10);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
-	lcm_dcs_write_seq_static(ctx, 0xF0, 0x5A, 0x59);
-	lcm_dcs_write_seq_static(ctx, 0xF1, 0xA5, 0xA6);
-	lcm_dcs_write_seq_static(ctx, 0xFA, 0x45, 0x93, 0x01);
-	lcm_dcs_write_seq_static(ctx, 0xBE, 0x72, 0x7C, 0x46, 0x5A, 0x0C, 0x77, 0x43, 0x07, 0x0E, 0x0E);
-	lcm_dcs_write_seq_static(ctx, 0xBD, 0xE9, 0x02, 0x4E, 0xCF, 0x72, 0xA4, 0x08, 0x44, 0xAE, 0x15);
-	lcm_dcs_write_seq_static(ctx, 0xC1, 0xC0, 0x0C, 0x20, 0xAA, 0x04, 0x42, 0x42, 0x04, 0x2A, 0x40, 0x36, 0x00, 0x07, 0xC0, 0x10, 0xFF, 0x7E, 0x01, 0xC0);
-	kernel_vref_reg_update(ctx);
-	lcm_dcs_write_seq_static(ctx, 0xD0, 0x80, 0x0D, 0xFF, 0x0F, 0x61, 0x0B, 0x08, 0x04);
-	lcm_dcs_write_seq_static(ctx, 0xE0, 0x30, 0x00, 0x80, 0x88, 0x11, 0x3F, 0x22, 0x62, 0xDF, 0xA0, 0x04, 0xCC, 0x01, 0xFF, 0xF6, 0xFF, 0xF0, 0xFD, 0xFF, 0xFD, 0xF8, 0xF5, 0xFC, 0xFC, 0xFD, 0xFF);
-	lcm_dcs_write_seq_static(ctx, 0xE1, 0xEF, 0xFE, 0xFE, 0xFE, 0xFE, 0xEE, 0xF0, 0x20, 0x33, 0xFF, 0x00, 0x00, 0x6A, 0x90, 0xC0, 0x0D, 0x6A, 0xF0, 0x3E, 0xFF, 0x00, 0x07, 0xD0);
-	lcm_dcs_write_seq_static(ctx, 0xF1, 0x5A, 0x59);
-	lcm_dcs_write_seq_static(ctx, 0xF0, 0xA5, 0xA6);
-	lcm_dcs_write_seq_static(ctx, 0x35, 0x00);
-	lcm_dcs_write_seq_static(ctx, 0x51, 0x00, 0x00);
-	lcm_dcs_write_seq_static(ctx, 0x53, 0x2C);
-	lcm_dcs_write_seq_static(ctx, 0x55, 0x01);
-	lcm_dcs_write_seq_static(ctx, 0x11, 0x00);
-	msleep(120);
-	lcm_dcs_write_seq_static(ctx, 0x29, 0x00);
-	msleep(20);
-	lcm_dcs_write_seq_static(ctx, 0x26, 0x01);
+	/* 7 represents GPIOD_OUT_LOW or similar internal flags */
+    ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+    
+    if (IS_ERR(ctx->reset_gpio)) {
+        dev_err(dev, "%s: cannot get reset gpio %ld\n", "lcm_panel_init", PTR_ERR(ctx->reset_gpio));
+		return;
+    }
+	
+    /* Initial Generic Writes */
+    lcm_dcs_write_seq_static(ctx, 0xf0, 0x5a, 0x59); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf1, 0xa5, 0xa6); // mipi_dsi_generic_write
+
+    /* DCS Read-Modify-Write for register 0xF6 */
+    if (ctx->error >= 0) {
+        ret = mipi_dsi_dcs_read(dsi, 0xF6, &dcs_f6_val, 1);
+        if (ret < 0) {
+            dev_err(dev, "error %zd reading dcs seq:(%#x)\n", ret, 0xF6);
+            ctx->error = (int)ret;
+        }
+    }
+
+    /* Value modification (Brightness/Gamma cap logic) */
+    dcs_f6_val += 0x10;
+    if (dcs_f6_val > 0x3F) {
+        dcs_f6_val = 0x3F;
+    }
+
+    write_buf[0] = 0xF6;
+    write_buf[1] = dcs_f6_val;
+
+    /* Write modified 0xF6 buffer back */
+    if (ctx->error >= 0) {
+        if (write_buf[1] < 0xB0) {
+            ret = mipi_dsi_dcs_write_buffer(dsi, write_buf, 2);
+        } else {
+            ret = mipi_dsi_generic_write(dsi, write_buf, 2);
+        }
+        if (ret < 0) {
+            dev_err(dev, "error %zd writing seq: %ph\n", ret, write_buf);
+            ctx->error = (int)ret;
+        }
+    }
+
+    lcm_dcs_write_seq_static(ctx, 0xc3, 0x6, 0x0, 0xff, 0x0, 0xff, 0x0, 0x0, 0x81, 0x1); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xc4, 0x84, 0x1, 0x2b, 0x41, 0x0, 0x3c, 0x0, 0x3, 0x3, 0x2e); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xc5, 0x3, 0x1c, 0x70, 0x54, 0x40, 0x10, 0x42, 0x44, 0x8, 0xe, 0x14); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xc6, 0x87, 0xa2, 0x24, 0x22, 0x22, 0x31, 0x7f, 0x34, 0x8, 0x4); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xc7, 0xf7, 0xc6, 0xa7, 0x8f, 0x63, 0x43, 0x11, 0x63, 0x2a, 0xfe, 0xd0, 0x9c, 0xf4, 0xc8, 0xab, 0x82, 0x6a, 0x47, 0x1a, 0x7f, 0xc0, 0x0); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xc8, 0xf7, 0xc6, 0xa7, 0x8f, 0x63, 0x43, 0x11, 0x63, 0x2a, 0xfe, 0xd0, 0x9c, 0xf4, 0xc8, 0xab, 0x82, 0x6a, 0x47, 0x1a, 0x7f, 0xc0, 0x0); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xcb, 0x0); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xd0, 0x80, 0xd, 0xff, 0xf, 0x63); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xd2, 0x42); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xfe, 0xff, 0xff, 0xff, 0x40); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xe0, 0x30, 0x0, 0x80, 0x88, 0x11, 0x3f, 0x22, 0x62, 0xdf, 0xa0, 0x4, 0xcc, 0x1, 0xff, 0xf6, 0xff, 0xf0, 0xfd, 0xff, 0xfd, 0xf8, 0xf5, 0xfc, 0xfc, 0xfd, 0xff); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xe1, 0xef, 0xfe, 0xfe, 0xfe, 0xfe, 0xee, 0xf0, 0x20, 0x33, 0xff, 0x0, 0x0, 0x6a, 0x90, 0xc0, 0xd, 0x6a, 0xf0, 0x3e, 0xff, 0x0, 0x6, 0x40); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf1, 0x5a, 0x59); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf0, 0xa5, 0xa6); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0x35, 0x0); // mipi_dsi_dcs_write_buffer
+	lcm_dcs_write_seq_static(ctx, 0x51, 0x0, 0x0); // mipi_dsi_dcs_write_buffer
+
+    lcm_dcs_write_seq_static(ctx, 0x35, 0x0); // mipi_dsi_dcs_write_buffer
+	lcm_dcs_write_seq_static(ctx, 0x51, 0x0, 0x0); // mipi_dsi_dcs_write_buffer
+	lcm_dcs_write_seq_static(ctx, 0x53, 0x2c); // mipi_dsi_dcs_write_buffer
+	lcm_dcs_write_seq_static(ctx, 0x11); // mipi_dsi_dcs_write_buffer
+
+    msleep(120); /* 0x78 */
+    lcm_dcs_write_seq_static(ctx, 0x29); // mipi_dsi_dcs_write_buffer
+    msleep(10);
 }
 
 static int lcm_disable(struct drm_panel *panel)
 {
+	// skip this for now lol
+	// return 0;
+
 	struct lcm *ctx = panel_to_lcm(panel);
 
 	if (!ctx->enabled)
@@ -288,152 +314,79 @@ static int lcm_disable(struct drm_panel *panel)
 	return 0;
 }
 
+int lcm_power_enable(void);
+int lcm_power_disable(void);
+
 static int lcm_unprepare(struct drm_panel *panel)
 {
+	// this breaks the LCD for now
+	return 0;
+
 	struct lcm *ctx = panel_to_lcm(panel);
+	struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+    struct device *dev = &dsi->dev;
 
 	if (!ctx->prepared)
 		return 0;
 
-	lcm_dcs_write_seq_static(ctx, 0x26, 0x08);
+	// todo: look closer at this in ghidra
+	lcm_dcs_write_seq_static(ctx, 0xf0, 0x5a, 0x59); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf1, 0xa5, 0xa6); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xbb, 0x1, 0x5, 0x9, 0x11, 0xd, 0x19, 0x1d, 0x15, 0x25, 0x69, 0x0, 0x21, 0x25); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf0, 0xa5, 0xa6); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0xf1, 0x5a, 0x59); // mipi_dsi_generic_write
+	lcm_dcs_write_seq_static(ctx, 0x26, 0x8); // mipi_dsi_dcs_write_buffer
+	lcm_dcs_write_seq_static(ctx, 0x26, 0x8); // mipi_dsi_dcs_write_buffer
+
 	lcm_dcs_write_seq_static(ctx, 0x28);
-	msleep(50);
+	msleep(20);
 	lcm_dcs_write_seq_static(ctx, 0x10);
-	msleep(150);
+	msleep(100);
+
+	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+	gpiod_set_value(ctx->reset_gpio, 1);
+	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	ctx->error = 0;
 	ctx->prepared = false;
-#if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
-	lcm_panel_bias_disable();
-#else
-#if defined(CONFIG_LEDS_MTK_I2C)
-	/*this is rt4831a*/
-	mtk_leds_deinit_power();
-	lcm_i2c_write_bytes(0x09, 0x18);
-	ctx->pm_enable_gpio = devm_gpiod_get(ctx->dev,
-		"pm-enable", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->pm_enable_gpio)) {
-		dev_warn(ctx->dev, "%s: cannot get pm-enable %ld\n",
-			__func__, PTR_ERR(ctx->pm_enable_gpio));
-		return PTR_ERR(ctx->pm_enable_gpio);
-	}
-	gpiod_set_value(ctx->pm_enable_gpio, 0);
-	devm_gpiod_put(ctx->dev, ctx->pm_enable_gpio);
-#else
-	ctx->reset_gpio =
-		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->reset_gpio)) {
-		dev_err(ctx->dev, "%s: cannot get reset_gpio %ld\n",
-			__func__, PTR_ERR(ctx->reset_gpio));
-		return PTR_ERR(ctx->reset_gpio);
-	}
-	//gpiod_set_value(ctx->reset_gpio, 0);
-	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
+    lcm_power_disable();
 
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
-		"bias", 1, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg)) {
-		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-		return PTR_ERR(ctx->bias_neg);
-	}
-	gpiod_set_value(ctx->bias_neg, 0);
-	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-
-	udelay(1000);
-
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev,
-		"bias", 0, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos)) {
-		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-		return PTR_ERR(ctx->bias_pos);
-	}
-	gpiod_set_value(ctx->bias_pos, 0);
-	devm_gpiod_put(ctx->dev, ctx->bias_pos);
-#endif
-#endif
 	return 0;
 }
 
-static int lcm_prepare(struct drm_panel *panel)
+int lcm_prepare(struct drm_panel *panel)
 {
-	struct lcm *ctx = panel_to_lcm(panel);
-	int ret;
+	// assume the LK initialized the display for now
+	return 0;
 
-	pr_info("%s\n", __func__);
-	if (ctx->prepared)
-		return 0;
+    struct lcm *ctx = panel_to_lcm(panel);
+    struct mipi_dsi_device *dsi = to_mipi_dsi_device(ctx->dev);
+    struct device *dev = &dsi->dev;
+    
+    u8 dcs_f6_val;
+    u8 write_buf[2];
+    ssize_t ret;
 
-#if defined(CONFIG_RT5081_PMU_DSV) || defined(CONFIG_MT6370_PMU_DSV)
-	lcm_panel_bias_enable();
-#else
-#if defined(CONFIG_LEDS_MTK_I2C)
-	/*rt4831a co-work with leds_i2c*/
-	ctx->pm_enable_gpio = devm_gpiod_get(ctx->dev,
-		"pm-enable", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->pm_enable_gpio)) {
-		dev_err(ctx->dev, "%s: cannot get pm-enable %ld\n",
-			__func__, PTR_ERR(ctx->pm_enable_gpio));
-		return PTR_ERR(ctx->pm_enable_gpio);
-	}
-	gpiod_set_value(ctx->pm_enable_gpio, 1);
-	devm_gpiod_put(ctx->dev, ctx->pm_enable_gpio);
-	lcm_i2c_write_bytes(0x0a, 0x11);
-	lcm_i2c_write_bytes(0x0b, 0x00);
-	/*set bias to 5.4v*/
-	lcm_i2c_write_bytes(0x0c, 0x24);
-	lcm_i2c_write_bytes(0x0d, 0x1c);
-	lcm_i2c_write_bytes(0x0e, 0x1c);
-	/* set FPWM mode */
-	lcm_i2c_write_bytes(0xF0, 0x69);
-	lcm_i2c_write_bytes(0xB1, 0x6C);
-	/*bias enable*/
-	lcm_i2c_write_bytes(0x09, 0x9e);
-	mtk_leds_init_power();
-#else
-	ctx->bias_pos = devm_gpiod_get_index(ctx->dev,
-		"bias", 0, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos)) {
-		dev_err(ctx->dev, "%s: cannot get bias_pos %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-		return PTR_ERR(ctx->bias_pos);
-	}
-	gpiod_set_value(ctx->bias_pos, 1);
-	devm_gpiod_put(ctx->dev, ctx->bias_pos);
+    pr_info("[%d_%s] hxl_check_lcd_resum_ente\n", 0x123, __func__);
 
-	udelay(2000);
+    if (ctx->prepared)
+        return 0;
 
-	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
-		"bias", 1, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg)) {
-		dev_err(ctx->dev, "%s: cannot get bias_neg %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-		return PTR_ERR(ctx->bias_neg);
-	}
-	gpiod_set_value(ctx->bias_neg, 1);
-	devm_gpiod_put(ctx->dev, ctx->bias_neg);
-#endif
-#endif
 	lcm_panel_init(ctx);
+    lcm_power_enable();
 
 	ret = ctx->error;
+
 	if (ret < 0)
 		lcm_unprepare(panel);
 
 	ctx->prepared = true;
 
 	ctx->cabc_mode = 0; //UI mode
+    mtk_panel_tch_rst(panel);
 
-#if defined(CONFIG_MTK_PANEL_EXT)
-	mtk_panel_tch_rst(panel);
-#endif
-#ifdef PANEL_SUPPORT_READBACK
-	lcm_panel_get_data(ctx);
-#endif
-
-	return ret;
+    return ret;
 }
 
 static int lcm_enable(struct drm_panel *panel)
@@ -457,7 +410,7 @@ static int lcm_enable(struct drm_panel *panel)
 #define HSA (4)
 #define HBP (48)
 // 1000 seems to work fine?
-#define VFP_60HZ (100)
+#define VFP_60HZ (150)
 #define VSA (4)
 #define VBP (32)
 #define VAC (1640)
@@ -466,13 +419,13 @@ static int lcm_enable(struct drm_panel *panel)
 static struct drm_display_mode default_mode = {
 	.clock = 142467,
 	.hdisplay = HAC,
-	.hsync_start = HAC + HFP,
-	.hsync_end = HAC + HFP + HSA,
-	.htotal = HAC + HFP + HSA + HBP,
+	.hsync_start = 768, // HAC + HFP
+	.hsync_end = 772, // HAC + HFP + HSA
+	.htotal = 820, // HAC + HFP + HSA + HBP
 	.vdisplay = VAC,
-	.vsync_start = VAC + VFP_60HZ,
-	.vsync_end = VAC + VFP_60HZ + VSA,
-	.vtotal = VAC + VFP_60HZ + VSA + VBP,
+	.vsync_start = 1790, // VAC + VFP_60HZ
+	.vsync_end = 1794, // VAC + VFP_60HZ + VSA
+	.vtotal = 1826, // VAC + VFP_60HZ + VSA + VBP
 	.vrefresh = 60,
 };
 
@@ -525,9 +478,11 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	void *handle, unsigned int level)
 {
 	char bl_tb0[] = {0x51, 0xFF, 0x0E};
-	char dimming_tb[] = {0x53, 0x24};
+	// char dimming_tb[] = {0x53, 0x24};
 
 	pr_debug("icnl9911c level : %d\n", level);
+
+	if(level > 0xfe) level = 0xff;
 
 	bl_tb0[1] = ((level >> 3) & 0xFF);
 	bl_tb0[2] = ((level << 1) & 0x0E);
@@ -535,8 +490,8 @@ static int lcm_setbacklight_cmdq(void *dsi, dcs_write_gce cb,
 	if (!cb)
 		return -1;
 
-	if (!level)
-		cb(dsi, handle, dimming_tb, ARRAY_SIZE(dimming_tb));
+	//if (!level)
+	//	cb(dsi, handle, dimming_tb, ARRAY_SIZE(dimming_tb));
 
 	cb(dsi, handle, bl_tb0, ARRAY_SIZE(bl_tb0));
 
@@ -554,7 +509,7 @@ static int lcm_get_virtual_width(void)
 }
 
 static struct mtk_panel_params ext_params = {
-	.pll_clk = 449,
+	.pll_clk = 285,
 	.vfp_low_power = VFP_60HZ,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
@@ -660,7 +615,7 @@ static struct mtk_panel_funcs ext_funcs = {
 	.set_backlight_cmdq = lcm_setbacklight_cmdq,
 	.ext_param_set = mtk_panel_ext_param_set,
 	.ext_param_get = mtk_panel_ext_param_get,
-	.ata_check = panel_ata_check,
+	// .ata_check = panel_ata_check,
 	.get_virtual_heigh = lcm_get_virtual_heigh,
 	.get_virtual_width = lcm_get_virtual_width,
 	//.cabc_set_cmdq = panel_cabc_set_cmdq,
@@ -759,6 +714,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 	ctx->dev = dev;
 	dsi->lanes = 4;
 	dsi->format = MIPI_DSI_FMT_RGB888;
+	// *(undefined8 *)(param_1 + 0x3e0) = 0xe05; todo smth
 	dsi->mode_flags = MIPI_DSI_MODE_VIDEO
 			 | MIPI_DSI_MODE_LPM | MIPI_DSI_MODE_EOT_PACKET
 			 | MIPI_DSI_CLOCK_NON_CONTINUOUS;
@@ -772,30 +728,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 			return -EPROBE_DEFER;
 	}
 
-	ctx->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->reset_gpio)) {
-		dev_err(dev, "%s: cannot get reset-gpios %ld\n",
-			__func__, PTR_ERR(ctx->reset_gpio));
-		return PTR_ERR(ctx->reset_gpio);
-	}
-	devm_gpiod_put(dev, ctx->reset_gpio);
-#ifndef CONFIG_LEDS_MTK_I2C
-	ctx->bias_pos = devm_gpiod_get_index(dev, "bias", 0, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_pos)) {
-		dev_err(dev, "%s: cannot get bias-pos 0 %ld\n",
-			__func__, PTR_ERR(ctx->bias_pos));
-		return PTR_ERR(ctx->bias_pos);
-	}
-	devm_gpiod_put(dev, ctx->bias_pos);
-
-	ctx->bias_neg = devm_gpiod_get_index(dev, "bias", 1, GPIOD_OUT_HIGH);
-	if (IS_ERR(ctx->bias_neg)) {
-		dev_err(dev, "%s: cannot get bias-neg 1 %ld\n",
-			__func__, PTR_ERR(ctx->bias_neg));
-		return PTR_ERR(ctx->bias_neg);
-	}
-	devm_gpiod_put(dev, ctx->bias_neg);
-#endif
+	lcm_power_enable();
 	//ctx->bl_iset_en_gpio = devm_gpiod_get(dev, "bl-iset-en", GPIOD_IN);
 	//if (IS_ERR(ctx->bl_iset_en_gpio)) {
 	//	dev_err(dev, "%s: cannot get bl_iset_en_gpio %ld\n",

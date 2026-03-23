@@ -10,10 +10,10 @@ Most of the sensors
 Side buttons
 Hardware decoding
 Hardware encoding
+Display (BOE panel not tested.)
 
 What partially works:
 Audio (Headphone jack, microphone and earpiece speaker works; Main speaker doesn't work.)
-Display (If display turns off it can't turn on; BOE panel not tested.)
 Touchscreen (Touch is all wonky)
 Modem (Mobile data, calls and SMS aren't tested.)
 USB (OTG doesn't work)
