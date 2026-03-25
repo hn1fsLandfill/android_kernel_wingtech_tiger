@@ -11,10 +11,10 @@ Side buttons
 Hardware decoding
 Hardware encoding
 Display (BOE panel not tested.)
+Touchscreen
 
 What partially works:
 Audio (Headphone jack, microphone and earpiece speaker works; Main speaker doesn't work.)
-Touchscreen (Touch is all wonky)
 Modem (Mobile data, calls and SMS aren't tested.)
 USB (OTG doesn't work)
 
