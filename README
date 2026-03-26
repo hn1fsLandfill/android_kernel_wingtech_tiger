@@ -23,6 +23,7 @@ SD Cards
 Side fingerprint scanner
 Camera
 Connectivity (Wi-Fi, Bluetooth)
+NFC
 
 TODO for camera image sensors: 
 [ ] dt2_main_xl_hi5021_mipi_raw (Bare minimum!)
