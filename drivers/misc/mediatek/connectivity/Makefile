@@ -18,21 +18,24 @@ ifneq ($(KERNELRELEASE),)
     subdir-ccflags-y += -I$(srctree)/
     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include
     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/clkbuf/src
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/base/power/include/clkbuf_v1/$(MTK_PLATFORM)
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
-ifeq ($(CONFIG_MTK_PMIC_CHIP_MT6359),y)
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include/mt6359
-endif
-ifeq ($(CONFIG_MTK_PMIC_NEW_ARCH),y)
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include
-endif
+    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/include/mt-plat
     subdir-ccflags-y += -I$(srctree)/drivers/mmc/core
-    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/$(MTK_PLATFORM)
     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/eccci/
     subdir-ccflags-y += -I$(srctree)/drivers/clk/mediatek/
     subdir-ccflags-y += -I$(srctree)/drivers/pinctrl/mediatek/
     subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/power_throttling/
+    subdir-ccflags-y += -I$(srctree)/drivers/misc/mediatek/pmic/include
+
+    #ifneq ($(CONFIG_MTK_TINYSYS_SCP_SUPPORT),)
+        # SCP
+    #    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/scp/include
+    #    subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/connectivity/conap_scp
+
+        # Aoltest
+    #    ifeq ($(CONFIG_MTK_AOL_DEBUG),y)
+    #        subdir-ccflags-y += -Werror -I$(srctree)/drivers/misc/mediatek/connectivity/aoltest/
+    #    endif
+    #endif
 
     # Do Nothing, move to standalone repo
     MODULE_NAME := connadp
@@ -46,22 +49,28 @@ endif
         $(MODULE_NAME)-objs += power_throttling/test.o
     endif
 
+    #ifneq ($(CONFIG_MTK_TINYSYS_SCP_SUPPORT),)
+        ###########################################################################
+        # SCP
+    #    $(MODULE_NAME)-objs += conap_scp/msg_thread.o
+    #    $(MODULE_NAME)-objs += conap_scp/ring_buffer.o
+    #    $(MODULE_NAME)-objs += conap_scp/conap_scp_core.o
+    #    $(MODULE_NAME)-objs += conap_scp/conap_scp_ipi.o
+    #    $(MODULE_NAME)-objs += conap_scp/conap_platform_data.o
+        #$(MODULE_NAME)-objs += conap_scp/conap_scp_test.o
+        ###########################################################################
+        # Aoltest
+    #    ifeq ($(CONFIG_MTK_AOL_DEBUG),y)
+    #        ccflags-y += -D AOLTEST_SUPPORT
+    #        $(MODULE_NAME)-objs += aoltest/aoltest_core.o
+    #        $(MODULE_NAME)-objs += aoltest/aoltest_netlink.o
+    #        $(MODULE_NAME)-objs += aoltest/aoltest_ring_buffer.o
+    #    endif
+    #endif
+
     ifeq ($(CONFIG_MTK_COMBO), y)
         ccflags-y += -D CFG_CONNADP_BUILD_IN
     endif
-
-    # for gen4m options
-    export CONFIG_MTK_COMBO_WIFI_HIF=axi
-    export MTK_COMBO_CHIP=CONNAC2X2_SOC5_0
-    export BT_PLATFORM=6877
-    export WLAN_CHIP_ID=6877
-    export MTK_ANDROID_WMT=y
-    export MTK_ANDROID_EMI=y
-    export WIFI_IP_SET=1
-    export MTK_WLAN_SERVICE=yes
-    export CONNAC_VER=2_0
-    export CFG_BUILD_CONNAC2=true
-
     # Do build-in for Makefile checking
     # export CONFIG_WLAN_DRV_BUILD_IN=y
 
@@ -97,6 +106,12 @@ endif
         $(shell ln -s $(ABS_PATH_TO_WLAN_CHR_DRV) $(srctree)/$(src)/wmt_chrdev_wifi)
         $(shell ln -s $(ABS_PATH_TO_WLAN_DRV)     $(srctree)/$(src)/wlan_drv_gen4m)
 
+        # for gen4m options
+        export CONFIG_MTK_COMBO_WIFI_HIF=axi
+        export MTK_COMBO_CHIP=CONNAC
+        export WLAN_CHIP_ID=6765
+        export MTK_ANDROID_WMT=y
+
         # Do build-in for xxx.c checking
         subdir-ccflags-y += -D MTK_WCN_REMOVE_KERNEL_MODULE
         subdir-ccflags-y += -D MTK_WCN_BUILT_IN_DRIVER
@@ -104,14 +119,6 @@ endif
         obj-y += wmt_chrdev_wifi/
         obj-y += wlan_drv_gen4m/
     endif
-
-    obj-$(CONFIG_MTK_COMBO) += conninfra/
-    obj-$(CONFIG_MTK_COMBO_WIFI) += wlan/adaptor/
-    obj-$(CONFIG_MTK_COMBO_CHIP_CONSYS_6877) += wlan/core/gen4m/
-    obj-$(CONFIG_MTK_BTIF) += bt/mt66xx/btif/
-    obj-$(CONFIG_MTK_COMBO_GPS) += gps/
-    obj-$(CONFIG_MTK_FMRADIO) += fmradio/
-    obj-$(CONFIG_MTK_CONNFEM) += connfem/
 
 # Otherwise we were called directly from the command line;
 # invoke the kernel build system.
