@@ -1,17 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
- * awinic_monitor.c monitor_module
- *
- * Version: v0.1.17
- *
- * Copyright (c) 2019 AWINIC Technology CO., LTD
- *
- *  Author: Nick Li <liweilei@awinic.com.cn>
- *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
- * option) any later version.
+ * Copyright (c) 2023 MediaTek Inc.
  */
+
 #include <linux/module.h>
 #include <linux/i2c.h>
 #include <sound/core.h>
@@ -431,11 +422,6 @@ static void aw_monitor_set_gain(struct aw_device *aw_dev, uint16_t gain)
 	compared_vol = AW_GET_MAX_VALUE(vol_desc->ctl_volume,
 		vol_desc->monitor_volume);
 
-	if (aw_dev->attenuate_in_process){
-		compared_vol += AW_ATTENUATION_VOL;  //reduce 20db
-		aw_dev_dbg(aw_dev->dev,"reduce volume to %d, as attenuation enabled",compared_vol);
-	}
-
 	aw883xx_dev_set_volume(aw_dev, compared_vol);
 }
 
@@ -542,15 +528,7 @@ static int aw_monitor_work(struct aw_device *aw_dev)
 
 	aw_monitor_set_ipeak(aw_dev, set_table.ipeak);
 
-#ifdef CONFIG_AW883XX_RAMP_SUPPORT
-	if (aw_dev->ramp_in_process){
-		aw_dev_info(aw_dev->dev,"skip volume setting in monitor as ramp in process");
-	} else {
-#endif
-		aw_monitor_set_gain(aw_dev, set_table.gain);
-#ifdef CONFIG_AW883XX_RAMP_SUPPORT
-	}
-#endif
+	aw_monitor_set_gain(aw_dev, set_table.gain);
 
 	aw_monitor_set_vmax(aw_dev, set_table.vmax);
 

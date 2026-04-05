@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0 */  
+/*
+ * Copyright (c) 2023 MediaTek Inc.
+ */
+
 #ifndef __AW883XX_PID_2049_REG_H__
 #define __AW883XX_PID_2049_REG_H__
 

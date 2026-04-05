@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0 */  
+/*
+ * Copyright (c) 2023 MediaTek Inc.
+ */
+
 #ifndef __AW883XX_H__
 #define __AW883XX_H__
 
@@ -21,10 +26,6 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)
 #define AW_KERNEL_VER_OVER_5_4_0
 MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
-#endif
-
-#ifndef CONFIG_AW883XX_RAMP_SUPPORT
-#define CONFIG_AW883XX_RAMP_SUPPORT 1
 #endif
 
 /* i2c transaction on Linux limited to 64k
@@ -54,13 +55,7 @@ MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
 #define AW883XX_DSP_16_DATA_MASK	(0x0000ffff)
 
 #define AW_GET_IV_CNT_MAX		(6)
-
-#ifdef CONFIG_AW883XX_RAMP_SUPPORT
-#define AW_KCONTROL_NUM			(6)
-#else
 #define AW_KCONTROL_NUM			(4)
-#endif
-
 #define AW_HW_MONITOR_DELAY		(1000)
 
 enum {

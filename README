@@ -13,9 +13,9 @@ Hardware encoding
 Display (BOE panel not tested.)
 Touchscreen
 Modem (SMS isn't tested but it may work given mobile data and phone calls work)
+Audio
 
 What partially works:
-Audio (Headphone jack, microphone and earpiece speaker works; Main speaker doesn't work.)
 USB (OTG doesn't work)
 
 What doesn't:

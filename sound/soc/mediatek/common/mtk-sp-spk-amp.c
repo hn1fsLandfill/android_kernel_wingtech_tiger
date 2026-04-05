@@ -38,20 +38,9 @@
 #include "aw87339.h"
 #endif
 
-/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 begin */
 #ifdef CONFIG_SND_SMARTPA_AW883XX
-#include "../../codecs/aw883xx/aw883xx.h"
-int aw883xx_i2c_remove(struct i2c_client *i2c);
-int aw883xx_i2c_probe(struct i2c_client *i2c,
-				const struct i2c_device_id *id);
+#include "../../codecs/aw883xx/aw883xx_ext.h"
 #endif
-/* prize modified by pzp, add awinic smartpa aw883xx, 20220316 end */
-
-/* prize added by hanjiuping for awinic aw88394 smartPA v1.3.0 start */
-#ifdef CONFIG_SND_SMARTPA_AW883XX_V1_3_0
-#include "../../codecs/aw883xx_v1_3_0/aw883xx.h"
-#endif
-/* prize added by hanjiuping for awinic aw88394 smartPA v1.3.0 end */
 
 #define MTK_SPK_NAME "Speaker Codec"
 #define MTK_SPK_REF_NAME "Speaker Codec Ref"
@@ -96,14 +85,15 @@ static struct mtk_spk_i2c_ctrl mtk_spk_list[MTK_SPK_TYPE_NUM] = {
 		.codec_name = "tfa98xx",
 	},
 #endif /* CONFIG_SND_SOC_TFA9874 */
-#if defined(CONFIG_SND_SMARTPA_AW883XX) || defined(CONFIG_SND_SMARTPA_AW883XX_V1_3_0)
-        [MTK_SPK_AWINIC_AW883XX] = {
-                .i2c_probe = aw883xx_i2c_probe,
-                .i2c_remove = aw883xx_i2c_remove,
-                .codec_dai_name = "aw883xx-aif-3-34",
-                .codec_name = "aw883xx_smartpa.3-0034",
-        },
-#endif
+
+#ifdef CONFIG_SND_SMARTPA_AW883XX
+	[MTK_SPK_AWINIC_AW883XX] = {
+		.i2c_probe = aw883xx_i2c_probe,
+		.i2c_remove = aw883xx_i2c_remove,
+		.codec_dai_name = "aw883xx-aif",
+		.codec_name = "aw883xx_smartpa",
+	},
+#endif  /* CONFIG_SND_SMARTPA_AW883XX */
 };
 
 static int mtk_spk_i2c_probe(struct i2c_client *client,
@@ -496,6 +486,7 @@ EXPORT_SYMBOL(mtk_spk_recv_ipi_buf_from_dsp);
 
 static const struct i2c_device_id mtk_spk_i2c_id[] = {
 	{ "tfa98xx", 0},
+	{ "aw883xx_smartpa", 0},
 	{ "speaker_amp", 0},
 	{}
 };
@@ -504,6 +495,7 @@ MODULE_DEVICE_TABLE(i2c, mtk_spk_i2c_id);
 #ifdef CONFIG_OF
 static const struct of_device_id mtk_spk_match_table[] = {
 	{.compatible = "nxp,tfa98xx",},
+	{.compatible = "awinic,aw883xx_smartpa",},
 	{.compatible = "mediatek,speaker_amp",},
 	{},
 };

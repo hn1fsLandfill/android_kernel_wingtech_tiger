@@ -1,3 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0 */  
+/*
+ * Copyright (c) 2023 MediaTek Inc.
+ */
+
 #ifndef __AW883XX_DATA_TYPE_H__
 #define __AW883XX_DATA_TYPE_H__
 
@@ -79,7 +84,7 @@ enum aw_profile_status {
 struct aw_cfg_hdr {
 	uint32_t a_id;					/*acf file ID 0xa15f908*/
 	char a_project[PROJECT_NAME_MAX];		/*project name*/
-	char a_custom[CUSTOMER_NAME_MAX];		/*custom name :huawei xiaomi vivo oppo*/
+	char a_custom[CUSTOMER_NAME_MAX];		/*custom name*/
 	char a_version[CFG_VERSION_MAX];		/*author update version*/
 	uint32_t a_author_id;				/*author id*/
 	uint32_t a_ddt_size;				/*sub section table entry size*/
