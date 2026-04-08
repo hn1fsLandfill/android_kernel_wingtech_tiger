@@ -30,72 +30,74 @@
 #define __SILEAD_FP_H__
 
 #include <linux/printk.h>
-#include <linux/pm_wakeup.h>
-
+#include <linux/version.h>
 #define BSP_SIL_PLAT_MTK 1
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0))
+#define VERIFY_READ   0
+#define VERIFY_WRITE  1
+#define ACCESS_OK(t,x,y)  access_ok(x, y)
+#else
+#define ACCESS_OK(t,x,y)  access_ok(t, x, y)
+#endif
 #ifndef _LINUX_WAKELOCK_H
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0))
+#define USE_WAKEUP_REG
+#endif
+
 enum {
     WAKE_LOCK_SUSPEND, /* Prevent suspend */
     WAKE_LOCK_TYPE_COUNT
 };
 
+#ifdef USE_WAKEUP_REG
 struct wake_lock {
-    struct wakeup_source ws;
+    struct wakeup_source  *ws;
 };
 
-static inline void wakeup_source_prepare(struct wakeup_source *ws, const char *name)
-{
-    if (ws) {
-        memset(ws, 0, sizeof(*ws));
-        ws->name = name;
-    }
-}
+#define ws_init(s, n)     s = wakeup_source_register(NULL, n)
+#define ws_deinit(s)      wakeup_source_unregister(s)
+#define ws_lock(s)        __pm_stay_awake(s)
+#define ws_lock_tm(s, t)  __pm_wakeup_event(s, t)
+#define ws_unlock(s)      __pm_relax(s)
 
-static inline void wakeup_source_drop(struct wakeup_source *ws)
-{
-    if (!ws)
-        return;
+#else
+struct wake_lock {
+    struct wakeup_source  ws;
+};
 
-    __pm_relax(ws);
-}
+#define ws_init(s, n)     wakeup_source_init(&s, n)
+#define ws_deinit(s)      wakeup_source_trash(&s)
+#define ws_lock(s)        __pm_stay_awake(&s)
+#define ws_lock_tm(s, t)  __pm_wakeup_event(&s, t)
+#define ws_unlock(s)      __pm_relax(&s)
 
-static inline void wakeup_source_init(struct wakeup_source *ws,
-                      const char *name)
-{
-    wakeup_source_prepare(ws, name);
-    wakeup_source_add(ws);
-}
-
-static inline void wakeup_source_trash(struct wakeup_source *ws)
-{
-    wakeup_source_remove(ws);
-    wakeup_source_drop(ws);
-}
+#endif /* USE_WAKEUP_REG */
 
 static inline void wake_lock_init(struct wake_lock *lock, int type,
                                   const char *name)
 {
-    wakeup_source_init(&lock->ws, name);
+    ws_init(lock->ws, name);
 }
 
 static inline void wake_lock_destroy(struct wake_lock *lock)
 {
-    wakeup_source_trash(&lock->ws);
+    ws_deinit(lock->ws);
 }
 
 static inline void wake_lock(struct wake_lock *lock)
 {
-    __pm_stay_awake(&lock->ws);
+    ws_lock(lock->ws);
 }
 
 static inline void wake_lock_timeout(struct wake_lock *lock, long timeout)
 {
-    __pm_wakeup_event(&lock->ws, jiffies_to_msecs(timeout));
+    ws_lock_tm(lock->ws, jiffies_to_msecs(timeout));
 }
 
 static inline void wake_unlock(struct wake_lock *lock)
 {
-    __pm_relax(&lock->ws);
+    ws_unlock(lock->ws);
 }
 #endif /* _LINUX_WAKELOCK_H */
 
@@ -215,10 +217,7 @@ struct fp_dev_touch_info {
 //#define PROC_DIR		"fp"      /* if defined, create node under /proc/fp/xxx */
 #define PROC_NODE		"fp_id"   /* proc node name */
 //Bug 612359,zjj.wt,add,2021/01/18, add fp adm node
-
-/* HS03s code added for SR-AL5625-01-199 by wurui at 20210513 start */
-//#define CLASS_NODE   "fingerprint"   /* if defined, create class node /sys/class/fingerprint/fingerprint */
-/* HS03s code added for SR-AL5625-01-199 by wurui at 20210513 end */
+#define CLASS_NODE   "fingerprint"   /* if defined, create class node /sys/class/fingerprint/fingerprint */
 
 #if (SIFP_NETLINK_ROUTE > 0) && (SIFP_NETLINK_ROUTE < 32)
     #define BSP_SIL_NETLINK
@@ -229,8 +228,8 @@ struct fp_dev_touch_info {
 #endif /* ! BSP_SIL_PLAT_MTK & ! BSP_SIL_PLAT_QCOM */
 
 /* Todo: enable correct power supply mode */
-//#define BSP_SIL_POWER_SUPPLY_REGULATOR
-#define BSP_SIL_POWER_SUPPLY_PINCTRL
+#define BSP_SIL_POWER_SUPPLY_REGULATOR
+//#define BSP_SIL_POWER_SUPPLY_PINCTRL
 //#define BSP_SIL_POWER_SUPPLY_GPIO
 
 /* AVDD voltage range 2.8v ~ 3.3v */

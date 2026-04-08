@@ -952,22 +952,12 @@ static int silfp_resource_deinit(struct silfp_data *fp_dev)
             }
 #endif /* !BSP_SIL_PLAT_MTK */
             pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_l);
-            /* HS03s code added for DEVAL5625-51 by wurui at 20210511 start */
-            devm_pinctrl_put(fp_dev->pin.pinctrl);
-            fp_dev->pin.pinctrl = NULL;
-            LOG_MSG_DEBUG(DBG_LOG, "[%s] devm_pinctrl_put, fp_dev->pin.pinctrl\n", __func__);
-
             fp_dev->irq_no_use = 0;
             fp_dev->int_port = 0;
-            gpio_free(fp_dev->rst_port);
-            /* HS03s code added for DEVAL5625-51 by wurui at 20210511 end */
             fp_dev->rst_port = 0;
 
             silfp_input_deinit(fp_dev);
-            if(0)
-            {
-                silfp_power_deinit(fp_dev);
-            }
+            silfp_power_deinit(fp_dev);
 #ifdef PROC_NODE
             silfp_proc_deinit(fp_dev);
 #endif /* PROC_NODE */
@@ -1370,32 +1360,9 @@ static int silfp_probe(struct spi_device *spi)
 {
     struct silfp_data *fp_dev;
     int    status = 0;
-    /* HS03S code added for DEVAL5625-2567 by hujincan at 20211122 start */
-    int    avdd_gpio = 0;
-    int    ret = 0;
-    char   *command_line = saved_command_line;
     //unsigned long		minor;
 
     LOG_MSG_DEBUG(INFO_LOG, "[%s] enter.\n", __func__);
-    LOG_MSG_DEBUG(DBG_LOG, "[%s] command_line = %s\n", __func__, command_line);
-
-    if (NULL != strstr(command_line, "androidboot.mode=charger")) {
-        avdd_gpio = of_get_named_gpio(spi->dev.of_node, "avdd-gpio", 0);
-        if (avdd_gpio > 0) {
-            gpio_free(avdd_gpio);
-            ret = gpio_request(avdd_gpio, "FPS_AVDD_GPIO");
-            if (ret < 0) {
-                LOG_MSG_DEBUG(DBG_LOG, "[%s] Failed to request avdd_gpio.\n", __func__);
-            }
-            else {
-                gpio_direction_output(avdd_gpio, 0);
-                gpio_free(avdd_gpio);
-                avdd_gpio = 0;
-                LOG_MSG_DEBUG(DBG_LOG, "[%s] Shutdown charging mode,poweroff.\n", __func__);
-            }
-        }
-    }
-    /* HS03S code added for DEVAL5625-2567 by hujincan at 20211122 end */
     /* Allocate driver data */
     fp_dev = kzalloc(sizeof(*fp_dev), GFP_KERNEL);
     if (!fp_dev) {
@@ -1504,9 +1471,6 @@ static int silfp_remove(struct spi_device *spi)
 
 static const struct of_device_id sildev_dt_ids[] = {
     { .compatible = "sil,silead_fp" },
-    { .compatible = "sil,silead-fp" },
-    { .compatible = "sil,fingerprint" },
-    { .compatible = "sil,silead_fp-pins" },
     {},
 };
 
