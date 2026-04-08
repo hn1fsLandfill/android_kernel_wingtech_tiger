@@ -34,7 +34,7 @@
 #include <linux/regulator/consumer.h>
 //#include "nt_smc_call.h"
 #include <linux/gpio.h>
-//#include <mt-plat/upmu_common.h>
+#include <mt-plat/upmu_common.h>
 
 #if !defined(CONFIG_MTK_CLKMGR)
 #include <linux/clk.h>
@@ -64,23 +64,20 @@ struct mt_spi_t {
 #endif				/* !defined(CONFIG_MTK_LEGACY) */
 };
 
-#ifndef __MTK_SPI_HAL_H__
-extern int mt_spi_enable_master_clk(struct spi_device *spidev);
+//#ifndef __MTK_SPI_HAL_H__
+extern void mt_spi_enable_master_clk(struct spi_device *spidev);
 extern void mt_spi_disable_master_clk(struct spi_device *spidev);
-#endif /* !__MTK_SPI_HAL_H__ */
+//#endif /* !__MTK_SPI_HAL_H__ */
 #endif /* !CONFIG_SILEAD_FP_PLATFORM */
 
-//#define FP_IRQ_OF  "sil,silead_fp-pins"
-//#define FP_PINS_OF "sil,silead_fp-pins"
-#define FP_IRQ_OF  "mediatek,mt6765-fingerprint"
-#define FP_PINS_OF "mediatek,mt6765-fingerprint"
-
+#define FP_IRQ_OF  "sil,silead_fp-pins"
+#define FP_PINS_OF "sil,silead_fp-pins"
 
 const static uint8_t TANAME[] = { 0x51, 0x1E, 0xAD, 0x0D, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
 static irqreturn_t silfp_irq_handler(int irq, void *dev_id);
 static void silfp_work_func(struct work_struct *work);
-static int silfp_input_init(struct silfp_data *fp_dev);
+//static int silfp_input_init(struct silfp_data *fp_dev);//ExtB P210330-00833,zjj.wt,delete,2021/03/31, fp driver delete nav key
 
 /* -------------------------------------------------------------------- */
 /*                            power supply                              */
@@ -96,20 +93,23 @@ static void silfp_hw_poweron(struct silfp_data *fp_dev)
         err = regulator_set_voltage(fp_dev->avdd_ldo, AVDD_MIN, AVDD_MAX);	/*set 2.8v*/
         err = regulator_enable(fp_dev->avdd_ldo);	/*enable regulator*/
     }
+#if 0
     if ( fp_dev->vddio_ldo ) {
         err = regulator_set_voltage(fp_dev->vddio_ldo, VDDIO_MIN, VDDIO_MAX);	/*set 1.8v*/
         err = regulator_enable(fp_dev->vddio_ldo);	/*enable regulator*/
     }
+#endif
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
 
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
     /* Power control by GPIOs */
     if ( fp_dev->pin.pins_avdd_h ) {
         err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_avdd_h);
+        LOG_MSG_DEBUG(INFO_LOG, "%s: pins_avdd_h power supply ret:%d \n", __func__, err);
     }
-    if ( fp_dev->pin.pins_vddio_h ) {
-        err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_vddio_h);
-    }
+//    if ( fp_dev->pin.pins_vddio_h ) {
+//        err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_vddio_h);
+//    }
 #endif /* BSP_SIL_POWER_SUPPLY_PINCTRL */
 
 #ifdef BSP_SIL_POWER_SUPPLY_GPIO
@@ -124,20 +124,28 @@ static void silfp_hw_poweron(struct silfp_data *fp_dev)
     LOG_MSG_DEBUG(INFO_LOG, "%s: power supply ret:%d \n", __func__, err);
 }
 
+/* HS03S code added for DEVAL5625-2567 by wurui at 20211122 start */
 static void silfp_hw_poweroff(struct silfp_data *fp_dev)
 {
+    int err = 0;
     LOG_MSG_DEBUG(INFO_LOG, "[%s] enter.\n", __func__);
 #ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     /* Power control by Regulators(LDO) */
     if ( fp_dev->avdd_ldo && (regulator_is_enabled(fp_dev->avdd_ldo) > 0)) {
         regulator_disable(fp_dev->avdd_ldo);    /*disable regulator*/
     }
+#if 0
     if ( fp_dev->vddio_ldo && (regulator_is_enabled(fp_dev->vddio_ldo) > 0)) {
         regulator_disable(fp_dev->vddio_ldo);   /*disable regulator*/
     }
+#endif
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
 
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
+    if ( fp_dev->pin.pins_avdd_l ) {
+        err = pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_avdd_l);
+        LOG_MSG_DEBUG(INFO_LOG, "%s: pins_avdd_h power supply ret:%d \n", __func__, err);
+    }
     /* Power control by GPIOs */
     //fp_dev->pin.pins_avdd_h = NULL;
     //fp_dev->pin.pins_vddio_h = NULL;
@@ -153,6 +161,7 @@ static void silfp_hw_poweroff(struct silfp_data *fp_dev)
 #endif /* BSP_SIL_POWER_SUPPLY_GPIO */
     fp_dev->power_is_off = 1;
 }
+/* HS03S code added for DEVAL5625-2567 by wurui at 20211122 end */
 
 static void silfp_power_deinit(struct silfp_data *fp_dev)
 {
@@ -164,11 +173,13 @@ static void silfp_power_deinit(struct silfp_data *fp_dev)
         regulator_put(fp_dev->avdd_ldo);
         fp_dev->avdd_ldo = NULL;
     }
+#if 0
     if ( fp_dev->vddio_ldo ) {
         regulator_disable(fp_dev->vddio_ldo);	/*disable regulator*/
         regulator_put(fp_dev->vddio_ldo);
         fp_dev->vddio_ldo = NULL;
     }
+#endif
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
 
 #ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
@@ -203,7 +214,7 @@ static void silfp_hw_reset(struct silfp_data *fp_dev, u8 delay)
     if (fp_dev->irq_no_use) {
         pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_irq_rst_h);
     }
-    mdelay((delay?delay:5)*RESET_TIME_MULTIPLE);
+    mdelay(5);
     pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_h);
     if (fp_dev->irq_no_use) {
         pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_irq_rst_l);
@@ -219,12 +230,11 @@ static void silfp_pwdn(struct silfp_data *fp_dev, u8 flag_avdd)
 {
     LOG_MSG_DEBUG(INFO_LOG, "[%s] enter, port=%d\n", __func__, fp_dev->rst_port);
 
-    if (SIFP_PWDN_FLASH == flag_avdd) {
-        silfp_hw_poweroff(fp_dev);
-        msleep(200*RESET_TIME_MULTIPLE);
-        silfp_hw_poweron(fp_dev);
-    }
+    /* HS03S code added for DEVAL5625-753 by wurui at 20210621 start */
     pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_l);
+    LOG_MSG_DEBUG(ERR_LOG, "[%s] msleep 200ms\n", __func__);
+    msleep(200*RESET_TIME_MULTIPLE);
+    /* HS03S code added for DEVAL5625-753 by wurui at 20210621 end */
     if (fp_dev->irq_no_use) {
         pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_irq_rst_h);
     }
@@ -254,7 +264,7 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
 
     node = of_find_compatible_node(NULL, NULL, FP_PINS_OF);
     if (node) {
-        //LOG_MSG_DEBUG(INFO_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
+        LOG_MSG_DEBUG(INFO_LOG, "%s, irq = %d\n", __func__, fp_dev->int_port);
         pdev = of_find_device_by_node(node);
         if (pdev) {
             fp_dev->pin.pinctrl = devm_pinctrl_get(&pdev->dev);
@@ -270,30 +280,27 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
         LOG_MSG_DEBUG(ERR_LOG, "%s %s compatible device node is null\n", __func__,FP_PINS_OF);
         return ret;
     }
-	
-    //fp_dev->pin.pins_irq = pinctrl_lookup_state(fp_dev->pin.pinctrl, "int-gpio");
-    fp_dev->pin.pins_irq = pinctrl_lookup_state(fp_dev->pin.pinctrl, "fingerprint_irq");
+
+    fp_dev->pin.pins_irq = pinctrl_lookup_state(fp_dev->pin.pinctrl, "irq-init");
     if (IS_ERR(fp_dev->pin.pins_irq)) {
         ret = PTR_ERR(fp_dev->pin.pins_irq);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp irq-init\n", __func__);
         return ret;
     }
 
-    //fp_dev->pin.pins_rst_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-high");
-    fp_dev->pin.pins_rst_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "fingerprint_reset_high");
+    fp_dev->pin.pins_rst_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-high");
     if (IS_ERR(fp_dev->pin.pins_rst_h)) {
         ret = PTR_ERR(fp_dev->pin.pins_rst_h);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp rst-high\n", __func__);
         return ret;
     }
-    //fp_dev->pin.pins_rst_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-low");
-    fp_dev->pin.pins_rst_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "fingerprint_reset_low");
+    fp_dev->pin.pins_rst_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "rst-low");
     if (IS_ERR(fp_dev->pin.pins_rst_l)) {
         ret = PTR_ERR(fp_dev->pin.pins_rst_l);
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp rst-high\n", __func__);
         return ret;
     }
-#if 0//def BSP_SIL_CTRL_SPI
+#ifdef BSP_SIL_CTRL_SPI
     fp_dev->pin.spi_default = pinctrl_lookup_state(fp_dev->pin.pinctrl, "spi-default");
     if (IS_ERR(fp_dev->pin.spi_default)) {
         ret = PTR_ERR(fp_dev->pin.spi_default);
@@ -304,29 +311,38 @@ static int silfp_parse_dts(struct silfp_data* fp_dev)
 #endif /* BSP_SIL_CTRL_SPI */
 
     /* Get power settings */
-#if 0//def BSP_SIL_POWER_SUPPLY_PINCTRL
-    fp_dev->pin.pins_avdd_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "avdd-enable");
+#ifdef BSP_SIL_POWER_SUPPLY_PINCTRL
+    fp_dev->pin.pins_avdd_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "avdd-enable"); // fp_vdd
     if (IS_ERR_OR_NULL(fp_dev->pin.pins_avdd_h)) {
         fp_dev->pin.pins_avdd_h = NULL;
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp avdd-enable\n", __func__);
         // Ignore error
     }
-
+/* HS03S code added for DEVAL5625-2567 by wurui at 20211122 start */
+    fp_dev->pin.pins_avdd_l = pinctrl_lookup_state(fp_dev->pin.pinctrl, "avdd-disable"); // fp_vdd
+    if (IS_ERR_OR_NULL(fp_dev->pin.pins_avdd_l)) {
+        fp_dev->pin.pins_avdd_l = NULL;
+        LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp avdd-disable\n", __func__);
+        // Ignore error
+    }
+/* HS03S code added for DEVAL5625-2567 by wurui at 20211122 end */
+#ifdef VDDIO
     fp_dev->pin.pins_vddio_h = pinctrl_lookup_state(fp_dev->pin.pinctrl, "vddio-enable");
     if (IS_ERR_OR_NULL(fp_dev->pin.pins_vddio_h)) {
         fp_dev->pin.pins_vddio_h = NULL;
         LOG_MSG_DEBUG(ERR_LOG, "%s can't find silfp vddio-enable\n", __func__);
         // Ignore error
     }
+#endif /* VDDIO */
 #endif /* BSP_SIL_POWER_SUPPLY_PINCTRL */
 
-#if 0//def BSP_SIL_POWER_SUPPLY_REGULATOR
+#ifdef BSP_SIL_POWER_SUPPLY_REGULATOR
     // Todo: use correct settings.
-    fp_dev->avdd_ldo = regulator_get(&fp_dev->spi->dev, "avdd");
-    fp_dev->vddio_ldo= regulator_get(&fp_dev->spi->dev, "vddio");
+    fp_dev->avdd_ldo = regulator_get(&fp_dev->spi->dev, "fp_vdd");
+    //fp_dev->vddio_ldo= regulator_get(&fp_dev->spi->dev, "vddio");
 #endif /* BSP_SIL_POWER_SUPPLY_REGULATOR */
 
-#if 0//(!defined(CONFIG_SILEAD_FP_PLATFORM))
+#if (!defined(CONFIG_SILEAD_FP_PLATFORM))
     if ( fp_dev->spi->dev.of_node ) {
         /* Get the SPI ID (#1-6) */
         ret = of_property_read_u32(fp_dev->spi->dev.of_node,"spi-id", &fp_dev->pin.spi_id);
@@ -367,24 +383,21 @@ static int silfp_set_spi(struct silfp_data *fp_dev, bool enable)
     LOG_MSG_DEBUG(DBG_LOG, "[%s] done\n",__func__);
 #else
     int ret = -ENOENT;
-    struct mt_spi_t *ms = NULL;
-    ms = spi_master_get_devdata(fp_dev->spi->master);
-
-    if ( /*!fp_dev->pin.spi_id || */ !ms ) {
-        LOG_MSG_DEBUG(ERR_LOG, "%s: not support\n", __func__);
-        return ret;
-    }
-
+   // struct mt_spi_t *ms = NULL;
+    //ms = spi_master_get_devdata(fp_dev->spi->master);
     if ( enable && !atomic_read(&fp_dev->spionoff_count) ) {
+		LOG_MSG_DEBUG(DBG_LOG, "[%s] acq start \n",__func__);
         atomic_inc(&fp_dev->spionoff_count);
         /*	clk_prepare_enable(ms->clk_main); */
-        //ret = clk_enable(ms->clk_main);
-         ret = mt_spi_enable_master_clk(fp_dev->spi); 
+      //  ret = clk_enable(ms->clk_main);
+        mt_spi_enable_master_clk(fp_dev->spi);
+		ret = 0;
     } else if (atomic_read(&fp_dev->spionoff_count)) {
+		LOG_MSG_DEBUG(DBG_LOG, "[%s] release start \n",__func__);
         atomic_dec(&fp_dev->spionoff_count);
         /*	clk_disable_unprepare(ms->clk_main); */
         //clk_disable(ms->clk_main);
-         mt_spi_disable_master_clk(fp_dev->spi); 
+        mt_spi_disable_master_clk(fp_dev->spi);
         ret = 0;
     } else {
         LOG_MSG_DEBUG(ERR_LOG, "unpaired enable/disable %d [%s]\n",enable, __func__);
@@ -455,7 +468,11 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
 
     fp_dev->irq_no_use = 0;
     silfp_parse_dts(fp_dev);
+    pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_l);
+    mdelay(1);
     silfp_hw_poweron(fp_dev);
+    mdelay(5);
+    pinctrl_select_state(fp_dev->pin.pinctrl, fp_dev->pin.pins_rst_h); 
     /*fp_dev->int_port = of_get_named_gpio(fp_dev->spi->dev.of_node, "irq-gpios", 0);
     fp_dev->rst_port = of_get_named_gpio(fp_dev->spi->dev.of_node, "rst-gpios", 0); */
     LOG_MSG_DEBUG(INFO_LOG, "[%s] int_port %d, rst_port %d.\n",__func__,fp_dev->int_port,fp_dev->rst_port);
@@ -497,9 +514,9 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
     }
 
     if (!ret) {
-        if (silfp_input_init(fp_dev)) {
-            goto err_input;
-        }
+        //if (silfp_input_init(fp_dev)) {
+        //    goto err_input;
+        //}
         atomic_set(&fp_dev->init,1);
     }
 
@@ -516,10 +533,10 @@ static int silfp_resource_init(struct silfp_data *fp_dev, struct fp_dev_init_t *
 
     return status;
 
-err_input:
-    if (fp_dev->rst_port > 0 ) {
+//err_input:
+//    if (fp_dev->rst_port > 0 ) {
         //gpio_free(fp_dev->rst_port);
-    }
+//    }
 
 err_rst:
     free_irq(fp_dev->irq, fp_dev);

@@ -21,6 +21,8 @@
  * Bill Yu    2018/6/7    0.1.4      Support create proc node
  * Bill Yu    2018/6/27   0.1.5      Expand pwdn I/F
  * Rui Wu     2019/10/10  0.1.6      Support create class node
+ * Bill Yu    2020/5/11   0.1.7      Netlink id should < 32
+ * Bill Yu    2020/5/29   0.1.8      Default use poll
  *
  */
 
@@ -30,6 +32,7 @@
 #include <linux/printk.h>
 #include <linux/pm_wakeup.h>
 
+#define BSP_SIL_PLAT_MTK 1
 #ifndef _LINUX_WAKELOCK_H
 enum {
     WAKE_LOCK_SUSPEND, /* Prevent suspend */
@@ -206,15 +209,18 @@ struct fp_dev_touch_info {
 
 #define RESET_TIME            2	/* Default chip reset wait time(ms) */
 #define RESET_TIME_MULTIPLE   1 /* Multiple for reset time multiple*wait_time */
-#define SIFP_NETLINK_ROUTE    30
+#define SIFP_NETLINK_ROUTE    0 /* 0: poll/1-31: netlink(cat /proc/net/netlink)/ > 31: epoll/ 30 */
 #define NL_MSG_LEN            16
 
 //#define PROC_DIR		"fp"      /* if defined, create node under /proc/fp/xxx */
 #define PROC_NODE		"fp_id"   /* proc node name */
+//Bug 612359,zjj.wt,add,2021/01/18, add fp adm node
 
+/* HS03s code added for SR-AL5625-01-199 by wurui at 20210513 start */
 //#define CLASS_NODE   "fingerprint"   /* if defined, create class node /sys/class/fingerprint/fingerprint */
+/* HS03s code added for SR-AL5625-01-199 by wurui at 20210513 end */
 
-#if (SIFP_NETLINK_ROUTE > 0)
+#if (SIFP_NETLINK_ROUTE > 0) && (SIFP_NETLINK_ROUTE < 32)
     #define BSP_SIL_NETLINK
 #endif
 
@@ -224,12 +230,12 @@ struct fp_dev_touch_info {
 
 /* Todo: enable correct power supply mode */
 //#define BSP_SIL_POWER_SUPPLY_REGULATOR
-//#define BSP_SIL_POWER_SUPPLY_PINCTRL
+#define BSP_SIL_POWER_SUPPLY_PINCTRL
 //#define BSP_SIL_POWER_SUPPLY_GPIO
 
 /* AVDD voltage range 2.8v ~ 3.3v */
-#define AVDD_MAX  2800000
-#define AVDD_MIN  2800000
+#define AVDD_MAX  3300000
+#define AVDD_MIN  3300000
 
 /* VDDIO voltage range 1.8v ~ AVDD */
 #define VDDIO_MAX 1800000
@@ -248,7 +254,7 @@ struct fp_dev_touch_info {
   #define PKG_SIZE 1
   //#define BSP_SIL_DYNAMIC_SPI
  #ifndef CONFIG_SILEAD_FP_PLATFORM
-  #define BSP_SIL_CTRL_SPI
+  //#define BSP_SIL_CTRL_SPI
  #endif /* !CONFIG_SILEAD_FP_PLATFORM */
 #elif defined(BSP_SIL_PLAT_QCOM)
   #define QSEE_V4  /* Enable it if QSEE v4 or higher */
