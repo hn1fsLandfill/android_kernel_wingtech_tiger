@@ -275,10 +275,10 @@ bool usb_prepare_clock(bool enable)
 
 	mutex_lock(&prepare_lock);
 
-	if (IS_ERR_OR_NULL(glue->musb_clk) ||
-			IS_ERR_OR_NULL(glue->musb_ref_clk) ||
-			IS_ERR_OR_NULL(glue->musb_clk_top_sel) ||
-			IS_ERR_OR_NULL(glue->musb_clk_univpll5_d4)) {
+	if (IS_ERR_OR_NULL(musb_clk) ||
+			IS_ERR_OR_NULL(musb_ref_clk) ||
+			IS_ERR_OR_NULL(musb_clk_top_sel) ||
+			IS_ERR_OR_NULL(musb_clk_univpll5_d4)) {
 		DBG(0, "clk not ready\n");
 		mutex_unlock(&prepare_lock);
 		return 0;
@@ -286,25 +286,25 @@ bool usb_prepare_clock(bool enable)
 
 	if (enable) {
 
-		if (clk_prepare(glue->musb_clk_top_sel)) {
+		if (clk_prepare(musb_clk_top_sel)) {
 			DBG(0, "musb_clk_top_sel prepare fail\n");
 		} else {
-			if (clk_set_parent(glue->musb_clk_top_sel,
-						glue->musb_clk_univpll5_d4))
+			if (clk_set_parent(musb_clk_top_sel,
+						musb_clk_univpll5_d4))
 				DBG(0, "musb_clk_top_sel set_parent fail\n");
 		}
-		if (clk_prepare(glue->musb_clk))
+		if (clk_prepare(musb_clk))
 			DBG(0, "musb_clk prepare fail\n");
 
-		if (clk_prepare(glue->musb_ref_clk))
+		if (clk_prepare(musb_ref_clk))
 			DBG(0, "musb_ref_clk prepare fail\n");
 
 		atomic_inc(&clk_prepare_cnt);
 	} else {
 
-		clk_unprepare(glue->musb_clk_top_sel);
-		clk_unprepare(glue->musb_ref_clk);
-		clk_unprepare(glue->musb_clk);
+		clk_unprepare(musb_clk_top_sel);
+		clk_unprepare(musb_ref_clk);
+		clk_unprepare(musb_clk);
 
 		atomic_dec(&clk_prepare_cnt);
 	}
@@ -344,21 +344,21 @@ bool usb_enable_clock(bool enable)
 	}
 
 	if (enable && count == 0) {
-		if (clk_enable(glue->musb_clk_top_sel)) {
+		if (clk_enable(musb_clk_top_sel)) {
 			DBG(0, "musb_clk_top_sel enable fail\n");
 			goto exit;
 		}
 
-		if (clk_enable(glue->musb_clk)) {
+		if (clk_enable(musb_clk)) {
 			DBG(0, "musb_clk enable fail\n");
-			clk_disable(glue->musb_clk_top_sel);
+			clk_disable(musb_clk_top_sel);
 			goto exit;
 		}
 
-		if (clk_enable(glue->musb_ref_clk)) {
+		if (clk_enable(musb_ref_clk)) {
 			DBG(0, "musb_ref_clk enable fail\n");
-			clk_disable(glue->musb_clk);
-			clk_disable(glue->musb_clk_top_sel);
+			clk_disable(musb_clk);
+			clk_disable(musb_clk_top_sel);
 			goto exit;
 		}
 
@@ -366,9 +366,9 @@ bool usb_enable_clock(bool enable)
 		real_enable++;
 
 	} else if (!enable && count == 1) {
-		clk_disable(glue->musb_clk);
-		clk_disable(glue->musb_ref_clk);
-		clk_disable(glue->musb_clk_top_sel);
+		clk_disable(musb_clk);
+		clk_disable(musb_ref_clk);
+		clk_disable(musb_clk_top_sel);
 
 		usb_hal_dpidle_request(USB_DPIDLE_ALLOWED);
 		real_disable++;

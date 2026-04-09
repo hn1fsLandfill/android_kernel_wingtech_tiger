@@ -57,6 +57,21 @@
 #define RT1711H_DID_C		0x2172
 
 #define RT1715_DID_D			0x2173
+#define HUSB311_DID             0x0
+
+
+#define RICHTEK_1711_VID	0x29cf
+#define RICHTEK_1711_PID	0x1711
+
+#define HUSB311_VID	        0x2e99
+#define HUSB311_PID	        0x0311
+
+#define ET7303A_VID	        0x6dcf
+#define ET7303A_PID	        0x1711
+
+#define SC2150A_VID	        0x311c
+#define SC2150A_PID	        0x2150
+
 
 /*
  * RT1711H_REG_PHY_CTRL1			(0x80)

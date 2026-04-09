@@ -1,17 +1,17 @@
-/************************************************************************
+/*
+ * Copyright (C) 2017 MediaTek Inc.
  *
- *  WILLSEMI TypeC Chipset Driver for Linux & Android.  
+ * Mediatek wusb3801 Type-C Port Control Driver
  *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
- * ######################################################################
- *
- *  Author: lei.huang (lhuang@sh-willsemi.com)
- *
- * Copyright (c) 2021, WillSemi Inc. All rights reserved.
- *
- ************************************************************************/
-
-
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ */
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/device.h>
@@ -30,160 +30,43 @@
 #include <linux/pm_wakeup.h>
 #include <linux/sched/clock.h>
 #include <uapi/linux/sched/types.h>
-
+#include <linux/kernel.h>
+#include <linux/compiler.h>
 #include "inc/pd_dbg_info.h"
 #include "inc/tcpci.h"
+#include "inc/wusb3801.h"
+
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/mutex.h>
+#include <linux/atomic.h>
+#include <linux/kthread.h>
+#include <linux/hrtimer.h>
+#include <linux/version.h>
+
+#include <linux/sched/rt.h>
+#include <uapi/linux/sched/types.h>
+
+#include "inc/tcpci.h"
+#include "inc/tcpci_timer.h"
 #include "inc/tcpci_typec.h"
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0))
+#include <linux/pm_wakeup.h>
+#include <linux/sched/types.h>
+#include <linux/sched/clock.h>
+
+#if 1 /*  #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0))*/
 #include <linux/sched/rt.h>
-#endif
+#endif /* #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)) */
 
-#define WUSB3801_IRQ_WAKE_TIME	(500) /* ms */
-/* Register Map */
-#define WUSB3801_DRV_VERSION	"3.1.0_MTK"
+#define __TEST_CC_PATCH__
 
-/******************************************************************************
-* Register addresses
-******************************************************************************/
-#define WUSB3801_REG_VERSION_ID         0x01
-#define WUSB3801_REG_CONTROL0           0x02
-#define WUSB3801_REG_INTERRUPT          0x03
-#define WUSB3801_REG_STATUS             0x04
-#define WUSB3801_REG_CONTROL1           0x05
-#define WUSB3801_REG_TEST0              0x06
-#define WUSB3801_REG_TEST_01            0x07
-#define WUSB3801_REG_TEST_02            0x08
-#define WUSB3801_REG_TEST_03            0x09
-#define WUSB3801_REG_TEST_04            0x0A
-#define WUSB3801_REG_TEST_05            0x0B
-#define WUSB3801_REG_TEST_06            0x0C
-#define WUSB3801_REG_TEST_07            0x0D
-#define WUSB3801_REG_TEST_08            0x0E
-#define WUSB3801_REG_TEST_09            0x0F
-#define WUSB3801_REG_TEST_0A            0x10
-#define WUSB3801_REG_TEST_0B            0x11
-#define WUSB3801_REG_TEST_0C            0x12
-#define WUSB3801_REG_TEST_0D            0x13
-#define WUSB3801_REG_TEST_0E            0x14
-#define WUSB3801_REG_TEST_0F            0x15
-#define WUSB3801_REG_TEST_10            0x16
-#define WUSB3801_REG_TEST_11            0x17
-#define WUSB3801_REG_TEST_12            0x18
+/* #define DEBUG_GPIO	66 */
 
+#define WUSB3801_DRV_VERSION	"2.0.1_MTK"
 
-#define WUSB3801_SLAVE_ADDR0            0xc0
-#define WUSB3801_SLAVE_ADDR1            0xd0
-/******************************************************************************
-* Register bits
-******************************************************************************/
-/* WUSB3801_REG_VERSION_ID (0x01)  RU*/
-/* WUSB3801_REG_CONTROL0 (0x02) */
-#define CTRL_INT_SHIFT    0
-#define CTRL_INT          (0x01 << CTRL_INT_SHIFT)      /*RW*/
-#define CTRL_WORK_MODE_SHIFT  1
-#define CTRL_WORK_MODE        (0x03 << CTRL_WORK_MODE_SHIFT)    /*RCU*/
-#define CTRL_CURRENT_MODE_SHIFT         3
-#define CTRL_CURRENT_MODE               (0x03 << CTRL_CURRENT_MODE_SHIFT)           /*RU*/
-#define CTRL_TRY_SNK_SRC_SHIFT    5
-#define CTRL_TRY_SNK_SRC           (0x03 << CTRL_TRY_SNK_SRC_SHIFT)      /*RU*/
-#define CTRL_ACC_SUPPORT_SHIFT    7
-#define CTRL_ACC_SUPPORT          (0x01 << CTRL_ACC_SUPPORT_SHIFT)      /*RU*/
+#define WUSB3801_IRQ_WAKE_TIME	(1000) /* ms */
 
-/* WUSB3801_REG_INTERRUPT (0x03) */
-#define INT_ATTACH_DETACH_SHIFT        0x00    /*RW*/
-#define INT_ATTACH_DETACH          (0x03 << INT_ATTACH_DETACH_SHIFT)      /*RU*/
-
-/* WUSB3801_REG_STATUS (0x04) */
-#define CC_STATUS_PLUG_ORIENTATION_SHIFT    0
-#define CC_STATUS_PLUG_ORIENTATION          (0x03 << CC_STATUS_PLUG_ORIENTATION_SHIFT)      /*RW*/
-#define CC_PLUG_PORT_STATUS_SHIFT  2
-#define CC_PLUG_PORT_STATUS      (0x07 << CC_PLUG_PORT_STATUS_SHIFT)    /*RCU*/
-#define CC_STATUS_CHARGING_CURRENT_SNK_SHIFT         5
-#define CC_STATUS_CHARGING_CURRENT_SNK              (0x03 << CC_STATUS_CHARGING_CURRENT_SNK_SHIFT)           /*RU*/
-#define CC_STATUS_VBUS_DETECTION_SRC_SHIFT    7
-#define CC_STATUS_VBUS_DETECTION_SRC         (0x01 << CC_STATUS_VBUS_DETECTION_SRC_SHIFT)      /*RU*/
-
-
-/* SET_MODE_SELECT */
-//#define SET_MODE_SELECT_DEFAULT  0x00
-#define SET_MODE_SELECT_SNK       0x00
-#define SET_MODE_SELECT_SRC       0x01
-#define SET_MODE_SELECT_DRP       0x02
-
-/* MOD_CURRENT_MODE_ADVERTISE */
-#define MOD_CURRENT_MODE_ADVERTISE_DEFAULT      0x00
-#define MOD_CURRENT_MODE_ADVERTISE_MID          0x01
-#define MOD_CURRENT_MODE_ADVERTISE_HIGH         0x02
-/* MOD_CURRENT_MODE_DETECT */
-#define MOD_CURRENT_MODE_DETECT_DEFAULT      0x00
-#define MOD_CURRENT_MODE_DETECT_MID          0x01
-#define MOD_CURRENT_MODE_DETECT_ACCESSARY    0x02
-#define MOD_CURRENT_MODE_DETECT_HIGH         0x03
-
-#define CC_STATUS_VBUS_DETECTION       0x01
-
-
-#define  IC_TEST_DEV
-/******************************************************************************
- * Constants
- ******************************************************************************/
-enum current_adv_type {
-	HOST_CUR_USB = 0,   /*default 500mA or 900mA*/
-	HOST_CUR_1P5,      /*1.5A*/
-	HOST_CUR_3A       /*3A*/
-};
-
-enum current_det_type {
-	DET_CUR_ACCESSORY = 0,  /*charg through accessory 500mA*/
-	DET_CUR_USB,    /*default 500mA or 900mA*/
-	DET_CUR_1P5,
-	DET_CUR_3A
-};
-
-enum cable_attach_type {
-	CABLE_NOT_INT = 0,
-	CABLE_ATTACHED,
-	CABLE_NOT_ATTACHED
-};
-
-enum cable_state_type {
-	CABLE_STATE_NOT_ATTACHED = 0,
-	CABLE_STATE_AS_DFP,
-	CABLE_STATE_AS_UFP,
-	CABLE_STATE_TO_ACCESSORY,
-	CABLE_STATE_TO_DEBUG
-};
-
-enum cable_dir_type {
-	ORIENT_DEFAULT,
-	ORIENT_CC1,
-	ORIENT_CC2,
-	ORIENT_CC1_CC2
-};
-
-enum cc_modes_type {
-	MODE_UFP,
-	MODE_DFP,
-	MODE_DRP
-};
-
-enum int_attach_type {
-	INT_NOT_INT = 0,
-	INT_ATTACHED,
-	INT_NOT_ATTACHED
-};
-
-/* Type-C Attrs */
-struct type_c_parameters {
-	enum current_det_type current_det;         /*charging current on UFP*/
-	enum int_attach_type int_attach;     /*if an accessory is attached*/
-	//enum cable_attach_type active_cable_attach;         /*if an active_cable is attached*/
-	enum cable_state_type attach_state;        /*DFP->UFP or UFP->DFP*/
-	enum cable_dir_type cable_dir;           /*cc1 or cc2*/
-};
-
-/*Working context structure*/
 struct wusb3801_chip {
 	struct i2c_client *client;
 	struct device *dev;
@@ -194,311 +77,316 @@ struct wusb3801_chip {
 	struct kthread_worker irq_worker;
 	struct kthread_work irq_work;
 	struct task_struct *irq_worker_task;
-	struct wakeup_source irq_wake_lock;
-	struct mutex  mutex;
+	struct wakeup_source *irq_wake_lock;
+	struct wakeup_source *i2c_wake_lock;
 
 	atomic_t poll_count;
 	struct delayed_work	poll_work;
+	struct delayed_work	first_check_typec_work;
 
-	struct type_c_parameters type_c_param;
-	struct type_c_parameters type_c_param_old;
 	int irq_gpio;
+#ifdef __TEST_CC_PATCH__
+	uint8_t     cc_test_flag;
+	uint8_t     cc_sts;
+#endif	/* __TEST_CC_PATCH__ */
+	uint8_t     dev_id;
+	uint8_t     dev_sub_id;
 	int irq;
 	int chip_id;
 };
 
-/* i2c operate interfaces */
-static int wusb3801_read_reg(struct i2c_client *i2c, u8 reg, u8 *dest)
-{
-	struct wusb3801_chip *info = i2c_get_clientdata(i2c);
-	int ret;
+enum wusb3801_mode {
+  REVERSE_CHG_DRP,
+  REVERSE_CHG_SINK,
+  REVERSE_CHG_SOURCE,
+};
 
-	mutex_lock(&info->mutex);
-	ret = i2c_smbus_read_byte_data(i2c, reg);
-	mutex_unlock(&info->mutex);
+#ifdef __TEST_CC_PATCH__
+	uint8_t     typec_cc_orientation;
+#endif	/* __TEST_CC_PATCH__ */
+static struct i2c_client *w_client;
+
+static int wusb3801_read_device(void *client, u32 reg, int len, void *dst)
+{
+	struct i2c_client *i2c = (struct i2c_client *)client;
+	struct wusb3801_chip *chip = i2c_get_clientdata(i2c);
+	int ret = 0, count = 5;
+
+	__pm_stay_awake(chip->i2c_wake_lock);
+	down(&chip->suspend_lock);
+	while (count) {
+		if (len > 1) {
+			ret = i2c_smbus_read_i2c_block_data(i2c, reg, len, dst);
+			if (ret < 0)
+				count--;
+			else
+				goto out;
+		} else {
+			ret = i2c_smbus_read_byte_data(i2c, reg);
+			if (ret < 0)
+				count--;
+			else {
+				*(u8 *)dst = (u8)ret;
+				goto out;
+			}
+		}
+		udelay(100);
+	}
+out:
+	up(&chip->suspend_lock);
+	__pm_relax(chip->i2c_wake_lock);
+	return ret;
+}
+
+static int wusb3801_write_device(void *client, u32 reg, int len, const void *src)
+{
+	const u8 *data;
+	struct i2c_client *i2c = (struct i2c_client *)client;
+	struct wusb3801_chip *chip = i2c_get_clientdata(i2c);
+	int ret = 0, count = 5;
+
+	__pm_stay_awake(chip->i2c_wake_lock);
+	down(&chip->suspend_lock);
+	while (count) {
+		if (len > 1) {
+			ret = i2c_smbus_write_i2c_block_data(i2c,
+							reg, len, src);
+			if (ret < 0)
+				count--;
+			else
+				goto out;
+		} else {
+			data = src;
+			ret = i2c_smbus_write_byte_data(i2c, reg, *data);
+			if (ret < 0)
+				count--;
+			else
+				goto out;
+		}
+		udelay(100);
+	}
+out:
+	up(&chip->suspend_lock);
+	__pm_relax(chip->i2c_wake_lock);
+	return ret;
+}
+
+static int wusb3801_reg_read(struct i2c_client *i2c, u8 reg)
+{
+	struct wusb3801_chip *chip = i2c_get_clientdata(i2c);
+	u8 val = 0;
+	int ret = 0;
+
+	ret = wusb3801_read_device(chip->client, reg, 1, &val);
 	if (ret < 0) {
-		pr_err("%s: (0x%x) error, ret(%d)\n", __func__, reg, ret);
+		dev_err(chip->dev, "wusb3801 reg read fail\n");
 		return ret;
 	}
-
-	ret &= 0xff;
-	*dest = ret;
-	return 0;
+	return val;
 }
-#if 1//def __TEST_CC_PATCH__
-static int wusb3801_write_reg(struct i2c_client *i2c, u8 reg, u8 value)
-{
-	struct wusb3801_chip *info = i2c_get_clientdata(i2c);
-	int ret;
 
-	mutex_lock(&info->mutex);
-	ret = i2c_smbus_write_byte_data(i2c, reg, value);
-	mutex_unlock(&info->mutex);
+static int wusb3801_reg_write(struct i2c_client *i2c, u8 reg, const u8 data)
+{
+	struct wusb3801_chip *chip = i2c_get_clientdata(i2c);
+	int ret = 0;
+
+	ret = wusb3801_write_device(chip->client, reg, 1, &data);
 	if (ret < 0)
-		pr_err("%s: (0x%x) error, ret(%d)\n", __func__, reg, ret);
-
+		dev_err(chip->dev, "wusb3801 reg write fail\n");
 	return ret;
 }
-#endif
-static int wusb3801_update_reg(struct i2c_client *i2c, u8 reg, u8 val, u8 mask)
+
+static inline int wusb3801_i2c_write8(
+	struct tcpc_device *tcpc, u8 reg, const u8 data)
 {
-	struct wusb3801_chip *info = i2c_get_clientdata(i2c);
-	int ret;
-	u8 old_val, new_val;
+	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
 
-	mutex_lock(&info->mutex);
-	ret = i2c_smbus_read_byte_data(i2c, reg);
-
-	if (ret >= 0) {
-		old_val = ret & 0xff;
-		new_val = (val & mask) | (old_val & (~mask));
-		ret = i2c_smbus_write_byte_data(i2c, reg, new_val);
-	}
-	mutex_unlock(&info->mutex);
-	return ret;
+	return wusb3801_reg_write(chip->client, reg, data);
 }
 
-//
+static inline int wusb3801_i2c_read8(struct tcpc_device *tcpc, u8 reg)
+{
+	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
+
+	return wusb3801_reg_read(chip->client, reg);
+}
+
+static inline void wusb3801_unattached_cc_entry(struct tcpc_device *tcpc_dev)
+{
+	tcpc_dev->typec_role = tcpc_dev->typec_attach_new;
+	switch (tcpc_dev->typec_role) {
+	case TYPEC_ATTACHED_NORP_SRC:
+	case TYPEC_ROLE_SNK:
+		pr_info("%s set_cc sink\n", __func__);
+		tcpci_set_cc(tcpc_dev, TYPEC_CC_RD);
+    	break;
+	case TYPEC_ROLE_DRP:
+		pr_info("%s set_cc drp\n", __func__);
+		tcpci_set_cc(tcpc_dev, TYPEC_CC_DRP);
+		break;
+  }
+}
+
 #ifdef __TEST_CC_PATCH__
-#undef  __CONST_FFS
-#define __CONST_FFS(_x) \
-        ((_x) & 0x0F ? ((_x) & 0x03 ? ((_x) & 0x01 ? 0 : 1) :\
-                                      ((_x) & 0x04 ? 2 : 3)) :\
-                       ((_x) & 0x30 ? ((_x) & 0x10 ? 4 : 5) :\
-                                      ((_x) & 0x40 ? 6 : 7)))
-
-#undef  FFS
-#define FFS(_x) \
-        ((_x) ? __CONST_FFS(_x) : 0)
-
-#undef  BITS
-#define BITS(_end, _start) \
-        ((BIT(_end) - BIT(_start)) + BIT(_end))
-
-#undef  __BITS_GET
-#define __BITS_GET(_byte, _mask, _shift) \
-        (((_byte) & (_mask)) >> (_shift))
-
-#undef  BITS_GET
-#define BITS_GET(_byte, _bit) \
-        __BITS_GET(_byte, _bit, FFS(_bit))
-
 static int test_cc_patch(struct wusb3801_chip *chip)
 {
 	int rc;
-	int rc_reg_08;
-	int i = 0;
-	
+	int ret;
 	struct device *cdev = &chip->client->dev;
-	dev_err(cdev, "%s \n",__func__);
+	dev_err(cdev, "%s \n", __func__);
 
-	wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST_02, 0x82);
+	wusb3801_i2c_write8(chip->tcpc,
+			WUSB3801_REG_TEST_02, 0x82);
 	msleep(100);
-	wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST_09, 0xC0);
+	wusb3801_i2c_write8(chip->tcpc,
+			WUSB3801_REG_TEST_09, 0xC0);
 	msleep(100);
-	rc = wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST0);
+	rc = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_TEST0);
 	msleep(10);
-	wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST_09, 0x00);
+	wusb3801_i2c_write8(chip->tcpc,
+			WUSB3801_REG_TEST_09, 0x00);
 	msleep(10);
-	wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST_02, 0x80);
-//huanglei add for reg 0x08 write zero fail begin
-	do{
-    		msleep(100);
-        	wusb3801_write_reg(chip->tcpc, WUSB3801_REG_TEST_02, 0x00);
-	    	msleep(100);
-	    	rc = wusb3801_read_reg(chip->tcpc, WUSB3801_REG_TEST_02,&rc_reg_08);
-			i++;		
-	}while(rc_reg_08 != 0 && i < 5);
-//end	
-	dev_err(cdev, "%s rc = [0x%02x] \n",__func__, rc);
+	wusb3801_i2c_write8(chip->tcpc,
+			WUSB3801_REG_TEST_02, 0x80);
+	msleep(10);
+	wusb3801_i2c_write8(chip->tcpc,
+			WUSB3801_REG_TEST_02, 0x00);
+	pr_err("dhx---add msleep 200\n");
+	dev_err(cdev, "%s rc = [0x%02x] \n", __func__, rc);
+	ret = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_TEST_02);
+	if (ret & WUSB3801_FORCE_ERR_RCY_MASK) {
+		pr_err("wusb3801 [%s]enter error recovery :0x%x\n", __func__, ret);
+		wusb3801_i2c_write8(chip->tcpc, WUSB3801_REG_TEST_02, 0x00);
+	}
     return BITS_GET(rc, 0x40);
 }
 #endif /* __TEST_CC_PATCH__ */
 
-
-/************************************************************************
- *
- *       fregdump_show
- *
- *  Description :
- *  -------------
- *  Dump registers to user space. there is side-effects for Read/Clear 
- *  registers. For example interrupt status. 
- *
- ************************************************************************/
- #ifdef IC_TEST_DEV
-static ssize_t fregdump_show(struct device *dev,
-				struct device_attribute *attr,
-				char *buf)
+static int first_check_flag;
+static void wusb3801_irq_work_handler(struct kthread_work *work)
 {
-	struct i2c_client *client = to_i2c_client(dev);
-	struct wusb3801_chip *chip = i2c_get_clientdata(client);
-	int i, rc, ret = 0;
+	struct wusb3801_chip *chip =
+			container_of (work, struct wusb3801_chip, irq_work);
+	int rc,i;
+	int int_sts;
+	uint8_t status, type;
+	struct tcpc_device *tcpc;
 
-	mutex_lock(&chip->mutex);
-	for (i = WUSB3801_REG_VERSION_ID ; i <= WUSB3801_REG_TEST_12; i++) {
+	if (0 == first_check_flag)
+		return;
+
+	tcpc = chip->tcpc;
+		tcpci_lock_typec(tcpc);
+	/* get interrupt */
+	rc = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_INTERRUPT);
+	if (rc < 0) {
+		pr_err("%s: failed to read interrupt\n", __func__);
+		return;
+	}
+
+	if(rc == 0) {
+	  //huanglei dump all registers
+	  for (i = WUSB3801_REG_VERSION_ID ; i <= WUSB3801_REG_TEST_12; i++) {
 		rc = i2c_smbus_read_byte_data(chip->client, (uint8_t)i);
 		if (rc < 0) {
 			pr_err("cannot read 0x%02x\n", i);
 			rc = 0;
 		}
-		ret += snprintf(buf + ret, 1024 - ret, "from 0x%02x read 0x%02x\n", (uint8_t)i, rc);
+		pr_err("%s from 0x%02x read 0x%02x\n", __func__, (uint8_t)i, rc);
 	}
-	mutex_unlock(&chip->mutex);
-	return ret;
-}
-
-DEVICE_ATTR(fregdump, S_IRUGO, fregdump_show, NULL);
-#endif
-static int wusb3801_init_alert_mask(struct tcpc_device *tcpc)
-{
-	return 0;
-}
-
-static int wusb3801_init_power_status_mask(struct tcpc_device *tcpc)
-{
-	return 0;
-}
-
-static int wusb3801_init_fault_mask(struct tcpc_device *tcpc)
-{
-	return 0;
-}
-
-static int wusb3801_init_rt_mask(struct tcpc_device *tcpc)
-{
-	return 0;
-}
-
-static inline void wusb3801_poll_ctrl(struct wusb3801_chip *chip)
-{
-	cancel_delayed_work_sync(&chip->poll_work);
-
-	if (atomic_read(&chip->poll_count) == 0) {
-		atomic_inc(&chip->poll_count);
-		cpu_idle_poll_ctrl(true);
-	}
-
-	schedule_delayed_work(
-		&chip->poll_work, msecs_to_jiffies(40));
-}
-
-/***********************************************************
- * read registers in irq process
- ***********************************************************/
-static void process_mode_register(struct wusb3801_chip *info)
-{
-	#if 0
-	u8 val, tmp, reg_val;
-	int ret;
-	ret = wusb3801_read_reg(info->client, WUSB3801_REG_STATUS, &reg_val);
-	if (ret < 0) {
-		pr_err("%s err\n", __func__);
-		return;
-	}
-	tmp = reg_val;
-	/* check current_detect */
-	val = ((tmp & CC_STATUS_CHARGING_CURRENT_SNK) >> CC_STATUS_CHARGING_CURRENT_SNK_SHIFT);
-	info->type_c_param.current_det = val;
-	/* check accessory attch */
-	//tmp = reg_val;
-	//val = ((tmp & MOD_ACCESSORY_CONNECTED) >> MOD_ACCESSORY_CONNECTED_SHIFT);
-	//info->type_c_param.accessory_attach = val;
-
-	/* check cable attach */
-	//tmp = reg_val;
-	//val = (tmp & CC_PLUG_PORT_STATUS) >> CC_PLUG_PORT_STATUS_SHIFT;
-	//info->type_c_param.active_cable_attach = val;
-	/* check attach state */
-	val = ((tmp & CC_PLUG_PORT_STATUS) >> CC_PLUG_PORT_STATUS_SHIFT);
-	info->type_c_param.attach_state = val;
-	/* update current adv when act as DFP */
-	if (info->type_c_param.attach_state == CABLE_STATE_AS_DFP ||
-	    info->type_c_param.attach_state == CABLE_STATE_TO_ACCESSORY) {
-		val = (HOST_CUR_USB << CTRL_CURRENT_MODE_SHIFT);
-	} else {
-		val = (HOST_CUR_3A << CTRL_CURRENT_MODE_SHIFT);
-	}
-	wusb3801_update_reg(info->client, WUSB3801_REG_CONTROL0, val, CTRL_CURRENT_MODE);
-	/* check cable dir */
-	//tmp = reg_val;
-	//val = ((tmp & CC_STATUS_PLUG_ORIENTATION) >> CC_STATUS_PLUG_ORIENTATION_SHIFT);
-	//info->type_c_param.cable_dir = val;
-	//printk("wusb3801 process_mode_register reg_val=%d,val=%d\n",reg_val,val);
-	printk("wusb3801 process_mode_register attach_state=%d,current_det =%d\n",info->type_c_param.attach_state,info->type_c_param.current_det);
-	#endif
-}
-
-static void process_interrupt_register(struct wusb3801_chip *info)
-{
-	#if 0
-	u8 val, tmp, reg_val;
-	int ret;
-	/* get interrupt */
-	ret = wusb3801_read_reg(info->client, WUSB3801_REG_INTERRUPT, &reg_val);
-	if (ret < 0) {
-		pr_err("%s err\n", __func__);
-		return;
-	}
-	tmp = reg_val;
-	val = (tmp & INT_ATTACH_DETACH) >> INT_ATTACH_DETACH_SHIFT;
-	printk("wusb3801interrupt_register ATTACH=%d\n",val);
-	#endif
-}
-
-static void wusb3801_irq_work_handler(struct kthread_work *work)
-{
-	struct wusb3801_chip *chip =
-			container_of(work, struct wusb3801_chip, irq_work);
-	int regval = 0;
-	int gpio_val;
-	#ifdef IC_TEST_DEV
-	int i = 0;
-	int rc = 0;
-	#endif
-	wusb3801_poll_ctrl(chip);
-	/* make sure I2C bus had resumed */
-	down(&chip->suspend_lock);
-	tcpci_lock_typec(chip->tcpc);
-
-	process_mode_register(chip);
-	process_interrupt_register(chip);
-	printk("wusb3801_irq_work_handler\n");
-	do {
-		regval = tcpci_alert(chip->tcpc);
-		#ifdef IC_TEST_DEV
-		if(regval)
-		{
-			printk("wusb3801_tcpci_alert\n");
-		}
-		#endif
-		if (regval)
-			break;
-		gpio_val = gpio_get_value(chip->irq_gpio);
-		#ifdef IC_TEST_DEV
-		//异常情况 出现清除中断，中断脚应该置高，现在还是置低打印所有寄存器信息到FAE分析
-		for (i = WUSB3801_REG_VERSION_ID ; i <= WUSB3801_REG_TEST_12; i++) {
-			rc = i2c_smbus_read_byte_data(chip->client, (uint8_t)i);
-			if (rc < 0) {
-				printk("wusb3801 cannot read 0x%02x\n", i);
-				rc = 0;
-			}
-			//ret += snprintf(buf + ret, 1024 - ret, "from 0x%02x read 0x%02x\n", (uint8_t)i, rc);
-			printk("wusb3801_0x%02x_0x%02x\n", (uint8_t)i, rc);
-		}
-		#endif
-	} while (gpio_val == 0);
-
 	tcpci_unlock_typec(chip->tcpc);
-	up(&chip->suspend_lock);
-}
-static void wusb3801_poll_work(struct work_struct *work)
-{
-	struct wusb3801_chip *chip = container_of(
-		work, struct wusb3801_chip, poll_work.work);
+	  	
+	}
+	int_sts = rc & WUSB3801_INT_STS_MASK;
 
-	if (atomic_dec_and_test(&chip->poll_count))
-		cpu_idle_poll_ctrl(false);
+	rc = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_STATUS);
+	if (rc < 0) {
+		pr_err("%s: failed to read reg status\n", __func__);
+		return;
+	}
+	pr_info("%s WUSB3801_REG_STATUS : 0x%02x\n", __func__, rc);
+
+	pr_info("%s: int_sts[0x%02x]\n", __func__, int_sts);
+		status = (rc & WUSB3801_ATTACH) ? true : false;
+	type = status ? \
+			rc & WUSB3801_TYPE_MASK : WUSB3801_TYPE_INVALID;
+	pr_info("sts[0x%02x], type[0x%02x]\n", status, type);
+	if (int_sts & WUSB3801_INT_DETACH) {
+		#ifdef __TEST_CC_PATCH__
+		if (chip->cc_test_flag == 1) {
+			pr_err("%s: test_cc_patch not used int and return \n", __func__);
+			tcpci_unlock_typec(tcpc);
+			return;
+		}
+		#endif	/* __TEST_CC_PATCH__ */
+		typec_cc_orientation = 0x0;
+		tcpc->typec_attach_new = TYPEC_UNATTACHED;
+		//tcpc->typec_role = TYPEC_ROLE_UNKNOWN;
+		tcpci_report_usb_port_changed(tcpc);
+		if (tcpc->typec_attach_old == TYPEC_ATTACHED_SRC) {
+		    tcpci_source_vbus(tcpc, TCP_VBUS_CTRL_TYPEC, TCPC_VBUS_SOURCE_0V, 0);
+		}
+		tcpc->typec_attach_old = TYPEC_UNATTACHED;
+	}
+	if (int_sts & WUSB3801_INT_ATTACH) {
+#ifdef __TEST_CC_PATCH__
+	if (chip->dev_sub_id != 0xA0) {
+		if (chip->cc_test_flag == 0 &&  BITS_GET(rc, WUSB3801_CC_STS_MASK) == 0) {
+			chip->cc_sts = test_cc_patch(chip);
+			chip->cc_test_flag = 1;
+			pr_err("%s: cc_sts[0x%02x]\n", __func__, chip->cc_sts);
+			tcpci_unlock_typec(tcpc);
+			return;
+		}
+		if (chip->cc_test_flag == 1) {
+			chip->cc_test_flag = 0;
+			if (BITS_GET(rc, WUSB3801_CC_STS_MASK) == 0) {
+				if (chip->cc_sts == WUSB3801_CC2_CONNECTED)
+					rc = rc | 0x02;
+				else if (chip->cc_sts == WUSB3801_CC1_CONNECTED)
+					rc = rc | 0x01;
+				pr_err("%s: cc_test_patch rc[0x%02x]\n",
+						__func__, rc);
+			} else
+				pr_err("%s:rc[0x%x},cc is not null\n",
+						__func__, rc);
+		}
+	}
+	typec_cc_orientation = BITS_GET(rc, WUSB3801_CC_STS_MASK);
+#endif	/* __TEST_CC_PATCH__ */
+	switch (type) {
+	case WUSB3801_TYPE_SNK:
+		/*if ( tcpc->typec_role != TYPEC_ROLE_SRC) {
+				tcpc->typec_role = TYPEC_ROLE_SRC;
+				tcpci_notify_role_swap(tcpc, TCP_NOTIFY_DR_SWAP, PD_ROLE_DFP);
+		}*/
+		if (tcpc->typec_attach_new != TYPEC_ATTACHED_SRC) {
+				tcpc->typec_attach_new = TYPEC_ATTACHED_SRC;
+				tcpci_source_vbus(tcpc, TCP_VBUS_CTRL_TYPEC, TCPC_VBUS_SOURCE_5V, 0);
+				tcpci_report_usb_port_changed(tcpc);
+				tcpc->typec_attach_old = TYPEC_ATTACHED_SRC;
+		}
+		break;
+	case WUSB3801_TYPE_SRC:
+		 /*if ( tcpc->typec_role != TYPEC_ROLE_SNK) {
+				tcpc->typec_role = TYPEC_ROLE_SNK;
+				tcpci_notify_role_swap(tcpc, TCP_NOTIFY_DR_SWAP, PD_ROLE_UFP);
+		 }*/
+		if (tcpc->typec_attach_new != TYPEC_ATTACHED_SNK) {
+				tcpc->typec_attach_new = TYPEC_ATTACHED_SNK;
+				tcpci_report_usb_port_changed(tcpc);
+				tcpc->typec_attach_old = TYPEC_ATTACHED_SNK;
+		}
+		break;
+	default:
+		pr_err("%s: Unknwon type[0x%02x]\n", __func__, type);
+		break;
+	}
+	}
+
+	if (tcpc->typec_attach_new == TYPEC_UNATTACHED)
+		wusb3801_unattached_cc_entry(tcpc);
+	tcpci_unlock_typec(tcpc);
 }
 
 
@@ -506,7 +394,7 @@ static irqreturn_t wusb3801_intr_handler(int irq, void *data)
 {
 	struct wusb3801_chip *chip = data;
 
-	__pm_wakeup_event(&chip->irq_wake_lock, WUSB3801_IRQ_WAKE_TIME);
+	__pm_wakeup_event(chip->irq_wake_lock, WUSB3801_IRQ_WAKE_TIME);
 
 	kthread_queue_work(&chip->irq_worker, &chip->irq_work);
 	return IRQ_HANDLED;
@@ -519,14 +407,13 @@ static int wusb3801_init_alert(struct tcpc_device *tcpc)
 	int ret;
 	char *name;
 	int len;
-	int reg_val = 0;
-	//u8 val = 0;
+
 	len = strlen(chip->tcpc_desc->name);
 	name = devm_kzalloc(chip->dev, len+5, GFP_KERNEL);
 	if (!name)
 		return -ENOMEM;
 
-	snprintf(name, PAGE_SIZE, "%s-IRQ", chip->tcpc_desc->name);
+	snprintf (name, PAGE_SIZE, "%s-IRQ", chip->tcpc_desc->name);
 
 	pr_info("%s name = %s, gpio = %d\n", __func__,
 				chip->tcpc_desc->name, chip->irq_gpio);
@@ -556,7 +443,7 @@ static int wusb3801_init_alert(struct tcpc_device *tcpc)
 
 	kthread_init_worker(&chip->irq_worker);
 	chip->irq_worker_task = kthread_run(kthread_worker_fn,
-			&chip->irq_worker, "%s", chip->tcpc_desc->name);
+			&chip->irq_worker, "chip->tcpc_desc->name");
 	if (IS_ERR(chip->irq_worker_task)) {
 		pr_err("Error: Could not create tcpc task\n");
 		goto init_alert_err;
@@ -566,35 +453,22 @@ static int wusb3801_init_alert(struct tcpc_device *tcpc)
 	kthread_init_work(&chip->irq_work, wusb3801_irq_work_handler);
 
 	pr_info("IRQF_NO_THREAD Test\r\n");
+	i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_INTERRUPT);//first clear interrupt
+	ret = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_TEST_02);
+	if (ret & WUSB3801_FORCE_ERR_RCY_MASK) {
+		pr_err("wusb3801 [%s]enter error recovery :0x%x\n", __func__, ret);
+		wusb3801_i2c_write8(chip->tcpc, WUSB3801_REG_TEST_02, 0x00);
+	}
 	ret = request_irq(chip->irq, wusb3801_intr_handler,
-		IRQF_TRIGGER_LOW | IRQF_NO_THREAD, name, chip);//IRQF_TRIGGER_FALLING IRQF_TRIGGER_LOW  modify EINT 41 is pending suppend die
+		IRQF_TRIGGER_FALLING | IRQF_NO_THREAD |
+		IRQF_NO_SUSPEND, name, chip);
 	if (ret < 0) {
 		pr_err("Error: failed to request irq%d (gpio = %d, ret = %d)\n",
 			chip->irq, chip->irq_gpio, ret);
 		goto init_alert_err;
 	}
-	reg_val = (1 << CTRL_INT_SHIFT);
-	ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, reg_val, CTRL_INT);
-	if (ret < 0) {
-		pr_err("%s: init WUSB3801_REG_CONTROL0 fail!\n", __func__);
-		return ret;
-	}
-	/* get interrupt */
-	//ret = wusb3801_read_reg(chip->client, WUSB3801_REG_INTERRUPT, &val);
-	//if (ret < 0) {
-	//	pr_err("%s: failed to read interrupt\n", __func__);
-	//	return ret;
-	//}
-	//reg_val = (0 << CTRL_INT_SHIFT);
-	//ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, reg_val, CTRL_INT);
-	//if (ret < 0) {
-	//	pr_err("%s: init WUSB3801_REG_CONTROL0 fail!\n", __func__);
-	//	return ret;
-	//}
-	//wusb3801_write_reg(chip->client,WUSB3801_REG_CONTROL1, 0x0);
+
 	enable_irq_wake(chip->irq);
-	//disable_irq(chip->irq);
-	//wusb3801_write_reg(chip->client,WUSB3801_REG_CONTROL1, 0x1);
 	return 0;
 init_alert_err:
 	return -EINVAL;
@@ -602,316 +476,248 @@ init_alert_err:
 
 int wusb3801_alert_status_clear(struct tcpc_device *tcpc, uint32_t mask)
 {
-	//
-	int ret = 0;
-	if (ret < 0) {
-		pr_err("%s: update reg fail!\n", __func__);
-	}
-        pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 static int wusb3801_tcpc_init(struct tcpc_device *tcpc, bool sw_reset)
 {
-    struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);   
-	//struct wusb3801_chip *info = i2c_get_clientdata(chip->client);
-	int ret = 0;
-	u8 reg_val;
-	//u8 val, reg_val;
-	pr_info("%s enter \n",__func__);
-	//int_sts = rc & WUSB3801_INT_STS_MASK;
-	//pr_info("%s WUSB3801_REG_INTERRUPT : 0x%02x\n", __func__, reg_val); 
-	//msleep(100);
-	ret = wusb3801_read_reg(chip->client, WUSB3801_REG_STATUS, &reg_val);
-	if (ret < 0) {
-		pr_err("%s: failed to read reg status\n", __func__);
-		return ret;
+	int rc = 0;
+
+	pr_info("%s enter \n", __func__);
+	rc = i2c_smbus_read_byte_data(w_client, WUSB3801_REG_CONTROL0);
+	if (rc < 0) {
+		pr_err("%s: fail to read mode\n", __func__);
+    	return rc;
 	}
-	pr_info("%s WUSB3801_REG_STATUS : 0x%02x\n", __func__, reg_val);
-	/* check current_detect */
-	//val = ((reg_val & CC_STATUS_CHARGING_CURRENT_SNK) >> CC_STATUS_CHARGING_CURRENT_SNK_SHIFT);
-	//chip->type_c_param.current_det = val;
-	/* check attach state */
-	//val = ((reg_val & CC_PLUG_PORT_STATUS) >> CC_PLUG_PORT_STATUS_SHIFT);
-	//chip->type_c_param.attach_state = val;
-	/* Try SNK/SRC [bit 7:6] */
-	reg_val = (1 << CTRL_TRY_SNK_SRC_SHIFT);
-	ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, reg_val, CTRL_TRY_SNK_SRC);
-	if (ret < 0) {
-		pr_err("%s: init WUSB3801_REG_CONTROL0 fail!\n", __func__);
-		return ret;
+
+	if (rc < 0) {
+		pr_err("failed to write mode(%d)\n", rc);
+		return rc;
 	}
-	/* CURRENT MODE ADVERTISE 3A [bit 7:6] */
-	reg_val = (HOST_CUR_3A << CTRL_CURRENT_MODE_SHIFT);
-	ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, reg_val, CTRL_CURRENT_MODE);
-	if (ret < 0) {
-		pr_err("%s: init WUSB3801_REG_CONTROL0 fail!\n", __func__);
-		return ret;
-	}
-	tcpci_alert_status_clear(tcpc, 0xffffffff);
-	wusb3801_init_power_status_mask(tcpc);
-	wusb3801_init_alert_mask(tcpc);
-	wusb3801_init_fault_mask(tcpc);
-	wusb3801_init_rt_mask(tcpc);
-	/* INT ENABLE [bit 0] */
-    reg_val = (0 << CTRL_INT_SHIFT);
-	ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, reg_val, CTRL_INT);
-	if (ret < 0) {
-		pr_err("%s: init WUSB3801_REG_CONTROL0 fail!\n", __func__);
-		return ret;
-	}
-	//RST int
-	wusb3801_write_reg(chip->client,WUSB3801_REG_CONTROL1, 0x1);
-	msleep(55);//5
 	return 0;
 }
 
 int wusb3801_fault_status_clear(struct tcpc_device *tcpc, uint8_t status)
 {
-    pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 int wusb3801_get_alert_mask(struct tcpc_device *tcpc, uint32_t *mask)
 {
-	*mask = 0;
-	*mask |= (TCPC_REG_ALERT_CC_STATUS |
-				TCPC_REG_ALERT_POWER_STATUS |
-				TCPC_REG_ALERT_EXT_RA_DETACH);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
-/*****************************************************************
- * wusb3801 does not have alert register, compare type_c_param_old
- * with type_c_param for figuring out what has been changed.
- ****************************************************************/
 int wusb3801_get_alert_status(struct tcpc_device *tcpc, uint32_t *alert)
 {
-	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
-	#if 1
-	u8 val, tmp, reg_val;
-	int ret;
-	#endif
-	*alert = 0;
-	//log上看出中断后产生的状态在*alert值不正确,直接改为寄存器中读取判断状态
-	#if 1
-	ret = wusb3801_read_reg(chip->client, WUSB3801_REG_INTERRUPT, &reg_val);
-	if (ret < 0) {
-		pr_err("%s err\n", __func__);
-		//return;
-	}
-	tmp = reg_val;
-	val = (tmp & INT_ATTACH_DETACH) >> INT_ATTACH_DETACH_SHIFT;
-	chip->type_c_param.int_attach = val;
-	ret = wusb3801_read_reg(chip->client, WUSB3801_REG_STATUS, &reg_val);
-	if (ret < 0) {
-		pr_err("%s err\n", __func__);
-		//return 0;
-	}
-	tmp = reg_val;
-	/* check current_detect */
-	val = ((tmp & CC_STATUS_CHARGING_CURRENT_SNK) >> CC_STATUS_CHARGING_CURRENT_SNK_SHIFT);
-	chip->type_c_param.current_det = val;
-	val = ((tmp & CC_PLUG_PORT_STATUS) >> CC_PLUG_PORT_STATUS_SHIFT);
-	chip->type_c_param.attach_state = val;
-/* prize added for dectect tcpc polarity,wangmd,20211022,start */
-	val = (tmp & 0x03) ;//Plug Orientation
-	chip->type_c_param.cable_dir = val;
-/* prize added for dectect tcpc polarity,wangmd,20211022,end   */
-	if(chip->type_c_param.int_attach != INT_NOT_INT)
-	{
-		if(chip->type_c_param.attach_state != CABLE_STATE_NOT_ATTACHED)
-		{
-			*alert |= TCPC_REG_ALERT_CC_STATUS;
-		}
-		if(chip->type_c_param.attach_state == CABLE_STATE_AS_UFP)
-		{
-			*alert |= TCPC_REG_ALERT_POWER_STATUS;
-			*alert |= TCPC_REG_ALERT_EXT_RA_DETACH;
-		}
-	}
-	if(chip->type_c_param.int_attach == INT_NOT_ATTACHED)
-	{
-		*alert |= TCPC_REG_ALERT_CC_STATUS;
-		*alert |= TCPC_REG_ALERT_POWER_STATUS;
-		*alert |= TCPC_REG_ALERT_EXT_RA_DETACH;
-	}
-	
-	/* update current adv when act as DFP */
-	if (chip->type_c_param.attach_state == CABLE_STATE_AS_DFP ||
-	    chip->type_c_param.attach_state == CABLE_STATE_TO_ACCESSORY) {
-		val = (HOST_CUR_USB << CTRL_CURRENT_MODE_SHIFT);
-	} else {
-		val = (HOST_CUR_3A << CTRL_CURRENT_MODE_SHIFT);
-	}
-	wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, val, CTRL_CURRENT_MODE);
-	#else
-	/* cc status change */
-	if ((chip->type_c_param.current_det != chip->type_c_param_old.current_det) ||
-		//(chip->type_c_param.active_cable_attach != chip->type_c_param_old.active_cable_attach) ||
-		(chip->type_c_param.attach_state != chip->type_c_param_old.attach_state) ||
-		(chip->type_c_param.cable_dir != chip->type_c_param_old.cable_dir)) {
-		*alert |= TCPC_REG_ALERT_CC_STATUS;
-	}
-	/* UFP <-> Non-UFP = Power present change */
-	if (((chip->type_c_param.attach_state == CABLE_STATE_AS_UFP) &&
-		(chip->type_c_param_old.attach_state != CABLE_STATE_AS_UFP)) ||
-		((chip->type_c_param.attach_state != CABLE_STATE_AS_UFP) &&
-		(chip->type_c_param_old.attach_state == CABLE_STATE_AS_UFP))) {
-		*alert |= TCPC_REG_ALERT_POWER_STATUS;
-		*alert |= TCPC_REG_ALERT_EXT_RA_DETACH;
-	}
-	/* Add more alert bits here if need */
-	/* sync status to type_c_param_old */
-	chip->type_c_param_old.current_det = chip->type_c_param.current_det;
-	//chip->type_c_param_old.active_cable_attach = chip->type_c_param.active_cable_attach;
-	chip->type_c_param_old.attach_state = chip->type_c_param.attach_state;
-	chip->type_c_param_old.cable_dir = chip->type_c_param.cable_dir;
-	//chip->type_c_param_old.accessory_attach = chip->type_c_param.accessory_attach;
-	#endif
-	printk("wusb3801_get_alert_status *alert=%x,attach_state=%d,int_attach=%d\n",*alert,chip->type_c_param.attach_state,chip->type_c_param.int_attach);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 static int wusb3801_get_power_status(
 		struct tcpc_device *tcpc, uint16_t *pwr_status)
 {
-	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
-	u8 reg_val;
-	u8 val;
-	int ret;
-
-	ret = wusb3801_read_reg(chip->client, WUSB3801_REG_STATUS, &reg_val);
-	if (ret < 0) {
-		pr_err("%s err\n", __func__);
-		return ret;
-	}
-	val = ((reg_val & CC_STATUS_VBUS_DETECTION_SRC) >> CC_STATUS_VBUS_DETECTION_SRC_SHIFT);
-	*pwr_status = 0;
-	if (val & CC_STATUS_VBUS_DETECTION) {
-		*pwr_status |= TCPC_REG_POWER_STATUS_VBUS_PRES;
-	}
-	//if(chip->type_c_param.attach_state & CABLE_STATE_AS_UFP)
-	//{
-	//	*pwr_status |= TCPC_REG_POWER_STATUS_VBUS_PRES;
-	//}
-	printk("wusb3801_get_power_status pwr_status=%d,val=%d\n",*pwr_status,reg_val);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 int wusb3801_get_fault_status(struct tcpc_device *tcpc, uint8_t *status)
 {
 
-    pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
-/*******************************************************************
- * Translate wusb3801 cc register's value to tcpc_cc_voltage_status.
- *******************************************************************/
 static int wusb3801_get_cc(struct tcpc_device *tcpc, int *cc1, int *cc2)
 {
-	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
-	int *active_cc, *secondary_cc;
-
-	*cc1 = TYPEC_CC_VOLT_OPEN;
-	*cc2 = TYPEC_CC_VOLT_OPEN;
-
-	if (chip->type_c_param.attach_state == CABLE_STATE_NOT_ATTACHED) {
-		pr_debug("cc not attached\n");
-		return 0;
-	}
-
-	switch(chip->type_c_param.cable_dir)
-	{
-		case 1:
-			active_cc = cc1;
-			secondary_cc = cc2;
-			break;
-		case 2:
-			active_cc = cc2;
-			secondary_cc = cc1;
-			break;
-		default:
-			active_cc = cc1;
-			secondary_cc = cc2;
-			break;
-	}
-	if (chip->type_c_param.attach_state == CABLE_STATE_AS_UFP) {
-		switch (chip->type_c_param.current_det) {
-		case 0: /* RP Default */
-			*active_cc |= TYPEC_CC_VOLT_SNK_DFT;
-			break;
-		case 1: /* RP 1.5V */
-			*active_cc |= TYPEC_CC_VOLT_SNK_1_5;
-			break;
-		case 3: /* RP 3.0V */
-			*active_cc |= TYPEC_CC_VOLT_SNK_3_0;
-			break;
-		default:
-			*active_cc |= TYPEC_CC_VOLT_SNK_DFT;
-			break;
-		}
- 	} else if (chip->type_c_param.attach_state == CABLE_STATE_TO_ACCESSORY) {
-			*active_cc |= TYPEC_CC_VOLT_RA;
-			*secondary_cc |= TYPEC_CC_VOLT_RA;
- 	} else if (chip->type_c_param.attach_state == CABLE_STATE_TO_DEBUG) {
-			*active_cc |= TYPEC_CC_VOLT_RD;
-			*secondary_cc |= TYPEC_CC_VOLT_RD;
-	}
-	else if (chip->type_c_param.attach_state == CABLE_STATE_AS_DFP) {
-			*active_cc |= TYPEC_CC_VOLT_RD;
- 	}
-	printk("wusb3801_get_cc active_cc=%d,secondary_cc=%d\n",*active_cc,*secondary_cc);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
+int wusb3801_typec_cc_orientation(void)
+{
+	if (typec_cc_orientation != 0) {
+		pr_info("%s typec_polarity =%d \n", __func__,typec_cc_orientation);
+		return typec_cc_orientation;
+	} else {
+		return -2;
+	}
+}
+
+static int wusb3801_set_role(struct tcpc_device *tcpc, int mode);
 static int wusb3801_set_cc(struct tcpc_device *tcpc, int pull)
 {
-	struct wusb3801_chip *chip = tcpc_get_dev_data(tcpc);
 	int ret;
-	u8 value = SET_MODE_SELECT_SNK;
-	
-	if (pull == TYPEC_CC_RP)
-		value = SET_MODE_SELECT_SRC;
-	else if (pull == TYPEC_CC_RD)
-		value = SET_MODE_SELECT_SNK;
-	else if (pull == TYPEC_CC_DRP)
-		value = SET_MODE_SELECT_DRP;
-	printk("wusb3801_set_cc pull=%d,%d\n",pull,value);
-	value = value << CTRL_WORK_MODE_SHIFT;
-	ret = wusb3801_update_reg(chip->client, WUSB3801_REG_CONTROL0, value, CTRL_WORK_MODE_SHIFT);
-	if (ret < 0) {
-		pr_err("%s: update reg fail!\n", __func__);
-	}
+	uint8_t mode = 0;
 
-	return 0;
+	pr_info("%s enter\n", __func__);
+
+	if (pull == TYPEC_CC_RP)
+		mode = REVERSE_CHG_SOURCE;
+	else if (pull == TYPEC_CC_RD)
+		mode = REVERSE_CHG_SINK;
+	else if (pull == TYPEC_CC_DRP)
+		mode = REVERSE_CHG_DRP;
+
+	ret = wusb3801_set_role(tcpc, mode);
+	if (ret < 0){
+		pr_err("%s: set mode fail!\n", __func__);
+	}
+	return ret;
 }
 
 static int wusb3801_set_polarity(struct tcpc_device *tcpc, int polarity)
 {
-        pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 static int wusb3801_set_low_rp_duty(struct tcpc_device *tcpc, bool low_rp)
 {
-        pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
 
 static int wusb3801_set_vconn(struct tcpc_device *tcpc, int enable)
 {
-        pr_info("%s enter \n",__func__);
+		pr_info("%s enter \n", __func__);
 	return 0;
 }
-
+#ifdef CONFIG_USB_POWER_DELIVERY
+static int wusb3801_set_msg_header(
+	struct tcpc_device *tcpc, uint8_t power_role, uint8_t data_role)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_set_rx_enable(struct tcpc_device *tcpc, uint8_t enable)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_protocol_reset(struct tcpc_device *tcpc_dev)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_get_message(struct tcpc_device *tcpc, uint32_t *payload,
+			uint16_t *msg_head, enum tcpm_transmit_type *frame_type)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_transmit(struct tcpc_device *tcpc,
+	enum tcpm_transmit_type type, uint16_t header, const uint32_t *data)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_set_bist_test_mode(struct tcpc_device *tcpc, bool en)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+static int wusb3801_set_bist_carrier_mode(
+	struct tcpc_device *tcpc, uint8_t pattern)
+{
+		pr_info("%s enter \n", __func__);
+	return 0;
+}
+#endif // CONFIG_USB_POWER_DELIVERY
 static int wusb3801_tcpc_deinit(struct tcpc_device *tcpc_dev)
 {
-        pr_info("%s enter \n",__func__);
+	pr_info("%s enter \n", __func__);
+	wusb3801_set_cc(tcpc_dev, TYPEC_CC_DRP);
 	return 0;
 }
+#if 0
+static int wusb3801_tcpc_get_mode(struct tcpc_device *tcpc, int *typec_mode)
+{
+	int rc;
+	int status, type;
+	rc = i2c_smbus_read_byte_data(w_client, WUSB3801_REG_STATUS);
+	if (rc < 0) {
+		*typec_mode = 0;
+		pr_err("%s: failed to read reg status\n", __func__);
+		return 0;
+	}
+	pr_info("%s WUSB3801_REG_STATUS : 0x%02x\n", __func__, rc);
 
+	status = (rc & WUSB3801_ATTACH) ? true : false;
+	type = status ? \
+			rc & WUSB3801_TYPE_MASK : WUSB3801_TYPE_INVALID;
+	pr_info("sts[0x%02x], type[0x%02x]\n", status, type);
+
+	switch (type) {
+	case WUSB3801_TYPE_SNK:
+		*typec_mode = 2;
+		break;
+	case WUSB3801_TYPE_SRC:
+		*typec_mode = 1;
+		break;
+	default:
+		*typec_mode = 0;
+		break;
+	}
+	pr_err("%s: wusb3801 type[0x%02x]\n", __func__, type);
+
+	return 0;
+}
+#endif
+static int wusb3801_set_role(struct tcpc_device *tcpc, int mode)
+{
+	int rc = 0;
+
+	rc = i2c_smbus_read_byte_data(w_client, WUSB3801_REG_CONTROL0);
+	if (rc < 0) {
+		pr_err("%s: fail to read mode\n", __func__);
+		return rc;
+	}
+	pr_err("dhx--set role %d\n", mode);
+	rc &= ~WUSB3801_MODE_MASK;
+	rc &= ~WUSB3801_INT_MASK;//Disable the chip interrupt
+	if (mode == REVERSE_CHG_SOURCE) {
+		rc |= 0x02;
+	} else if (mode == REVERSE_CHG_SINK) {
+		rc |= 0x80;
+	} else if (mode == REVERSE_CHG_DRP) {
+		rc |= 0x04;
+	} else {
+		return 0;
+	}
+
+	rc = i2c_smbus_write_byte_data(w_client,
+			   WUSB3801_REG_CONTROL0, rc);
+
+	if (rc < 0) {
+		pr_err("failed to write mode(%d)\n", rc);
+		return rc;
+	}
+
+	//Clear the chip interrupt
+	rc = i2c_smbus_read_byte_data(w_client, WUSB3801_REG_CONTROL0);
+	if (rc < 0) {
+		pr_err("%s: fail to clear chip interrupt\n", __func__);
+		return rc;
+	}
+
+	// rc = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_CONTROL0);
+	// if (rc < 0) {
+	// 	pr_err("%s: fail to read chip interrupt\n", __func__);
+	// 	return rc;
+	// }
+	// rc |= WUSB3801_INT_MASK;//enable the chip interrupt
+	// rc = i2c_smbus_write_byte_data(chip->client,
+	// 		   WUSB3801_REG_CONTROL0, rc);
+
+	// if (rc < 0) {
+	// 	pr_err("failed to enable chip interrupt(%d)\n", rc);
+	// 	return rc;
+	// }
+	return rc;
+}
 
 static struct tcpc_ops wusb3801_tcpc_ops = {
 	.init = wusb3801_tcpc_init,
@@ -923,10 +729,21 @@ static struct tcpc_ops wusb3801_tcpc_ops = {
 	.get_fault_status = wusb3801_get_fault_status,
 	.get_cc = wusb3801_get_cc,
 	.set_cc = wusb3801_set_cc,
+	//.set_role = wusb3801_set_role,
+	//.get_mode = wusb3801_tcpc_get_mode,
 	.set_polarity = wusb3801_set_polarity,
 	.set_low_rp_duty = wusb3801_set_low_rp_duty,
 	.set_vconn = wusb3801_set_vconn,
 	.deinit = wusb3801_tcpc_deinit,
+#ifdef CONFIG_USB_POWER_DELIVERY
+	.set_msg_header = wusb3801_set_msg_header,
+	.set_rx_enable = wusb3801_set_rx_enable,
+	.protocol_reset = wusb3801_protocol_reset,
+	.get_message = wusb3801_get_message,
+	.transmit = wusb3801_transmit,
+	.set_bist_test_mode = wusb3801_set_bist_test_mode,
+	.set_bist_carrier_mode = wusb3801_set_bist_carrier_mode,
+#endif
 };
 
 
@@ -940,15 +757,14 @@ static int mt_parse_dt(struct wusb3801_chip *chip, struct device *dev)
 
 	pr_info("%s\n", __func__);
 
-	np = of_find_node_by_name(NULL, "wusb3801_type_c_port0");
+	np = of_find_node_by_name(NULL, "usb_type_c_wusb3801x");
 	if (!np) {
-		pr_err("%s find node type_c_port0 fail\n", __func__);
+		pr_err("%s find node usb_type_c_wusb3801x fail\n", __func__);
 		return -ENODEV;
 	}
-	dev->of_node = np;
 
 #if (!defined(CONFIG_MTK_GPIO) || defined(CONFIG_MTK_GPIOLIB_STAND))
-	ret = of_get_named_gpio(np, "wusb3801,intr_gpio", 0);
+	ret = of_get_named_gpio(np, "wusb3801,irq-gpio", 0);
 	if (ret < 0) {
 		pr_err("%s no intr_gpio info\n", __func__);
 		return ret;
@@ -956,29 +772,148 @@ static int mt_parse_dt(struct wusb3801_chip *chip, struct device *dev)
 	chip->irq_gpio = ret;
 #else
 	ret = of_property_read_u32(
-		np, "wusb3801,intr_gpio_num", &chip->irq_gpio);
+		np, "wusb3801,irq-gpio_num", &chip->irq_gpio);
 	if (ret < 0)
 		pr_err("%s no intr_gpio info\n", __func__);
 #endif
-
 	return ret;
+}
+#if 0
+static int wusb3801_set_mode(struct wusb3801_chip *chip, uint8_t mode)
+{
+	int rc = 0;
+
+	rc = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_CONTROL0);
+	if (rc < 0) {
+		pr_err("%s: fail to read mode\n", __func__);
+		return rc;
+	}
+	rc &= ~WUSB3801_MODE_MASK;
+		rc &= ~WUSB3801_INT_MASK;//Disable the chip interrupt
+	rc |= mode;
+		rc = i2c_smbus_write_byte_data(chip->client,
+			   WUSB3801_REG_CONTROL0, rc);
+
+	if (rc < 0) {
+		pr_err("failed to write mode(%d)\n", rc);
+		return rc;
+	}
+
+	//Clear the chip interrupt
+	rc = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_INTERRUPT);
+	if (rc < 0) {
+		pr_err("%s: fail to clear chip interrupt\n", __func__);
+		return rc;
+	}
+
+	rc = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_CONTROL0);
+	if (rc < 0) {
+		pr_err("%s: fail to read chip interrupt\n", __func__);
+		return rc;
+	}
+	rc |= WUSB3801_INT_MASK;//enable the chip interrupt
+	rc = i2c_smbus_write_byte_data(chip->client,
+			   WUSB3801_REG_CONTROL0, rc);
+
+	if (rc < 0) {
+		pr_err("failed to enable chip interrupt(%d)\n", rc);
+		return rc;
+	}
+	return rc;
+}
+#endif
+static void wusb3801_first_check_typec_work(struct work_struct *work)
+{
+    struct wusb3801_chip *chip = container_of (work, struct wusb3801_chip, first_check_typec_work.work);
+    int status, type, rc, int_sts;
+
+	tcpci_lock_typec(chip->tcpc);
+	if (chip->cc_test_flag == 1 || typec_cc_orientation != 0) {
+		pr_err("%s: first enter interrupt and return \n", __func__);
+		tcpci_unlock_typec(chip->tcpc);
+		return ;
+	}
+	/* get interrupt */
+	rc = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_INTERRUPT);
+	if (rc < 0) {
+		pr_err("%s: failed to read interrupt\n", __func__);
+		return ;
+	}
+	int_sts = rc & WUSB3801_INT_STS_MASK;
+
+	first_check_flag = 1;
+	rc = wusb3801_i2c_read8(chip->tcpc, WUSB3801_REG_STATUS);
+	if (rc < 0) {
+		pr_err("%s: failed to read reg status\n", __func__);
+		return ;
+	}
+	pr_info("%s WUSB3801_REG_STATUS : 0x%02x\n", __func__, rc);
+
+	pr_info("%s: int_sts[0x%02x]\n", __func__, int_sts);
+		status = (rc & WUSB3801_ATTACH) ? true : false;
+	type = status ? \
+			rc & WUSB3801_TYPE_MASK : WUSB3801_TYPE_INVALID;
+	pr_info("sts[0x%02x], type[0x%02x]\n", status, type);
+	if (status) {
+#ifdef __TEST_CC_PATCH__
+	if (chip->dev_sub_id != 0xA0) {
+		if (chip->cc_test_flag == 0 &&  BITS_GET(rc, WUSB3801_CC_STS_MASK) == 0 && type == WUSB3801_TYPE_SRC) {
+			chip->cc_sts = test_cc_patch(chip);
+			chip->cc_test_flag = 1;
+			pr_err("%s: cc_sts[0x%02x]\n", __func__, chip->cc_sts);
+			tcpci_unlock_typec(chip->tcpc);
+			return;
+		}
+		if (chip->cc_test_flag == 1) {
+			chip->cc_test_flag = 0;
+			if (chip->cc_sts == WUSB3801_CC2_CONNECTED) {
+				rc = rc | 0x02;
+			} else if (chip->cc_sts == WUSB3801_CC1_CONNECTED) {
+				rc = rc | 0x01;
+			}
+			pr_err("%s: cc_test_patch rc[0x%02x]\n", __func__, rc);
+		}
+	}
+	typec_cc_orientation = BITS_GET(rc, WUSB3801_CC_STS_MASK);
+#endif	/* __TEST_CC_PATCH__ */
+	switch (type) {
+	case WUSB3801_TYPE_SNK:
+		chip->tcpc->typec_attach_new = TYPEC_ATTACHED_SRC;
+		//chip->tcpc->typec_role = TYPEC_ROLE_SRC;
+		//tcpci_notify_role_swap(chip->tcpc, TCP_NOTIFY_DR_SWAP, PD_ROLE_DFP);
+		tcpci_source_vbus(chip->tcpc, TCP_VBUS_CTRL_TYPEC, TCPC_VBUS_SOURCE_5V, 0);
+		tcpci_report_usb_port_changed(chip->tcpc);
+		chip->tcpc->typec_attach_old = TYPEC_ATTACHED_SRC;
+		break;
+	case WUSB3801_TYPE_SRC:
+		chip->tcpc->typec_attach_new = TYPEC_ATTACHED_SNK;
+		//chip->tcpc->typec_role = TYPEC_ROLE_SNK;
+		//tcpci_notify_role_swap(chip->tcpc, TCP_NOTIFY_DR_SWAP, PD_ROLE_UFP);
+		tcpci_report_usb_port_changed(chip->tcpc);
+		chip->tcpc->typec_attach_old = TYPEC_ATTACHED_SNK;
+		break;
+	default:
+		pr_err("%s: Unknwon type[0x%02x]\n", __func__, type);
+		break;
+	}
+    }
+	tcpci_unlock_typec(chip->tcpc);
 }
 static int wusb3801_tcpcdev_init(struct wusb3801_chip *chip, struct device *dev)
 {
 	struct tcpc_desc *desc;
-	struct device_node *np = dev->of_node;
+	struct device_node *np;
 	u32 val, len;
-   // int ret;
 
 	const char *name = "default";
 
-	np = of_find_node_by_name(NULL, "wusb3801_type_c_port0");
+	np = of_find_node_by_name(NULL, "usb_type_c_wusb3801x");
 	if (!np) {
 		pr_err("%s find node mt6370 fail\n", __func__);
 		return -ENODEV;
 	}
 
-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+	desc = devm_kzalloc(dev, sizeof (*desc), GFP_KERNEL);
 	if (!desc)
 		return -ENOMEM;
 	if (of_property_read_u32(np, "wusb3801-tcpc,role_def", &val) >= 0) {
@@ -993,14 +928,14 @@ static int wusb3801_tcpcdev_init(struct wusb3801_chip *chip, struct device *dev)
 
 	if (of_property_read_u32(
 		np, "wusb3801-tcpc,notifier_supply_num", &val) >= 0) {
-		if (val < 0)
-			desc->notifier_supply_num = 0;
-		else
+		if (val >= 0)
 			desc->notifier_supply_num = val;
+		else
+			desc->notifier_supply_num = 0;
 	} else
 		desc->notifier_supply_num = 0;
 
-	if (of_property_read_u32(np, "wusb3801-tcpc,rp_level", &val) >= 0) {
+	if (of_property_read_u32(np, "wusb3801,rp_level", &val) >= 0) {
 		switch (val) {
 		case 0: /* RP Default */
 			desc->rp_lvl = TYPEC_CC_RP_DFT;
@@ -1015,9 +950,12 @@ static int wusb3801_tcpcdev_init(struct wusb3801_chip *chip, struct device *dev)
 			break;
 		}
 	}
+	desc->rp_lvl = TYPEC_CC_RP_1_5;
 
-
-	of_property_read_string(np, "wusb3801-tcpc,name", (char const **)&name);
+	if (of_property_read_string(np, "wusb3801-tcpc,name",
+			(char const **)&name) < 0) {
+		dev_info(dev, "use default name\n");
+	}
 
 	len = strlen(name);
 	desc->name = kzalloc(len+1, GFP_KERNEL);
@@ -1033,10 +971,15 @@ static int wusb3801_tcpcdev_init(struct wusb3801_chip *chip, struct device *dev)
 	if (IS_ERR(chip->tcpc))
 		return -EINVAL;
 
-	chip->tcpc->tcpc_flags = TCPC_FLAGS_LPM_WAKEUP_WATCHDOG;
+	chip->tcpc->typec_attach_old = TYPEC_UNATTACHED;
+    chip->tcpc->typec_attach_new = TYPEC_UNATTACHED;
+    //chip->tcpc->typec_role = TYPEC_ROLE_UNKNOWN;
+	schedule_delayed_work(
+						&chip->first_check_typec_work, msecs_to_jiffies(3000));
 	return 0;
 }
 
+static uint8_t dev_sub_id;
 static inline int wusb3801_check_revision(struct i2c_client *client)
 {
 	int rc;
@@ -1044,23 +987,103 @@ static inline int wusb3801_check_revision(struct i2c_client *client)
 	if (rc < 0)
 		return rc;
 
-	pr_info("VendorID register: 0x%02x\n", rc );
+	pr_info("VendorID register: 0x%02x\n", rc);
+	if ((rc & WUSB3801_VENDOR_ID_MASK) != WUSB3801_VENDOR_ID) {
+		return -EINVAL;
+	}
+	pr_info("Vendor id: 0x%02x, Version id: 0x%02x\n", rc & WUSB3801_VENDOR_ID_MASK,
+															 (rc & WUSB3801_VERSION_ID_MASK) >> 3);
 
-	return rc;
+	rc = i2c_smbus_read_byte_data(client, WUSB3801_REG_TEST_01);
+	if (rc > 0)
+		dev_sub_id = rc & WUSB3801_VENDOR_SUB_ID_MASK;
+	pr_info("VendorSUBID register: 0x%02x\n", rc & WUSB3801_VENDOR_SUB_ID_MASK);
+
+	return WUSB3801_VENDOR_ID;
+}
+/************************************************************************
+ *
+ *       fregdump_show
+ *
+ *  Description :
+ *  -------------
+ *  Dump registers to user space. there is side-effects for Read/Clear
+ *  registers. For example interrupt status.
+ *
+ ************************************************************************/
+static ssize_t wusb3801_regdump_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct wusb3801_chip *chip = i2c_get_clientdata(client);
+	int i, rc, ret = 0;
+
+	tcpci_lock_typec(chip->tcpc);
+	for (i = WUSB3801_REG_VERSION_ID ; i <= WUSB3801_REG_TEST_12; i++) {
+		rc = i2c_smbus_read_byte_data(chip->client, (uint8_t)i);
+		if (rc < 0) {
+			pr_err("cannot read 0x%02x\n", i);
+			rc = 0;
+		}
+		ret += snprintf (buf + ret, 1024 - ret, "from 0x%02x read 0x%02x\n", (uint8_t)i, rc);
+	}
+	tcpci_unlock_typec(chip->tcpc);
+	return ret;
 }
 
+DEVICE_ATTR(wusb3801_regdump, S_IRUGO, wusb3801_regdump_show, NULL);
+
+#ifdef __TEST_CC_PATCH__
+/************************************************************************
+ *
+ *       fcc_status_show
+ *
+ *  Description :
+ *  -------------
+ *  show cc_status
+ *
+ ************************************************************************/
+static ssize_t typec_cc_orientation_show(struct device *dev,
+				struct device_attribute *attr,
+				char *buf)
+{
+	int ret;
+#if 0
+	struct i2c_client *client = to_i2c_client(dev);
+	struct wusb3801_chip *chip = i2c_get_clientdata(client);
+	int rc, ret = 0;
+
+	rc = i2c_smbus_read_byte_data(chip->client, WUSB3801_REG_STATUS);
+
+	if (rc < 0) {
+		pr_err("cannot read WUSB3801_REG_STATUS\n");
+		rc = 0xFF;
+		ret = snprintf (buf, PAGE_SIZE, "cc_sts (%d)\n", rc);
+	}
+	rc  =  BITS_GET(rc, WUSB3801_CC_STS_MASK);
+
+	if (rc == 0 && chip->cc_sts != 0xFF)
+		rc = chip->cc_sts;
+	else
+		rc -= 1;
+#endif
+	ret = snprintf (buf, PAGE_SIZE, "cc_sts (%d)\n", typec_cc_orientation);
+	return ret;
+}
+
+DEVICE_ATTR(typec_cc_orientation, S_IRUGO, typec_cc_orientation_show, NULL);
+#endif /*  __TEST_CC_PATCH__	 */
 
 static int wusb3801_i2c_probe(struct i2c_client *client,
 				const struct i2c_device_id *id)
 {
 	struct wusb3801_chip *chip;
 	int ret = 0, chip_id;
+	int i, rc;
 	bool use_dt = client->dev.of_node;
-	#ifdef IC_TEST_DEV
-	struct device *cdev = &client->dev;
-	#endif
-	pr_err("%s\n", __func__);
-	client->addr = 0x60;
+
+	pr_info("%s\n", __func__);
 	if (i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_I2C_BLOCK | I2C_FUNC_SMBUS_BYTE_DATA))
 		pr_info("I2C functionality : OK...\n");
@@ -1068,15 +1091,13 @@ static int wusb3801_i2c_probe(struct i2c_client *client,
 		pr_info("I2C functionality check : failuare...\n");
 
 	chip_id = wusb3801_check_revision(client);
-	//huanglei add
-	// Retry to avoid not receiving the stop bit in some extreme cases
 	if (chip_id < 0) {
 		chip_id = wusb3801_check_revision(client);
 		if (chip_id < 0)
 			return chip_id;
 	}
 
-	chip = devm_kzalloc(&client->dev, sizeof(*chip), GFP_KERNEL);
+	chip = devm_kzalloc(&client->dev, sizeof (*chip), GFP_KERNEL);
 	if (!chip)
 		return -ENOMEM;
 
@@ -1088,14 +1109,21 @@ static int wusb3801_i2c_probe(struct i2c_client *client,
 	}
 	chip->dev = &client->dev;
 	chip->client = client;
+#ifdef __TEST_CC_PATCH_
+	chip->cc_sts = 0xFF;
+	chip->cc_test_flag = 0;
+	chip->dev_sub_id = dev_sub_id;
+	 typec_cc_orientation = 0;
+#endif /* __TEST_CC_PATCH__ */
 	sema_init(&chip->io_lock, 1);
 	sema_init(&chip->suspend_lock, 1);
-	mutex_init(&chip->mutex);
 	i2c_set_clientdata(client, chip);
-
-	INIT_DELAYED_WORK(&chip->poll_work, wusb3801_poll_work);
-	wakeup_source_init(&chip->irq_wake_lock,
-		"wusb3801_irq_wakelock");
+	w_client = chip->client;
+	INIT_DELAYED_WORK(&chip->first_check_typec_work, wusb3801_first_check_typec_work);
+	chip->irq_wake_lock =
+    wakeup_source_register(chip->dev,"wusb3801_irq_wakelock");
+	chip->i2c_wake_lock =
+    wakeup_source_register(chip->dev,"wusb3801_i2c_wakelock");
 
 	chip->chip_id = chip_id;
 	pr_info("wusb3801_chipID = 0x%0x\n", chip_id);
@@ -1103,7 +1131,7 @@ static int wusb3801_i2c_probe(struct i2c_client *client,
 	ret = wusb3801_tcpcdev_init(chip, &client->dev);
 	if (ret < 0) {
 		dev_err(&client->dev, "wusb3801 tcpc dev init fail\n");
-		return -EINVAL;
+		goto err_tcpc_reg;
 	}
 
 	ret = wusb3801_init_alert(chip->tcpc);
@@ -1112,32 +1140,44 @@ static int wusb3801_i2c_probe(struct i2c_client *client,
 		goto err_irq_init;
 	}
 
-	tcpc_schedule_init_work(chip->tcpc);
-	pr_info("%s probe OK!\n", __func__);
-#ifdef __TEST_CC_PATCH__
-	//huanglei add for reg 0x08& 0x0F write zero fail begin
-    wusb3801_i2c_write8(chip->tcpc,
-        WUSB3801_REG_TEST_02, 0x00);
-    wusb3801_i2c_write8(chip->tcpc,
-        WUSB3801_REG_TEST_09, 0x00);
-//huanglei add for reg 0x08& 0x0F write zero fail end  
-#endif
-#ifdef IC_TEST_DEV
-	ret = device_create_file(cdev, &dev_attr_fregdump);
+	ret = device_create_file(&client->dev, &dev_attr_wusb3801_regdump);
 	if (ret < 0) {
-		dev_err(cdev, "failed to create dev_attr_fregdump\n");
-		device_remove_file(cdev, &dev_attr_fregdump);
-		return -ENODEV;
+		dev_err(&client->dev, "failed to create dev_attr_fregdump\n");
+		ret = -ENODEV;
+		goto err_create_fregdump_file;
 	}
-#endif
+#ifdef __TEST_CC_PATCH__
+	ret = device_create_file(&client->dev, &dev_attr_typec_cc_orientation);
+	if (ret < 0) {
+		dev_err(&client->dev, "failed to create dev_attr_typec_cc_orientation\n");
+		ret = -ENODEV;
+		goto err_create_file;
+	}
+#endif /* __TEST_CC_PATCH__ */
 
+	for (i = WUSB3801_REG_VERSION_ID ; i <= WUSB3801_REG_TEST_12; i++) {
+		rc = i2c_smbus_read_byte_data(chip->client, (uint8_t)i);
+		if (rc < 0) {
+			pr_err("cannot read 0x%02x\n", i);
+			rc = 0;
+		}
+		pr_err("from 0x%02x read 0x%02x\n", (uint8_t)i, rc);
+	}
 
+	pr_info("%s probe OK!\n", __func__);
 	return 0;
 
+#ifdef __TEST_CC_PATCH__
+err_create_file:
+	device_remove_file(&client->dev, &dev_attr_typec_cc_orientation);
+#endif /* __TEST_CC_PATCH__ */
+err_create_fregdump_file:
+	device_remove_file(&client->dev, &dev_attr_wusb3801_regdump);
 err_irq_init:
 	tcpc_device_unregister(chip->dev, chip->tcpc);
-	mutex_destroy(&chip->mutex);
-	wakeup_source_trash(&chip->irq_wake_lock);
+err_tcpc_reg:
+	wakeup_source_unregister(chip->i2c_wake_lock);
+	wakeup_source_unregister(chip->irq_wake_lock);
 	return ret;
 }
 
@@ -1146,13 +1186,14 @@ static int wusb3801_i2c_remove(struct i2c_client *client)
 	struct wusb3801_chip *chip = i2c_get_clientdata(client);
 
 	if (chip) {
-		cancel_delayed_work_sync(&chip->poll_work);
+		cancel_delayed_work_sync(&chip->first_check_typec_work);
 		tcpc_device_unregister(chip->dev, chip->tcpc);
-		#ifdef IC_TEST_DEV
-		device_remove_file(chip->dev, &dev_attr_fregdump);
-		#endif
+#ifdef __TEST_CC_PATCH__
+		device_remove_file(&client->dev, &dev_attr_typec_cc_orientation);
+#endif /* __TEST_CC_PATCH__ */
+		device_remove_file(&client->dev, &dev_attr_wusb3801_regdump);
 	}
-	mutex_destroy(&chip->mutex);
+
 	return 0;
 }
 
@@ -1190,11 +1231,12 @@ static void wusb3801_shutdown(struct i2c_client *client)
 {
 	struct wusb3801_chip *chip = i2c_get_clientdata(client);
 
-	/* Please reset IC here */
 	if (chip != NULL) {
+		/* Please reset IC here */
+		wusb3801_i2c_write8(chip->tcpc,
+				WUSB3801_REG_CONTROL0, 0x00);
 		if (chip->irq)
 			disable_irq(chip->irq);
-		tcpm_shutdown(chip->tcpc);
 	}
 }
 
@@ -1237,13 +1279,13 @@ static const struct i2c_device_id wusb3801_id_table[] = {
 MODULE_DEVICE_TABLE(i2c, wusb3801_id_table);
 
 static const struct of_device_id rt_match_table[] = {
-	{.compatible = "wusb3801,usb_type_c",},
+	{.compatible = "mediatek,usb_type_c_wusb3801",},
 	{},
 };
 
 static struct i2c_driver wusb3801_driver = {
 	.driver = {
-		.name = "usb_type_c0",
+		.name = "usb_type_c_wusb3801",
 		.owner = THIS_MODULE,
 		.of_match_table = rt_match_table,
 		.pm = wusb3801_PM_OPS,
@@ -1259,7 +1301,7 @@ static int __init wusb3801_init(void)
 	struct device_node *np;
 
 	pr_info("%s (%s): initializing...\n", __func__, WUSB3801_DRV_VERSION);
-	np = of_find_node_by_name(NULL, "usb_type_c");
+	np = of_find_node_by_name(NULL, "usb_type_c_wusb3801");
 	if (np != NULL)
 		pr_info("usb_type_c node found...\n");
 	else
@@ -1276,5 +1318,6 @@ static void __exit wusb3801_exit(void)
 module_exit(wusb3801_exit);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("yangyuhang <yangyuahang@wingtech.com>");
 MODULE_DESCRIPTION("wusb3801 TCPC Driver");
 MODULE_VERSION(WUSB3801_DRV_VERSION);

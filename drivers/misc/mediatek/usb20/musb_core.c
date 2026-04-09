@@ -33,7 +33,14 @@
 #include <usb20_phy.h>
 #endif
 
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+#include <linux/usblog_proc_notify.h>
+#endif
+
 #include <usb20.h>
+
+#define PHY_MODE_DPPULLUP_SET 5
+#define PHY_MODE_DPPULLUP_CLR 6
 
 int musb_fake_CDP;
 
@@ -1104,6 +1111,11 @@ b_host:
 		DBG(0, "%s:%d MUSB_INTR_RESET (%s)\n",
 			__func__, __LINE__,
 			otg_state_string(musb->xceiv->otg->state));
+
+#ifdef CONFIG_USB_NOTIFY_PROC_LOG
+			store_usblog_notify(NOTIFY_USBSTATE,
+						(void *)"USB_STATE=RESET", NULL);
+#endif
 		if ((devctl & MUSB_DEVCTL_HM) != 0) {
 			/*
 			 * Looks like non-HS BABBLE can be ignored, but
@@ -1224,6 +1236,23 @@ b_host:
 	return handled;
 }
 
+static void musb_dp_pullup_work(struct work_struct *w)
+{
+	//struct musb *musb = container_of(w, struct musb, dp_work);
+
+	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE,
+		PHY_MODE_DPPULLUP_SET);
+	mdelay(50);
+	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE,
+		PHY_MODE_DPPULLUP_CLR);
+}
+
+void musb_phy_dp_pullup(struct musb *musb)
+{
+	DBG(0, "%s\n", __func__);
+	queue_work(system_power_efficient_wq, &musb->dp_work);
+}
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -1246,7 +1275,9 @@ void musb_start(struct musb *musb)
 	intrusbe = musb_readb(regs, MUSB_INTRUSBE);
 	if (musb->is_host) {
 		musb->intrtxe = 0xffff;
+		musb_writew(regs, MUSB_INTRTXE, musb->intrtxe);
 		musb->intrrxe = 0xfffe;
+		musb_writew(regs, MUSB_INTRRXE, musb->intrrxe);
 		intrusbe = 0xf7;
 
 		while (!musb_platform_get_vbus_status(musb)) {
@@ -1257,10 +1288,9 @@ void musb_start(struct musb *musb)
 			}
 		}
 
+//zhaosidong.wt,  change usb state
+		musb_sync_with_bat(musb, USB_CONFIGURED);
 	} else if (!musb->is_host) {
-		/* enable ep0 interrupt */
-		musb->intrtxe = 0x1;
-		musb->intrrxe = 0;
 		/* device mode enable reset interrupt */
 		intrusbe |= MUSB_INTR_RESET;
 #if defined(CONFIG_USBIF_COMPLIANCE)
@@ -1269,8 +1299,6 @@ void musb_start(struct musb *musb)
 #endif
 	}
 
-	musb_writew(regs, MUSB_INTRTXE, musb->intrtxe);
-	musb_writew(regs, MUSB_INTRRXE, musb->intrrxe);
 	musb_writeb(regs, MUSB_INTRUSBE, intrusbe);
 
 	/* In U2 host mode, USB bus will issue
@@ -1296,6 +1324,9 @@ void musb_start(struct musb *musb)
 		if (musb->softconnect) {
 			DBG(0, "add softconn\n");
 			val |= MUSB_POWER_SOFTCONN;
+		} else if (!musb->is_ready) {
+			DBG(0, "pullup dp\n");
+			musb_phy_dp_pullup(musb);
 		}
 		musb_writeb(regs, MUSB_POWER, val);
 	}
@@ -1471,7 +1502,8 @@ void musb_stop(struct musb *musb)
 	 *  - ...
 	 */
 	musb_platform_try_idle(musb, 0);
-
+//zhaosidong.wt, change usb state
+	musb_sync_with_bat(musb, USB_SUSPEND);
 #ifdef CONFIG_DUAL_ROLE_USB_INTF
 	mt_usb_dual_role_changed(musb);
 #endif
@@ -2577,6 +2609,8 @@ static int musb_init_controller
 	if (status)
 		goto fail5;
 #endif
+
+	INIT_WORK(&musb->dp_work, musb_dp_pullup_work);
 
 	pm_runtime_put(musb->controller);
 

@@ -152,6 +152,10 @@ void pe_snk_ready_entry(struct pd_port *pd_port)
 void pe_snk_hard_reset_entry(struct pd_port *pd_port)
 {
 	pd_send_hard_reset(pd_port);
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID == tcpci_get_chip_id(pd_port->tcpc))
+		pd_enable_timer(pd_port,PD_TIMER_HARD_RESET_COMPLETE);
+#endif
 }
 
 void pe_snk_transition_to_default_entry(struct pd_port *pd_port)

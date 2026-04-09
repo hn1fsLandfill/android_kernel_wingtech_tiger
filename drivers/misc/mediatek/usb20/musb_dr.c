@@ -125,12 +125,18 @@ static void mt_usb_set_mailbox(struct otg_switch_mtk *otg_sx,
 		mt_usb_set_vbus(otg_sx, false);
 		musb->usb_connected = 0;
 		musb->is_host = false;
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+		musb->is_ready = false;
+#endif
 		mt_usb_disconnect(); /* sync to UI */
 		mt_usb_gadget_disconnect(musb); /* sync to UI */
 		otg_sx->sw_state &= ~MUSB_VBUS_VALID;
 		break;
 	case MUSB_VBUS_VALID:
 		mt_usb_set_vbus(otg_sx, true);
+#if defined (CONFIG_N26_CHARGER_PRIVATE)		
+		musb->is_ready = true;
+#endif
 		/* avoid suspend when works as device */
 		otg_sx->sw_state |= MUSB_VBUS_VALID;
 		musb->usb_connected = 1;
@@ -294,12 +300,7 @@ static int mt_usb_role_sx_set(struct device *dev, enum usb_role role)
 	if (!!(otg_sx->sw_state & MUSB_VBUS_VALID) ^ vbus_event) {
 		if (vbus_event) {
 			dev_info(dev, "%s: if vbus_event true\n", __func__);
-#ifdef CONFIG_MACH_MT6761
-			// phy_set_mode(glue->phy, PHY_MODE_USB_DEVICE);
-			set_usb_phy_clear();
-#else
 			phy_set_mode(glue->phy, PHY_MODE_USB_DEVICE);
-#endif
 			phy_power_on(glue->phy);
 			mt_usb_set_mailbox(otg_sx, MUSB_VBUS_VALID);
 		} else {
@@ -359,7 +360,6 @@ static int mt_usb_role_sw_register(struct otg_switch_mtk *otg_sx)
 
 	role_sx_desc.set = mt_usb_role_sx_set;
 	role_sx_desc.get = mt_usb_role_sx_get;
-	role_sx_desc.allow_userspace_control = true;
 	otg_sx->role_sw = usb_role_switch_register(glue->dev, &role_sx_desc);
 
 	if (IS_ERR(otg_sx->role_sw))

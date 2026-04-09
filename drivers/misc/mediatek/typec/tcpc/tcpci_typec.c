@@ -52,18 +52,6 @@ static const char *const typec_wait_ps_name[] = {
 };
 #endif	/* TYPEC_INFO2_ENABLE */
 
-//prize add by lipengpeng 20220426 start 
-#if defined(CONFIG_PRIZE_NE6153_SUPPORT) || defined(CONFIG_PRIZE_WIRELESS_RECEIVER_MAXIC_MT5715) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW)
-extern int set_otg_gpio(int en);
-
-#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW)
-extern int turn_off_5725(int en);
-#endif
-
-#endif
-
-//prize add by lipengpeng 20220426 end 
-
 static inline void typec_wait_ps_change(struct tcpc_device *tcpc,
 					enum TYPEC_WAIT_PS_STATE state)
 {
@@ -312,13 +300,6 @@ static const char *const typec_attach_name[] = {
 };
 #endif /* TYPEC_INFO_ENABLE || TYPEC_DBG_ENABLE */
 
-//prize add by lipengpeng 20200315 start
-#ifdef CONFIG_PRIZE_TYPEC_POSITIVE_NEGATIVE
-int otgdetection=-1;
-int typeccharge_det=-1;
-#endif
-//prize add by lipengpeng 20200315 end
-
 static int typec_alert_attach_state_change(struct tcpc_device *tcpc)
 {
 	int ret = 0;
@@ -339,88 +320,6 @@ static int typec_alert_attach_state_change(struct tcpc_device *tcpc)
 	TYPEC_INFO("Attached-> %s\n",
 		   typec_attach_name[tcpc->typec_attach_new]);
 
-//prize add by lipengpeng 20200315 start
-#ifdef CONFIG_PRIZE_TYPEC_POSITIVE_NEGATIVE
-	printk("lpp---cc1=%d,cc2=%d  tcpc->typec_attach_new=%d\n",typec_get_cc1(),typec_get_cc2(),tcpc->typec_attach_new);
-/*if(tcpc->typec_attach_new==2)
-{
-	if(typec_get_cc1()==0&&typec_get_cc2()==2)
-		otgdetection=1;
-	else if(typec_get_cc1()==2&&typec_get_cc2()==0){
-			otgdetection=0;
-		}	
-	else{
-			otgdetection= -1;
-			printk("lpp----otg typec not detection\n");
-		}
-	}
-	*/
-//prize add by lipengpeng 20220223 start 
-if(tcpm_inquire_typec_attach_state(tcpc) == TYPEC_ATTACHED_SRC)
-{
-	if(tcpm_inquire_cc_polarity(tcpc)==1)
-		otgdetection=1;
-	else if(tcpm_inquire_cc_polarity(tcpc)==0)
-	    otgdetection=0;
-	else{
-		  otgdetection= -1;
-		  printk("lpp----otg typec not detection\n");
-	  }
-}
-//prize add by lipengpeng 20220223 end 
-#endif
-//prize add by lipengpeng 20200315 end
-
-//prize add by lipengpeng 20200324 start
-#ifdef CONFIG_PRIZE_TYPEC_POSITIVE_NEGATIVE
-/*if(tcpc->typec_attach_new==1)
-{
-	if(((typec_get_cc1()==0)&&(typec_get_cc2()==5))||((typec_get_cc1()==0)&&(typec_get_cc2()==7))||((typec_get_cc1()==0)&&(typec_get_cc2()==6))){
-		typeccharge_det=1;
-	}
-	else if(((typec_get_cc1()==5)&&(typec_get_cc2()==0))||((typec_get_cc1()==7)&&(typec_get_cc2()==0))||((typec_get_cc1()==6)&&(typec_get_cc2()==0))){
-			typeccharge_det=0;
-		}	
-	else{
-			typeccharge_det= -1;
-			printk("lpp----typeccharge typec not detection\n");
-		}
-	}
-
-
-if(tcpc->typec_attach_new==0)
-{
-	typeccharge_det= -1;
-	otgdetection= -1;
-
-}
-*/
-//prize add by lipengpeng 20220223 start 
-if ((tcpm_inquire_typec_attach_state(tcpc) == TYPEC_ATTACHED_SNK) ||
-(tcpm_inquire_typec_attach_state(tcpc) == TYPEC_ATTACHED_DBGACC_SNK) ||
-(tcpm_inquire_typec_attach_state(tcpc) == TYPEC_ATTACHED_CUSTOM_SRC))
-{
-	if(tcpm_inquire_cc_polarity(tcpc)==1)
-		typeccharge_det=1;
-	else if(tcpm_inquire_cc_polarity(tcpc)==0)
-	    typeccharge_det=0;
-	else{
-		  typeccharge_det= -1;
-		  printk("lpp----typeccharge typec not detection\n");
-	  }
-	
-}
-
-if(tcpc->typec_attach_new==0)
-{
-	typeccharge_det= -1;
-	otgdetection= -1;
-
-}
-
-//prize add by lipengpeng 20220223 end 
-#endif
-//prize add by lipengpeng 20200324 end	
 	/*Report function */
 	ret = tcpci_report_usb_port_changed(tcpc);
 
@@ -440,23 +339,68 @@ static inline int typec_set_drp_toggling(struct tcpc_device *tcpc)
 }
 
 #ifdef CONFIG_WATER_DETECTION
+static void typec_wd_work(struct work_struct *work)
+{
+	struct tcpc_device *tcpc = container_of(work, struct tcpc_device,
+						wd_status_work.work);
+
+	mutex_lock(&tcpc->wd_lock);
+	if (tcpci_is_water_detected(tcpc) > 0)
+		tcpc_typec_handle_wd(tcpc, true);
+	mutex_unlock(&tcpc->wd_lock);
+}
+
 static int typec_check_water_status(struct tcpc_device *tcpc)
 {
-	int ret;
-
 	if (!(tcpc->tcpc_flags & TCPC_FLAGS_WATER_DETECTION))
 		return 0;
 
-	ret = tcpci_is_water_detected(tcpc);
-	if (ret < 0)
-		return ret;
-	if (ret) {
-		tcpc_typec_handle_wd(tcpc, true);
-		return 1;
-	}
+	TCPC_INFO("%s\n", __func__);
+
+	schedule_delayed_work(&tcpc->wd_status_work, 0);
+
 	return 0;
 }
 #endif /* CONFIG_WATER_DETECTION */
+
+#ifdef CONFIG_CC_BOUNCE_DETECTION
+static void typec_reset_cc_bounce(struct tcpc_device *tcpc)
+{
+	tcpc->cc_bounce_cnt = 0;
+	tcpc->cc_bounce_detected = false;
+}
+
+static bool typec_check_cc_bounce(struct tcpc_device *tcpc)
+{
+	s64 bounce_lapse;
+
+	if (tcpc->cc_bounce_cnt > 0) {
+		bounce_lapse = ktime_ms_delta(ktime_get(),
+					      tcpc->last_cc_change_time);
+		TCPC_INFO("%s cc bounce lapse %dms\n", __func__, bounce_lapse);
+		if (bounce_lapse >= CONFIG_CC_BOUNCE_TIME) {
+			typec_reset_cc_bounce(tcpc);
+			goto out;
+		}
+		if (tcpc->cc_bounce_cnt == CONFIG_CC_BOUNCE_COUNT &&
+		    !tcpc->cc_bounce_detected) {
+			tcpc->cc_bounce_detected = true;
+			TCPC_INFO("%s cc bounce detected\n", __func__);
+#ifdef CONFIG_WD_TRY_CC_BOUNCE
+			typec_check_water_status(tcpc);
+#endif /* CONFIG_WD_TRY_CC_BOUNCE */
+		}
+	}
+	if (!tcpc->cc_bounce_detected) {
+		tcpc->cc_bounce_cnt++;
+		TCPC_INFO("%s cc bounce count %d\n", __func__,
+			 tcpc->cc_bounce_cnt);
+	}
+	tcpc->last_cc_change_time = ktime_get();
+out:
+	return tcpc->cc_bounce_detected;
+}
+#endif /* CONFIG_CC_BOUNCE_DETECTION */
 
 /*
  * [BLOCK] NoRpSRC Entry
@@ -712,6 +656,10 @@ static void typec_unattached_entry(struct tcpc_device *tcpc)
 		tcpci_set_vconn(tcpc, false);
 	typec_unattached_cc_entry(tcpc);
 	typec_unattached_power_entry(tcpc);
+
+#ifdef CONFIG_WATER_DETECTION
+	cancel_delayed_work(&tcpc->wd_status_work);
+#endif /* CONFIG_WATER_DETECTION */
 }
 
 static void typec_unattach_wait_pe_idle_entry(struct tcpc_device *tcpc)
@@ -763,10 +711,29 @@ static inline void typec_disable_entry(struct tcpc_device *tcpc)
  * [BLOCK] Attached Entry
  */
 
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+#include <wingtech_charger.h>
+#endif
+#if defined (CONFIG_N23_CHARGER_PRIVATE)
+int polarity_state = 0;
+#endif
 static inline int typec_set_polarity(struct tcpc_device *tcpc,
 					bool polarity)
 {
 	tcpc->typec_polarity = polarity;
+//+Bug 715587,guoyanjun.wt,ADD,20220110,ATO need interface
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	{
+	extern struct wtchg_info *wt_get_wtchg_info(void);
+	struct wtchg_info *wtchg_info = wt_get_wtchg_info();
+	if(wtchg_info != NULL)
+		wtchg_info->cc_polarity = polarity + 1;
+	}
+#endif
+//-Bug 715587,guoyanjun.wt,ADD,20220110,ATO need interface
+#if defined (CONFIG_N23_CHARGER_PRIVATE)
+	polarity_state = polarity + 1;
+#endif
 	return tcpci_set_polarity(tcpc, polarity);
 }
 
@@ -810,11 +777,6 @@ static inline void typec_source_attached_entry(struct tcpc_device *tcpc)
 	typec_enable_vconn(tcpc);
 	tcpci_source_vbus(tcpc,
 			TCP_VBUS_CTRL_TYPEC, TCPC_VBUS_SOURCE_5V, -1);
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-	tcpc_enable_timer(tcpc, TYPEC_TIMER_VBUS_CHECK);
-#endif
-//prize add by huarui, cc controller sgm7220, end
 }
 
 static inline void typec_sink_attached_entry(struct tcpc_device *tcpc)
@@ -942,6 +904,11 @@ static inline void typec_try_src_entry(struct tcpc_device *tcpc)
 
 	tcpci_set_cc(tcpc, TYPEC_CC_RP);
 	tcpc_enable_timer(tcpc, TYPEC_TRY_TIMER_DRP_TRY);
+	
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+		tcpc_typec_handle_cc_change(tcpc);
+#endif	
 }
 
 static inline void typec_trywait_snk_entry(struct tcpc_device *tcpc)
@@ -1001,6 +968,10 @@ static inline void typec_try_snk_entry(struct tcpc_device *tcpc)
 
 	tcpci_set_cc(tcpc, TYPEC_CC_RD);
 	tcpc_enable_timer(tcpc, TYPEC_TRY_TIMER_DRP_TRY);
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+		tcpc_typec_handle_cc_change(tcpc);
+#endif	
 }
 
 static inline void typec_trywait_src_entry(struct tcpc_device *tcpc)
@@ -1722,9 +1693,13 @@ static inline void typec_attach_wait_entry(struct tcpc_device *tcpc)
 	tcpci_notify_attachwait_state(tcpc, as_sink);
 #endif	/* CONFIG_TYPEC_NOTIFY_ATTACHWAIT */
 
-	if (as_sink)
+	if (as_sink){
 		TYPEC_NEW_STATE(typec_attachwait_snk);
-	else {
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+		if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+			tcpci_set_cc(tcpc, TYPEC_CC_RD);
+#endif			
+	}else {
 		/* Advertise Rp level before Attached.SRC Ellisys 3.1.6359 */
 		tcpci_set_cc(tcpc,
 			TYPEC_CC_PULL(tcpc->typec_local_rp_level, TYPEC_CC_RP));
@@ -2134,6 +2109,10 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc)
 	u8 typec_state_old = tcpc->typec_state;
 #endif /* CONFIG_WATER_DETECTION */
 
+#ifdef CONFIG_CC_BOUNCE_DETECTION
+	typec_check_cc_bounce(tcpc);
+#endif /* CONFIG_CC_BOUNCE_DETECTION */
+
 	rp_present = typec_get_rp_present_flag(tcpc);
 
 	ret = tcpci_get_cc(tcpc);
@@ -2163,16 +2142,6 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc)
 		typec_wait_ps_change(tcpc, TYPEC_WAIT_PS_DISABLE);
 
 	if (typec_is_cc_attach(tcpc)) {
-//prize add by lipengpeng 20220426 start 		
-#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW)
-		turn_off_5725(1);
-#endif
-
-#if defined(CONFIG_PRIZE_NE6153_SUPPORT) || defined(CONFIG_PRIZE_WIRELESS_RECEIVER_MAXIC_MT5715) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
-		set_otg_gpio(1);
-#endif
-//prize add by lipengpeng 20220426 end
- 		
 		typec_disable_low_power_mode(tcpc);
 		typec_attach_wait_entry(tcpc);
 #ifdef CONFIG_WATER_DETECTION
@@ -2181,23 +2150,19 @@ int tcpc_typec_handle_cc_change(struct tcpc_device *tcpc)
 #ifdef CONFIG_WD_POLLING_ONLY
 			if (tcpc->bootmode == 8 || tcpc->bootmode == 9)
 				typec_check_water_status(tcpc);
+#ifdef CONFIG_WD_INIT_POWER_OFF_CHARGE
+			else if (tcpc->init_pwroff_check) {
+				tcpc->init_pwroff_check = false;
+				typec_check_water_status(tcpc);
+			}
+#endif /* CONFIG_WD_INIT_POWER_OFF_CHARGE */
 #else
 			typec_check_water_status(tcpc);
 #endif /* CONFIG_WD_POLLING_ONLY */
 		}
 #endif /* CONFIG_WATER_DETECTION */
-//prize add by lipengpeng 20220426 start 
-	} else{
-		#if defined(CONFIG_PRIZE_NE6153_SUPPORT) || defined(CONFIG_PRIZE_WIRELESS_RECEIVER_MAXIC_MT5715) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W)
-		set_otg_gpio(0);
-		#endif
-
-#if defined(CONFIG_PRIZE_MT5725_SUPPORT_15W) || defined(CONFIG_PRIZE_MT5725_SUPPORT_15W_NEW)
-		turn_off_5725(0);
-		#endif
+	} else
 		typec_detach_wait_entry(tcpc);
-   }
-//prize add by lipengpeng 20220426 end 
 
 	return 0;
 }
@@ -2255,9 +2220,21 @@ static inline int typec_handle_drp_try_timeout(struct tcpc_device *tcpc)
 static inline int typec_handle_debounce_timeout(struct tcpc_device *tcpc)
 {
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
-	if (typec_is_cc_no_res() && tcpci_check_vbus_valid(tcpc)
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID == tcpci_get_chip_id(tcpc)){
+		if (typec_is_cc_no_res() && tcpci_check_vbus_valid_from_ic(tcpc)
+			&& (tcpc->typec_state == typec_unattached_snk))
+			return typec_norp_src_attached_entry(tcpc);
+	}else{
+		if (typec_is_cc_no_res() && tcpci_check_vbus_valid(tcpc)	
+			&& (tcpc->typec_state == typec_unattached_snk))
+			return typec_norp_src_attached_entry(tcpc);
+	}
+#else
+	if (typec_is_cc_no_res() && tcpci_check_vbus_valid(tcpc)	
 		&& (tcpc->typec_state == typec_unattached_snk))
 		return typec_norp_src_attached_entry(tcpc);
+#endif	
 #endif
 
 	if (typec_is_drp_toggling()) {
@@ -2400,11 +2377,6 @@ static inline int typec_handle_role_swap_stop(struct tcpc_device *tcpc)
 }
 #endif	/* CONFIG_TYPEC_CAP_ROLE_SWAP */
 
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-extern int battery_get_vbus(void);
-#endif
-//prize add by huarui, cc controller sgm7220, end
 int tcpc_typec_handle_timeout(struct tcpc_device *tcpc, uint32_t timer_id)
 {
 	int ret = 0;
@@ -2539,16 +2511,6 @@ int tcpc_typec_handle_timeout(struct tcpc_device *tcpc, uint32_t timer_id)
 #endif	/* CONFIG_TYPEC_LEGACY2_AUTO_RECYCLE */
 #endif	/* CONFIG_TYPEC_CHECK_LEGACY_CABLE2 */
 #endif	/* CONFIG_TYPEC_CHECK_LEGACY_CABLE */
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-	case TYPEC_TIMER_VBUS_CHECK:
-		printk("HH %s: vbus:%d\n",__func__,battery_get_vbus());
-		if (battery_get_vbus() > 3500){
-			tcpc_typec_handle_ps_change(tcpc, TCPC_VBUS_VALID);
-		}
-		break;
-#endif	/* CONFIG_TYPEC_CAP_ROLE_SWAP */
-//prize add by huarui, cc controller sgm7220, end
 	}
 
 	return ret;
@@ -2633,16 +2595,9 @@ static inline int typec_handle_vbus_absent(struct tcpc_device *tcpc)
 
 	switch (tcpc->typec_state) {
 	case typec_attached_snk:
-/*prize add by sunshuai for A-C 30w charge 20201109-start */
-#ifdef CONFIG_PRIZE_ATOC_TYPEC_CHARGE
-	case typec_attached_dbgacc_snk:
-	case typec_attached_custom_src:
-#else
 #ifdef CONFIG_TYPEC_CAP_DBGACC_SNK
 	case typec_attached_dbgacc_snk:
 #endif	/* CONFIG_TYPEC_CAP_DBGACC_SNK */
-#endif  /* CONFIG_PRIZE_ATOC_TYPEC_CHARGE */
-/*prize add by sunshuai for A-C 30w charge 20201109-end */
 		typec_attached_snk_vbus_absent(tcpc);
 		break;
 	default:
@@ -2742,7 +2697,8 @@ int tcpc_typec_handle_vsafe0v(struct tcpc_device *tcpc)
 		TYPEC_NEW_STATE(typec_water_protection);
 		tcpci_set_water_protection(tcpc, true);
 		return 0;
-	}
+	} else if (tcpc->typec_state == typec_water_protection)
+		return 0;
 #endif /* CONFIG_WATER_DETECTION */
 
 	if (tcpc->typec_wait_ps_change == TYPEC_WAIT_PS_SRC_VSAFE0V) {
@@ -2855,6 +2811,14 @@ int tcpc_typec_change_role(
 			typec_role_name[typec_role]);
 		return 0;
 	}
+
+#ifdef CONFIG_WATER_DETECTION
+	if (tcpc->water_state) {
+		TYPEC_INFO("water is detected: %s is not allowed\n", __func__);
+		return 0;
+	}
+#endif
+
 	tcpc->typec_role_new = typec_role;
 
 	TYPEC_INFO("typec_new_role: %s\n", typec_role_name[typec_role]);
@@ -2884,6 +2848,10 @@ static int typec_init_power_off_charge(struct tcpc_device *tcpc)
 		return 0;
 #endif	/* CONFIG_TYPEC_CAP_NORP_SRC */
 
+#ifdef CONFIG_WD_INIT_POWER_OFF_CHARGE
+	tcpc->init_pwroff_check = true;
+#endif /* CONFIG_WD_INIT_POWER_OFF_CHARGE */
+
 	if (!tcpci_check_vbus_valid(tcpc))
 		return 0;
 
@@ -2912,6 +2880,10 @@ static int typec_init_power_off_charge(struct tcpc_device *tcpc)
 int tcpc_typec_init(struct tcpc_device *tcpc, uint8_t typec_role)
 {
 	int ret = 0;
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	bool is_power_off_boot = (tcpc->bootmode == KERNEL_POWER_OFF_CHARGING_BOOT
+		|| tcpc->bootmode == LOW_POWER_OFF_CHARGING_BOOT) ? true:false;
+#endif /*CONFIG_KPOC_GET_SOURCE_CAP_TRY*/
 
 	if (typec_role == TYPEC_ROLE_UNKNOWN ||
 		typec_role >= TYPEC_ROLE_NR) {
@@ -2919,15 +2891,24 @@ int tcpc_typec_init(struct tcpc_device *tcpc, uint8_t typec_role)
 		return -EINVAL;
 	}
 
-	TYPEC_INFO("typec_init: %s\n", typec_role_name[typec_role]);
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	if (is_power_off_boot)
+		tcpc->typec_role = TYPEC_ROLE_SNK;
+	else
+#endif /*CONFIG_KPOC_GET_SOURCE_CAP_TRY*/
+		tcpc->typec_role = typec_role;
 
-	tcpc->typec_role = typec_role;
-	tcpc->typec_role_new = typec_role;
+	TYPEC_INFO("typec_init: %s\n", typec_role_name[tcpc->typec_role]);
+
+	tcpc->typec_role_new = tcpc->typec_role;
 	tcpc->typec_attach_new = TYPEC_UNATTACHED;
 	tcpc->typec_attach_old = TYPEC_UNATTACHED;
 
 	tcpc->typec_remote_cc[0] = TYPEC_CC_VOLT_OPEN;
 	tcpc->typec_remote_cc[1] = TYPEC_CC_VOLT_OPEN;
+#ifdef CONFIG_WATER_DETECTION
+	INIT_WORK(&tcpc->wd_report_usb_port_work, typec_wd_report_usb_port_work);
+#endif /* CONFIG_WATER_DETECTION */
 
 	mutex_lock(&tcpc->access_lock);
 	tcpc->wake_lock_pd = 0;
@@ -2945,6 +2926,10 @@ int tcpc_typec_init(struct tcpc_device *tcpc, uint8_t typec_role)
 	typec_legacy_reset_cable_suspect(tcpc);
 #endif	/* CONFIG_TYPEC_CHECK_LEGACY_CABLE */
 
+#ifdef CONFIG_WATER_DETECTION
+	INIT_DELAYED_WORK(&tcpc->wd_status_work, typec_wd_work);
+#endif /* CONFIG_WATER_DETECTION */
+
 #ifdef CONFIG_TYPEC_CAP_POWER_OFF_CHARGE
 	ret = typec_init_power_off_charge(tcpc);
 	if (ret != 0)
@@ -2955,12 +2940,21 @@ int tcpc_typec_init(struct tcpc_device *tcpc, uint8_t typec_role)
 	tcpc->typec_power_ctrl = true;
 #endif	/* CONFIG_TYPEC_POWER_CTRL_INIT */
 
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	if (!is_power_off_boot) {
+		tcpc_typec_error_recovery(tcpc);
+		return ret;
+	}
+#endif /* CONFIG_KPOC_GET_SOURCE_CAP_TRY */
 	typec_unattached_entry(tcpc);
 	return ret;
 }
 
 void  tcpc_typec_deinit(struct tcpc_device *tcpc)
 {
+#ifdef CONFIG_WATER_DETECTION
+	cancel_delayed_work_sync(&tcpc->wd_status_work);
+#endif /* CONFIG_WATER_DETECTION */
 }
 
 #ifdef CONFIG_WATER_DETECTION
@@ -2972,6 +2966,7 @@ int tcpc_typec_handle_wd(struct tcpc_device *tcpc, bool wd)
 		return 0;
 
 	TYPEC_INFO("%s %d\n", __func__, wd);
+	tcpci_lock_typec(tcpc);
 	if (!wd) {
 		tcpci_set_water_protection(tcpc, false);
 		tcpc_typec_error_recovery(tcpc);
@@ -2987,6 +2982,7 @@ int tcpc_typec_handle_wd(struct tcpc_device *tcpc, bool wd)
 
 	tcpc->typec_attach_new = TYPEC_UNATTACHED;
 	ret = tcpci_set_cc(tcpc, TYPEC_CC_OPEN);
+	typec_enable_low_power_mode(tcpc, TYPEC_CC_DRP);
 #ifdef CONFIG_TCPC_VSAFE0V_DETECT_IC
 	ret = tcpci_is_vsafe0v(tcpc);
 	if (ret == 0) {
@@ -3007,6 +3003,7 @@ out:
 		typec_alert_attach_state_change(tcpc);
 		tcpc->typec_attach_old = tcpc->typec_attach_new;
 	}
+	tcpci_unlock_typec(tcpc);
 	return ret;
 }
 #endif /* CONFIG_WATER_DETECTION */

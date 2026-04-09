@@ -773,6 +773,9 @@ int pd_reset_protocol_layer(struct pd_port *pd_port, bool sop_only)
 
 int pd_set_rx_enable(struct pd_port *pd_port, uint8_t enable)
 {
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	pd_port->rx_cap = enable;
+#endif
 	return tcpci_set_rx_enable(pd_port->tcpc, enable);
 }
 
@@ -1329,7 +1332,34 @@ void pd_lock_msg_output(struct pd_port *pd_port)
 
 	pd_dbg_info_lock();
 }
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+void pd_add_miss_msg(struct pd_port *pd_port,struct pd_event *pd_event,
+				uint8_t msg)
+{
+	struct pd_msg *pd_msg = pd_event->pd_msg;
+	struct pd_msg * miss_msg = NULL;
+	uint8_t sop_type = 0;
+	struct pd_event evt = {
+		.event_type = PD_EVT_CTRL_MSG,
+		.msg = msg,
+		.pd_msg = NULL,
+	};
+	if (pd_msg != NULL) {
+		sop_type = pd_msg->frame_type;
+	}
+	pd_put_event(pd_port->tcpc,&evt,true);
+	miss_msg = pd_alloc_msg(pd_port->tcpc);
+	if (miss_msg == NULL) {
+		return;
+	}
+	if (pd_msg != NULL)
+		memcpy(miss_msg,pd_msg,sizeof(struct pd_msg));
 
+	pd_put_pd_msg_event(pd_port->tcpc,miss_msg);
+	pd_port->pe_data.msg_id_rx[sop_type]--;
+	return;
+}
+#endif
 void pd_unlock_msg_output(struct pd_port *pd_port)
 {
 	if (!pd_port->msg_output_lock)
@@ -1338,11 +1368,22 @@ void pd_unlock_msg_output(struct pd_port *pd_port)
 
 	pd_dbg_info_unlock();
 }
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+#include <wingtech_charger.h>
+#endif
 
 int pd_update_connect_state(struct pd_port *pd_port, uint8_t state)
 {
 	struct tcpc_device __maybe_unused *tcpc = pd_port->tcpc;
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	struct wtchg_info *info = wt_get_wtchg_info();
+	if (!IS_ERR_OR_NULL(info)){
+		info->pd_stat = state;
+		printk("%s: pd_state is %d\n",__func__,info->pd_stat);
+	}else{
+		printk("%s: info is error or null!\n",__func__);
+	}
+#endif
 	if (pd_port->pd_connect_state == state)
 		return 0;
 

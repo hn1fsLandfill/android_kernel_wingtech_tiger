@@ -6,10 +6,6 @@
 #ifndef __MUSB_MTK_MUSB_H__
 #define __MUSB_MTK_MUSB_H__
 
-//prize hjw  20220518 for ALPS07185706 otg usb  check fail start
-//#ifdef CONFIG_MTK_MUSB_PHY
-#if defined(CONFIG_MACH_MT6761)||defined(CONFIG_MTK_MUSB_PHY)
-//prize hjw  20220518 for ALPS07185706 otg usb  check fail start
 #ifdef CONFIG_OF
 extern struct musb *mtk_musb;
 
@@ -42,7 +38,6 @@ extern struct musb *mtk_musb;
 	USBPHY_WRITE32(offset, (USBPHY_READ32(offset)) & (~(mask)))
 
 #endif /* End of CONFIG_OF define */
-#endif /* End of CONFIG_MTK_MUSB_PHY */
 
 struct musb;
 
@@ -58,18 +53,30 @@ extern bool usb_pre_clock(bool enable);
 extern void usb_phy_context_restore(void);
 extern void usb_phy_context_save(void);
 #endif
+extern void usb_dpdm_pullup(bool enable);
 
 /* general USB */
 extern bool mt_usb_is_device(void);
 extern void mt_usb_connect(void);
 extern void mt_usb_disconnect(void);
 extern void mt_usb_reconnect(void);
+#if IS_ENABLED(CONFIG_USB_NOTIFY_LAYER)
+extern bool usb_cable_connected(void);
+#else
 extern bool usb_cable_connected(struct musb *musb);
+#endif
 extern void musb_sync_with_bat(struct musb *musb, int usb_state);
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+extern bool mt_usb_is_connected(void);
+#endif
 bool is_saving_mode(void);
 
 /* host and otg */
+extern void mt_usb_host_connect(int delay);
+extern void mt_usb_host_disconnect(int delay);
+extern void mt_otg_accessory_power(int is_on);
+extern void mt_usb_otg_init(struct musb *musb);
+extern void mt_usb_otg_exit(struct musb *musb);
 extern void mt_usb_init_drvvbus(void);
 extern void mt_usb_iddig_int(struct musb *musb);
 extern void switch_int_to_device(struct musb *musb);

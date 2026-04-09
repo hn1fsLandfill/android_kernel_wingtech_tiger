@@ -262,7 +262,10 @@ static int tcpci_alert_recv_msg(struct tcpc_device *tcpc)
 	int retval;
 	struct pd_msg *pd_msg;
 	enum tcpm_transmit_type type;
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)	
+	if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+		tcpci_set_rx_enable(tcpc, PD_RX_CAP_PE_STARTUP);
+#endif	
 	pd_msg = pd_alloc_msg(tcpc);
 	if (pd_msg == NULL) {
 		tcpci_alert_status_clear(tcpc, TCPC_REG_ALERT_RX_MASK);
@@ -276,7 +279,10 @@ static int tcpci_alert_recv_msg(struct tcpc_device *tcpc)
 		pd_free_msg(tcpc, pd_msg);
 		return retval;
 	}
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+		tcpci_set_rx_enable(tcpc, tcpc->pd_port.rx_cap);
+#endif	
 	pd_msg->frame_type = (uint8_t) type;
 	pd_put_pd_msg_event(tcpc, pd_msg);
 	return 0;
@@ -432,7 +438,9 @@ int tcpci_alert(struct tcpc_device *tcpc)
 		TCPC_INFO("Alert:0x%04x, Mask:0x%04x\n",
 			  alert_status, alert_mask);
 #endif /* CONFIG_USB_PD_DBG_ALERT_STATUS */
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	if (G_SC2150A_VID != tcpci_get_chip_id(tcpc))
+#endif
 	alert_status &= alert_mask;
 
 	tcpci_alert_status_clear(tcpc,

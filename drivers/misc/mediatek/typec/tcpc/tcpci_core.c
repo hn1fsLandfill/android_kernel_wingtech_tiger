@@ -406,6 +406,9 @@ struct tcpc_device *tcpc_device_register(struct device *parent,
 	mutex_init(&tcpc->typec_lock);
 	mutex_init(&tcpc->timer_lock);
 	mutex_init(&tcpc->mr_lock);
+#ifdef CONFIG_WATER_DETECTION
+	mutex_init(&tcpc->wd_lock);
+#endif /* CONFIG_WATER_DETECTION */
 	sema_init(&tcpc->timer_enable_mask_lock, 1);
 	spin_lock_init(&tcpc->timer_tick_lock);
 
@@ -439,19 +442,15 @@ struct tcpc_device *tcpc_device_register(struct device *parent,
 	 * please use it instead of "WAKE_LOCK_SUSPEND"
 	 */
 	tcpc->attach_wake_lock =
-		wakeup_source_register(NULL, "tcpc_attach_wake_lock");
+		wakeup_source_register(&tcpc->dev, "tcpc_attach_wake_lock");
 	tcpc->detach_wake_lock =
-		wakeup_source_register(NULL, "tcpc_detach_wake_lock");
+		wakeup_source_register(&tcpc->dev, "tcpc_detach_wake_lock");
 
 	tcpci_timer_init(tcpc);
 #ifdef CONFIG_USB_POWER_DELIVERY
 	pd_core_init(tcpc);
 #endif /* CONFIG_USB_POWER_DELIVERY */
 
-
-	/* prize hanjiuping 20210914 add debug msg for tcpc dev register OK start */
-	dev_info(&tcpc->dev, "%s OK\n", __func__);
-	/* prize hanjiuping 20210914 add debug msg for tcpc dev register OK start */
 	return tcpc;
 }
 EXPORT_SYMBOL(tcpc_device_register);
@@ -459,6 +458,11 @@ EXPORT_SYMBOL(tcpc_device_register);
 static int tcpc_device_irq_enable(struct tcpc_device *tcpc)
 {
 	int ret;
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+//	int seconds = 0;
+#else
+//	int seconds = 10;
+#endif
 
 	if (!tcpc->ops->init) {
 		pr_err("%s Please implment tcpc ops init function\n",
@@ -480,9 +484,9 @@ static int tcpc_device_irq_enable(struct tcpc_device *tcpc)
 		pr_err("%s : tcpc typec init fail\n", __func__);
 		return ret;
 	}
-
+	//Extb P210312-00394 lvyuanchuan.wt 2021/04/28 modify ,it cannot charging at power off with hub
 	schedule_delayed_work(
-		&tcpc->event_init_work, msecs_to_jiffies(10*1000));
+		&tcpc->event_init_work, msecs_to_jiffies(4*1000));
 
 	pr_info("%s : tcpc irq enable OK!\n", __func__);
 	return 0;
@@ -562,7 +566,7 @@ static void tcpc_event_init_work(struct work_struct *work)
 	tcpc->chg_psy = devm_power_supply_get_by_phandle(
 		tcpc->dev.parent, "charger");
 #endif
-	if (!tcpc->chg_psy) {
+	if (IS_ERR_OR_NULL(tcpc->chg_psy)) {
 		tcpci_unlock_typec(tcpc);
 		TCPC_ERR("%s get charger psy fail\n", __func__);
 		return;

@@ -2250,20 +2250,9 @@ static int musb_gadget_vbus_draw
 	return usb_phy_set_power(musb->xceiv, mA);
 }
 
-/* default value 0 */
-static int usb_rdy;
-void set_usb_rdy(void)
-{
-	DBG(0, "set usb_rdy, wake up bat\n");
-	usb_rdy = 1;
-}
-
 bool is_usb_rdy(void)
 {
-	if (usb_rdy)
-		return true;
-	else
-		return false;
+	return true;
 }
 EXPORT_SYMBOL(is_usb_rdy);
 
@@ -2294,7 +2283,7 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 
 	if (!musb->is_ready && is_on) {
 		musb->is_ready = true;
-		//set_usb_rdy();
+
 		/* direct issue connection work if usb is forced on */
 		if (musb_force_on) {
 			DBG(0, "mt_usb_connect() on is_ready begin\n");
@@ -2304,9 +2293,6 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 			mt_usb_reconnect();
 		}
 	}
-
-	if (!is_usb_rdy() && is_on)
-		set_usb_rdy();
 
 	spin_unlock_irqrestore(&musb->lock, flags);
 
@@ -3007,6 +2993,12 @@ void musb_g_reset(struct musb *musb)
 	if (!musb->usb_lock->active)
 		__pm_stay_awake(musb->usb_lock);
 
+#if defined(CONFIG_WT_PROJECT_S96516SA1) || defined(CONFIG_WT_PROJECT_S96616AA1)
+        #ifndef FPGA_PLATFORM
+         musb_platform_reset(musb);
+         musb_generic_disable(musb);
+        #endif
+#endif
 	/* re-init interrupt setting */
 	musb->intrrxe = 0;
 	musb_writew(mbase, MUSB_INTRRXE, musb->intrrxe);

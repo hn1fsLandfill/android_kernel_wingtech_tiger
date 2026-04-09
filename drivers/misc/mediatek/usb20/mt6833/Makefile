@@ -31,6 +31,6 @@ endif
 ccflags-y += -I$(srctree)/drivers/usb/core/
 
 # Phy
-#obj-$(CONFIG_MTK_MUSB_PHY)		+= mtk_usb20_phy.o
+obj-$(CONFIG_MTK_MUSB_PHY)		+= mtk_usb20_phy.o
 mtk_usb20_phy-y				+= usb20_phy.o
 mtk_usb20_phy-$(CONFIG_DEBUG_FS)	+= usb20_phy_debugfs.o

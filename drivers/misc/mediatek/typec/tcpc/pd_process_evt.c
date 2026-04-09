@@ -7,6 +7,7 @@
 #include "inc/tcpci_event.h"
 #include "inc/pd_process_evt.h"
 #include "inc/pd_dpm_core.h"
+#include <mt-plat/mtk_boot.h>
 
 /*
  * [BLOCK] print event
@@ -558,7 +559,12 @@ static inline bool pe_is_valid_pd_msg_id(struct pd_port *pd_port,
 			pd_event->msg, msg_id);
 		return false;
 	}
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)	
+	if (((pd_port->pe_data.msg_id_rx[sop_type] + 2) % PD_MSG_ID_MAX)== msg_id) {
+		PE_INFO("Miss Msg!!!\n");
+		pd_port->miss_msg = true;
+	}
+#endif
 	pd_port->pe_data.msg_id_rx[sop_type] = msg_id;
 	return true;
 }
@@ -638,6 +644,11 @@ static inline uint8_t pe_get_startup_state(
 {
 	bool act_as_sink = true;
 	uint8_t startup_state = 0xff;
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	struct tcpc_device *tcpc = pd_port->tcpc;
+	bool is_power_off_boot = (tcpc->bootmode == KERNEL_POWER_OFF_CHARGING_BOOT ||
+			tcpc->bootmode == LOW_POWER_OFF_CHARGING_BOOT) ? true:false;
+#endif	/* CONFIG_KPOC_GET_SOURCE_CAP_TRY */
 
 #ifdef CONFIG_USB_PD_CUSTOM_DBGACC
 	pd_port->custom_dbgacc = false;
@@ -645,15 +656,11 @@ static inline uint8_t pe_get_startup_state(
 
 	switch (pd_event->msg_sec) {
 	case TYPEC_ATTACHED_DBGACC_SNK:
-/*prize add by sunshuai for A-C 30w charge 20201109-start */
-#ifndef CONFIG_PRIZE_ATOC_TYPEC_CHARGE
 #ifdef CONFIG_USB_PD_CUSTOM_DBGACC
 		pd_port->custom_dbgacc = true;
 		startup_state = PE_DBG_READY;
 		break;
 #endif	/* CONFIG_USB_PD_CUSTOM_DBGACC */
-#endif
-/*prize add by sunshuai for A-C 30w charge 20201109-end */
 	case TYPEC_ATTACHED_SNK:
 		startup_state = PE_SNK_STARTUP;
 		break;
@@ -666,7 +673,12 @@ static inline uint8_t pe_get_startup_state(
 
 	/* At least > 4 for Ellisys VNDI PR_SWAP */
 #ifdef CONFIG_USB_PD_ERROR_RECOVERY_ONCE
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+	if ((is_power_off_boot && (pd_port->error_recovery_once >= PD_ERROR_RECOVERY_COUNT))
+			|| (!is_power_off_boot && pd_port->error_recovery_once > 4))
+#else
 	if (pd_port->error_recovery_once > 4)
+#endif /* CONFIG_KPOC_GET_SOURCE_CAP_TRY */
 		startup_state = PE_ERROR_RECOVERY_ONCE;
 #endif	/* CONFIG_USB_PD_ERROR_RECOVERY_ONCE */
 
@@ -713,6 +725,15 @@ static inline uint8_t pe_check_trap_in_idle_state(
 
 	case PE_IDLE2:
 		if (pd_event_hw_msg_match(pd_event, PD_HW_CC_ATTACHED)) {
+#ifdef CONFIG_KPOC_GET_SOURCE_CAP_TRY
+			if (tcpc->bootmode == KERNEL_POWER_OFF_CHARGING_BOOT
+				|| tcpc->bootmode == LOW_POWER_OFF_CHARGING_BOOT) {
+				if (pd_port->error_recovery_once == 1)
+					pd_port->error_recovery_once = PD_ERROR_RECOVERY_COUNT;
+				PE_INFO("error_recovery_once = %d\r\n",
+						pd_port->error_recovery_once);
+			}
+#endif /*CONFIG_KPOC_GET_SOURCE_CAP_TRY*/
 			if (pe_transit_startup_state(pd_port, pd_event))
 				return TII_TRANSIT_STATE;
 		}
@@ -784,6 +805,24 @@ bool pd_process_event(
 			PE_TRANSIT_STATE(pd_port, PE_ERROR_RECOVERY);
 			return true;
 		}
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+		if ((G_SC2150A_VID == tcpci_get_chip_id(pd_port->tcpc)) && pd_port->miss_msg) {
+			if (pd_port->pe_pd_state == PE_SNK_TRANSITION_SINK) {
+				pd_add_miss_msg(pd_port,pd_event,PD_CTRL_PS_RDY);
+			} else if (pd_port->pe_pd_state == PE_SNK_SELECT_CAPABILITY){
+				switch (pd_event->msg) {
+				case PD_CTRL_PS_RDY:
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_ACCEPT);
+					break;
+				case PD_DATA_SOURCE_CAP:
+					pd_add_miss_msg(pd_port,pd_event,PD_CTRL_REJECT);
+					break;
+				}
+			}
+			pd_port->miss_msg = false;
+			return false;
+		}
+#endif		
 	}
 
 	pd_copy_msg_data_from_evt(pd_port, pd_event);

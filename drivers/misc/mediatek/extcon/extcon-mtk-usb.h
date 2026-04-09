@@ -24,6 +24,7 @@ struct mtk_extcon_info {
 	struct notifier_block tcpc_nb;
 #endif
 	bool bypss_typec_sink;
+	struct charger_device *chg_dev;
 };
 
 struct usb_role_info {

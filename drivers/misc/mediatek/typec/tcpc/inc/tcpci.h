@@ -25,6 +25,8 @@
 #include "pd_core.h"
 #endif /* CONFIG_USB_POWER_DELIVERY */
 
+#define G_SC2150A_VID			0x311c
+
 #define PE_STATE_FULL_NAME	0
 
 #define TCPC_LOW_RP_DUTY		(100)		/* 10 % */
@@ -32,6 +34,9 @@
 
 /* provide to TCPC interface */
 extern int tcpci_report_usb_port_changed(struct tcpc_device *tcpc);
+#ifdef CONFIG_WATER_DETECTION
+extern void typec_wd_report_usb_port_work(struct work_struct *work);
+#endif /* CONFIG_WATER_DETECTION */
 extern int tcpci_set_wake_lock(
 	struct tcpc_device *tcpc, bool pd_lock, bool user_lock);
 extern int tcpci_report_power_control(struct tcpc_device *tcpc, bool en);
@@ -59,6 +64,7 @@ static inline int tcpci_check_vbus_valid(struct tcpc_device *tcpc)
 	return tcpc->vbus_level >= TCPC_VBUS_VALID;
 }
 
+int tcpci_get_chip_id(struct tcpc_device *tcpc);
 int tcpci_check_vbus_valid_from_ic(struct tcpc_device *tcpc);
 int tcpci_check_vsafe0v(struct tcpc_device *tcpc, bool detect_en);
 int tcpci_alert_status_clear(struct tcpc_device *tcpc, uint32_t mask);
@@ -100,6 +106,7 @@ int tcpci_is_vsafe0v(struct tcpc_device *tcpc);
 #endif /* CONFIG_TCPC_VSAFE0V_DETECT_IC */
 
 #ifdef CONFIG_WATER_DETECTION
+bool tcpci_is_in_water_detecting(struct tcpc_device *tcpc);
 int tcpci_is_water_detected(struct tcpc_device *tcpc);
 int tcpci_set_water_protection(struct tcpc_device *tcpc, bool en);
 int tcpci_set_usbid_polling(struct tcpc_device *tcpc, bool en);

@@ -12,22 +12,11 @@
 /* #define CONFIG_TYPEC_USE_DIS_VBUS_CTRL */
 #define CONFIG_TYPEC_POWER_CTRL_INIT
 
-//prize add by huarui, cc controller sgm7220
-#if !defined(CONFIG_TCPC_SGM7220)&&!defined(CONFIG_TCPC_WUSB3801)
 #define CONFIG_TYPEC_CAP_TRY_SOURCE
 #define CONFIG_TYPEC_CAP_TRY_SINK
-#endif
-//prize add by huarui, cc controller sgm7220
 
 #define CONFIG_TYPEC_CAP_DBGACC
-/*prize add by sunshuai for A-C 30w charge 20201109-start */
-#ifdef CONFIG_PRIZE_ATOC_TYPEC_CHARGE
-#define CONFIG_TYPEC_CAP_DBGACC_SNK
-#define CONFIG_TYPEC_WAIT_BC12
-#else
 /* #define CONFIG_TYPEC_CAP_DBGACC_SNK */
-#endif
-/*prize add by sunshuai for A-C 30w charge 20201109-end */
 #define CONFIG_TYPEC_CAP_CUSTOM_SRC
 #define CONFIG_TYPEC_CAP_NORP_SRC
 /* #define CONFIG_COMPATIBLE_APPLE_TA */
@@ -124,6 +113,10 @@
 #define CONFIG_USB_PD_PE_SINK
 #define CONFIG_USB_PD_PE_SOURCE
 #define CONFIG_USB_PD_DISABLE_PE
+
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+#undef CONFIG_USB_PD_DISABLE_PE
+#endif
 
 #define CONFIG_USB_PD_TCPM_CB_RETRY		3
 #define CONFIG_USB_PD_TCPM_CB_2ND
@@ -259,7 +252,7 @@
 #define CONFIG_USB_PD_KEEP_SVIDS
 #define CONFIG_USB_PD_SRC_STARTUP_DISCOVER_ID
 #define CONFIG_USB_PD_DFP_READY_DISCOVER_ID
-#define CONFIG_USB_PD_RESET_CABLE
+//#define CONFIG_USB_PD_RESET_CABLE
 
 #define CONFIG_USB_PD_RANDOM_FLOW_DELAY
 
@@ -289,13 +282,7 @@
 #endif	/* CONFIG_USB_PD_CUSTOM_VDM */
 
 #ifdef CONFIG_TYPEC_CAP_DBGACC_SNK
-/*prize add by sunshuai for A-C 30w charge 20201109-start */
-#ifdef CONFIG_PRIZE_ATOC_TYPEC_CHARGE
-#define CONFIG_USB_PD_CUSTOM_DBGACC
-#else
 /* #define CONFIG_USB_PD_CUSTOM_DBGACC */
-#endif
-/*prize add by sunshuai for A-C 30w charge 20201109-end */
 #endif	/* CONFIG_TYPEC_CAP_DBGACC_SNK */
 
 /* S/W patch for ESD issue: repeat HReset Alert */
@@ -405,8 +392,17 @@
 #endif	/* CONFIG_USB_PD_PPS_REQUEST_INTERVAL */
 
 #ifdef CONFIG_MTK_CHARGER
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
 #define CONFIG_USB_PD_WAIT_BC12
+#else
+#undef CONFIG_USB_PD_WAIT_BC12
+#endif
 #endif /* CONFIG_MTK_CHARGER */
+
+#ifdef CONFIG_MTK_CHARGER
+/* Need APIs from MTK charger */
+#define CONFIG_KPOC_GET_SOURCE_CAP_TRY
+#endif
 #endif /* CONFIG_USB_POWER_DELIVERY */
 
 /* debug config */
@@ -425,18 +421,18 @@
 #ifdef CONFIG_WATER_DETECTION
 #define CONFIG_WD_SBU_POLLING
 /* #define CONFIG_WATER_CALIBRATION */
+#define CONFIG_WD_INIT_POWER_OFF_CHARGE
 #define CONFIG_WD_SBU_CALIB_INIT	1800 /* mV */
 #define CONFIG_WD_SBU_PL_BOUND		200 /* mV */
-#define CONFIG_WD_SBU_PL_LBOUND_C2C	1100 /* mV */
-#define CONFIG_WD_SBU_PL_UBOUND_C2C	2600 /* mV */
-#define CONFIG_WD_SBU_PL_RETRY		2
-#define CONFIG_WD_SBU_PH_RETRY		2
-#define CONFIG_WD_SBU_PH_AUDDEV		200 /* mV */
+#define CONFIG_WD_SBU_PH_AUDDEV		70 /* mV */
+#define CONFIG_WD_SBU_PH_LBOUND_ATTACH	1650 /* mV */
 #define CONFIG_WD_SBU_PH_LBOUND		1180 /* mV */
 #define CONFIG_WD_SBU_PH_LBOUND1_C2C	2850 /* mV */
 #define CONFIG_WD_SBU_PH_UBOUND1_C2C	3150 /* mV */
 #define CONFIG_WD_SBU_PH_UBOUND2_C2C	3800 /* mV */
 #define CONFIG_WD_SBU_AUD_UBOUND	1600 /* mV */
+#define CONFIG_WD_SBU_PH_LBOUND1_SS	1150 /* mV */
+#define CONFIG_WD_SBU_PH_UBOUND1_SS	1250 /* mV */
 #define CONFIG_WD_PROTECT_RETRY_COUNT	3
 #endif /* CONFIG_WATER_DETECTION */
 
@@ -446,6 +442,17 @@
 
  /* FIXME : skip build error */
 /* #define CONFIG_CABLE_TYPE_DETECTION */
+
+#define CONFIG_CC_BOUNCE_DETECTION
+
+#ifdef CONFIG_CC_BOUNCE_DETECTION
+#define CONFIG_CC_BOUNCE_TIME	100	/* ms */
+#define CONFIG_CC_BOUNCE_COUNT	10
+
+#ifdef CONFIG_WATER_DETECTION
+#define CONFIG_WD_TRY_CC_BOUNCE
+#endif /* CONFIG_WATER_DETECTION */
+#endif /* CONFIG_CC_BOUNCE_DETECTION */
 
 #endif /* CONFIG_TCPC_CLASS */
 #endif /* __LINUX_TCPC_CONFIG_H */

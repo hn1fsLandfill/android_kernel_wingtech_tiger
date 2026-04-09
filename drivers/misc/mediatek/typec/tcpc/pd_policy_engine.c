@@ -1058,6 +1058,12 @@ static inline bool pd_try_get_vdm_event(
 
 	switch (pd_port->pe_pd_state) {
 #ifdef CONFIG_USB_PD_PE_SINK
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	case PE_SNK_TRANSITION_SINK:
+		if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+			ret = pd_get_vdm_event(tcpc, pd_event);
+		break;
+#endif
 	case PE_SNK_READY:
 		ret = pd_get_vdm_event(tcpc, pd_event);
 		break;

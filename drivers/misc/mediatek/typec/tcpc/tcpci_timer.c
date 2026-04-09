@@ -210,11 +210,6 @@ static const char *const tcpc_timer_name[] = {
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
 	"TYPEC_TIMER_NORP_SRC",
 #endif	/* CONFIG_TYPEC_CAP_NORP_SRC */
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-	"TYPEC_TIMER_VBUS_CHECK",
-#endif	/* CONFIG_TCPC_SGM7220 */
-//prize add by huarui, cc controller sgm7220, end
 };
 #endif /* TCPC_TIMER_DBG_EN || TCPC_TIMER_INFO_EN */
 /* CONFIG_USB_PD_SAFE0V_DELAY */
@@ -355,11 +350,6 @@ DECL_TCPC_TIMEOUT(TYPEC_TIMER_DRP_SRC_TOGGLE, 60),
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
 DECL_TCPC_TIMEOUT(TYPEC_TIMER_NORP_SRC, 300),
 #endif	/* CONFIG_TYPEC_CAP_NORP_SRC */
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-DECL_TCPC_TIMEOUT(TYPEC_TIMER_VBUS_CHECK, 200),
-#endif	/* CONFIG_TCPC_SGM7220 */
-//prize add by huarui, cc controller sgm7220, end
 };
 
 typedef enum hrtimer_restart (*tcpc_hrtimer_call)(struct hrtimer *timer);
@@ -425,7 +415,12 @@ static inline void on_pe_timer_timeout(
 		TCPC_INFO("pe_idle tout\n");
 		pd_put_pe_event(&tcpc->pd_port, PD_PE_IDLE);
 		break;
-
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+	case PD_TIMER_HARD_RESET_COMPLETE:
+		if (G_SC2150A_VID == tcpci_get_chip_id(tcpc))
+			pd_put_sent_hard_reset_event(tcpc);
+		break;
+#endif
 	default:
 		pd_put_event(tcpc, &pd_event, false);
 		break;
@@ -1080,20 +1075,6 @@ static enum hrtimer_restart tcpc_timer_norp_src(struct hrtimer *timer)
 }
 #endif	/* CONFIG_TYPEC_CAP_NORP_SRC */
 
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-static enum hrtimer_restart tcpc_timer_vbus_check(struct hrtimer *timer)
-{
-	int index = TYPEC_TIMER_VBUS_CHECK;
-	struct tcpc_device *tcpc =
-		container_of(timer, struct tcpc_device, tcpc_timer[index]);
-
-	TCPC_TIMER_TRIGGER();
-	return HRTIMER_NORESTART;
-}
-#endif	/* CONFIG_TCPC_SGM7220 */
-//prize add by huarui, cc controller sgm7220, end
-
 static tcpc_hrtimer_call tcpc_timer_call[PD_TIMER_NR] = {
 #ifdef CONFIG_USB_POWER_DELIVERY
 	tcpc_timer_discover_id,
@@ -1185,11 +1166,6 @@ static tcpc_hrtimer_call tcpc_timer_call[PD_TIMER_NR] = {
 #ifdef CONFIG_TYPEC_CAP_NORP_SRC
 	tcpc_timer_norp_src,
 #endif
-//prize add by huarui, cc controller sgm7220, start
-#if defined(CONFIG_TCPC_SGM7220)||defined(CONFIG_TCPC_WUSB3801)
-	tcpc_timer_vbus_check,
-#endif
-//prize add by huarui, cc controller sgm7220, end
 };
 
 /*
@@ -1391,7 +1367,7 @@ int tcpci_timer_init(struct tcpc_device *tcpc)
 		tcpc->tcpc_timer[i].function = tcpc_timer_call[i];
 	}
 	tcpc->wakeup_wake_lock =
-		wakeup_source_register(NULL, "tcpc_wakeup_wake_lock");
+		wakeup_source_register(&tcpc->dev, "tcpc_wakeup_wake_lock");
 	INIT_DELAYED_WORK(&tcpc->wake_up_work, wake_up_work_func);
 	alarm_init(&tcpc->wake_up_timer, ALARM_REALTIME, tcpc_timer_wakeup);
 
