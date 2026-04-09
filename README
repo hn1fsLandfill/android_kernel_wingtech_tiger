@@ -15,6 +15,7 @@ Touchscreen
 Modem (SMS isn't tested but it may work given mobile data and phone calls work)
 Audio
 Side fingerprint scanner
+Connectivity (Wi-Fi, Bluetooth, GPS via https://github.com/hn1fsLandfill/tiger_kernel_modules TODO: integrate into kernel)
 
 What partially works:
 USB (OTG doesn't work)
@@ -22,7 +23,6 @@ USB (OTG doesn't work)
 What doesn't:
 SD Cards
 Camera
-Connectivity (Wi-Fi, Bluetooth)
 NFC
 
 TODO for camera image sensors: 
