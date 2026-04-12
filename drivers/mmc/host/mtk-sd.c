@@ -2848,7 +2848,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	}
 
 	if (mmc->host_function == MSDC_SD)
-		mmc->caps |= MMC_CAP_AGGRESSIVE_PM | MMC_CAP_CD_WAKE;
+		mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	host->base = devm_ioremap_resource(&pdev->dev, res);
@@ -2908,7 +2908,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {
-		ret = -EINVAL;
+		ret = host->irq;
 		goto host_free;
 	}
 
@@ -3179,17 +3179,6 @@ static int msdc_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int msdc_suspend(struct device *dev)
-{
-	struct mmc_host *mmc = dev_get_drvdata(dev);
-	struct msdc_host *host = mmc_priv(mmc);
-
-	dev_dbg(host->dev,"%s, GPIO set cd wake enable",__func__);
-	mmc_gpio_set_cd_wake(mmc, true);
-
-	return pm_runtime_force_suspend(dev);
-}
-
 static int msdc_runtime_resume(struct device *dev)
 {
 	struct mmc_host *mmc = dev_get_drvdata(dev);
@@ -3213,21 +3202,11 @@ static int msdc_runtime_resume(struct device *dev)
 			1, 4, 1, 0, 0, 0, 0, &smccc_res);
 	return 0;
 }
-
-static int msdc_resume(struct device *dev)
-{
-	struct mmc_host *mmc = dev_get_drvdata(dev);
-	struct msdc_host *host = mmc_priv(mmc);
-
-	dev_dbg(host->dev,"%s, GPIO set cd wake disable",__func__);
-	mmc_gpio_set_cd_wake(mmc, false);
-
-	return pm_runtime_force_resume(dev);
-}
 #endif
 
 static const struct dev_pm_ops msdc_dev_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(msdc_suspend, msdc_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+				pm_runtime_force_resume)
 	SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
 };
 
