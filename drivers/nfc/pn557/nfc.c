@@ -82,18 +82,15 @@ void nfc_enable_irq(struct nfc_dev *nfc_dev)
     spin_unlock_irqrestore(&nfc_dev->irq_enabled_lock, flags);
 }
 
-static void nfc_init_stat(struct nfc_dev *nfc_dev)
-{
-	nfc_dev->count_irq = 0;
-}
-
 static irqreturn_t nfc_dev_irq_handler(int irq, void *dev_id)
 {
     struct nfc_dev *nfc_dev = dev_id;
     unsigned long flags;
+    pr_err("nfc enter into nfc_dev_irq_handler\n");
 
     if (device_may_wakeup(&nfc_dev->client->dev))
         pm_wakeup_event(&nfc_dev->client->dev, WAKEUP_SRC_TIMEOUT);
+
     nfc_disable_irq(nfc_dev);
     spin_lock_irqsave(&nfc_dev->irq_enabled_lock, flags);
     nfc_dev->count_irq++;
@@ -114,7 +111,6 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
     }
     if (count > MAX_BUFFER_SIZE)
         count = MAX_BUFFER_SIZE;
-    pr_debug("%s: start reading of %zu bytes\n", __func__, count);
     mutex_lock(&nfc_dev->read_mutex);
     irq_gpio_val = gpio_get_value(nfc_dev->irq_gpio);
     if (irq_gpio_val == 0) {
@@ -139,6 +135,19 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
             nfc_disable_irq(nfc_dev);
             if (gpio_get_value(nfc_dev->irq_gpio))
                 break;
+            /*
+            NFC service wanted to close the driver so,
+            *release the calling reader thread asap.
+            *
+            * This can happen in case of nfc node close call from
+            * eSE HAL in that case the NFC HAL reader thread
+            * will again call read system call
+            */
+            if (nfc_dev->release_read){
+                pr_info("%s: releasing read\n", __func__);
+                goto err;
+            }
+
             pr_warning("%s: spurious interrupt detected\n", __func__);
         }
     }
@@ -147,7 +156,7 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
     ret = i2c_master_recv(nfc_dev->client, tmp, count);
     mutex_unlock(&nfc_dev->read_mutex);
     /* delay of 1ms for slow devices*/
-    udelay(2000);
+    udelay(1000);
     if (ret < 0) {
         pr_err("%s: i2c_master_recv returned %d\n", __func__, ret);
         goto err;
@@ -163,7 +172,6 @@ static ssize_t nfc_dev_read(struct file *filp, char __user *buf,
         ret = -EFAULT;
         goto err;
     }
-    pr_debug("%s: Success in reading %zu bytes\n", __func__, count);
     return ret;
 err:
     mutex_unlock(&nfc_dev->read_mutex);
@@ -182,7 +190,6 @@ static ssize_t nfc_dev_write(struct file *filp, const char __user *buf,
     if (count > MAX_BUFFER_SIZE) {
         count = MAX_BUFFER_SIZE;
     }
-    pr_debug("%s: start writing of %zu bytes\n", __func__, count);
     if (copy_from_user(tmp, buf, count)) {
         pr_err("%s : failed to copy from user space\n", __func__);
         return -EFAULT;
@@ -192,14 +199,13 @@ static ssize_t nfc_dev_write(struct file *filp, const char __user *buf,
         pr_err("%s: i2c_master_send returned %d\n", __func__, ret);
         ret = -EIO;
     }
-    pr_debug("%s: Success in writing %zu bytes\n", __func__, count);
     /* delay of 1ms for slow devices*/
     udelay(1000);
     return ret;
 }
 
-/* Callback to claim the embedded secure element
- * It is a blocking call, in order to protect the ese
+/* callback to claim the embedded secure element
+ * it is a blocking call, in order to protect the ese
  * from being reset from outside when it is in use.
  */
 void nfc_ese_acquire(struct nfc_dev *nfc_dev)
@@ -218,6 +224,11 @@ void nfc_ese_release(struct nfc_dev *nfc_dev)
     pr_debug("%s: ese released\n", __func__);
 }
 
+static void nfc_init_stat(struct nfc_dev *nfc_dev)
+{
+    nfc_dev->count_irq = 0;
+}
+
 static int nfc_dev_open(struct inode *inode, struct file *filp)
 {
     int ret = 0;
@@ -228,6 +239,31 @@ static int nfc_dev_open(struct inode *inode, struct file *filp)
     nfc_init_stat(nfc_dev);
     pr_info("%s: %d,%d\n", __func__, imajor(inode), iminor(inode));
     return ret;
+}
+
+static int nfc_dev_flush(struct file *filep,fl_owner_t id)
+{
+    struct nfc_dev *nfc_dev = filep->private_data;
+    if (!nfc_dev)
+    {
+        pr_err("%s: pn557 instance is NULL!!\n", __func__);
+        return -ENODEV;
+    }
+    /*
+    *release blocked user thread waiting for pending read during close
+    */
+    if(!mutex_trylock(&nfc_dev->read_mutex)){
+        nfc_dev->release_read = true;
+        nfc_disable_irq(nfc_dev);
+        wake_up(&nfc_dev->read_wq);
+        pr_err("%s: waiting for release of block read\n", __func__);
+        mutex_lock(&nfc_dev->read_mutex);
+        nfc_dev->release_read = false;
+    }else{
+        pr_err("%s: read thread already released\n", __func__);
+    }
+    mutex_unlock(&nfc_dev->read_mutex);
+    return 0;
 }
 
 long nfc_dev_ioctl(struct file *filep, unsigned int cmd,
@@ -241,35 +277,21 @@ long nfc_dev_ioctl(struct file *filep, unsigned int cmd,
     return ret;
 }
 
-#ifdef CONFIG_COMPAT
-long nfc_compat_dev_ioctl(struct file *filep, unsigned int cmd,
-        unsigned long arg)
-{
-    long ret = 0;
-    struct nfc_dev *nfc_dev = filep->private_data;
-    ret = func(NFC_PLATFORM, _nfc_ioctl)(nfc_dev, cmd, arg);
-    if (ret != 0)
-        pr_err("%s: ioctl: cmd = %u, arg = %lu\n", __func__, cmd, arg);
-    return ret;
-}
-#endif
-
 static const struct file_operations nfc_dev_fops = {
         .owner  = THIS_MODULE,
         .llseek = no_llseek,
         .read   = nfc_dev_read,
         .write  = nfc_dev_write,
         .open   = nfc_dev_open,
+        .flush  = nfc_dev_flush,
         .unlocked_ioctl  = nfc_dev_ioctl,
-#ifdef CONFIG_COMPAT
-        .compat_ioctl = nfc_compat_dev_ioctl,
-#endif
 };
 
 struct nfc_platform_data {
     unsigned int irq_gpio;
     unsigned int ven_gpio;
     unsigned int firm_gpio;
+    //unsigned int clk_req;
     unsigned int ese_pwr_gpio;
 };
 
@@ -279,20 +301,24 @@ static int nfc_parse_dt(struct device *dev,
     int ret = 0;
     struct device_node *np = dev->of_node;
 
-    data->irq_gpio = of_get_named_gpio(np, "nxp,pn544-irq", 0);
+    data->irq_gpio = of_get_named_gpio(np, "nxp,pn557-irq", 0);
     if ((!gpio_is_valid(data->irq_gpio)))
             return -EINVAL;
 
-    data->ven_gpio = of_get_named_gpio(np, "nxp,pn544-ven", 0);
+    data->ven_gpio = of_get_named_gpio(np, "nxp,pn557-ven", 0);
     if ((!gpio_is_valid(data->ven_gpio)))
             return -EINVAL;
 
-    data->firm_gpio = of_get_named_gpio(np, "nxp,pn544-fd", 0);
+    data->firm_gpio = of_get_named_gpio(np, "nxp,pn557-fw-dwnld", 0);
     if ((!gpio_is_valid(data->firm_gpio)))
             return -EINVAL;
 
+  //  data->clk_req = of_get_named_gpio(np, "nxp,pn557-clk_req", 0);
+   // if ((!gpio_is_valid(data->clk_req)))
+            //return -EINVAL;
+
     //required for old platform only
-    data->ese_pwr_gpio = of_get_named_gpio(np, "nxp,pn544-ese-pwr", 0);
+    data->ese_pwr_gpio = of_get_named_gpio(np, "nxp,pn557-ese-pwr", 0);
     if ((!gpio_is_valid(data->ese_pwr_gpio)))
         data->ese_pwr_gpio =  -EINVAL;
 
@@ -310,7 +336,6 @@ static int nfc_probe(struct i2c_client *client,
     struct nfc_platform_data platform_data;
     struct nfc_dev *nfc_dev;
     pr_debug("%s: enter\n", __func__);
-
     ret = nfc_parse_dt(&client->dev, &platform_data);
     if (ret) {
         pr_err("%s : failed to parse\n", __func__);
@@ -368,6 +393,32 @@ static int nfc_probe(struct i2c_client *client,
         pr_err("%s: irq gpio not provided\n", __func__);
         goto err_en_gpio;
     }
+/*
+    if (gpio_is_valid(platform_data.clk_req)) {
+        ret = gpio_request(platform_data.clk_req, "nfc_clk_req_gpio");
+        if (ret) {
+            pr_err("%s: unable to request clk_req gpio [%d]\n",
+                        __func__, platform_data.clk_req);
+            goto err_clk_req;
+        }
+        ret = gpio_direction_input(platform_data.clk_req);
+        if (ret) {
+            pr_err("%s: unable to set direction for clk_req gpio [%d]\n",
+                        __func__, platform_data.clk_req);
+            goto err_clk_req;
+        }*/
+       /*only set irq input */
+       // irqn = gpio_to_irq(platform_data.clk_req);
+       // if (irqn < 0) {
+       //     ret = irqn;
+       //     goto err_clk_req;
+       // }
+       // client->irq = irqn;
+  /*  } else {
+        pr_err("%s: clk_req gpio not provided\n", __func__);
+        goto err_clk_req;
+    }*/
+
     if (gpio_is_valid(platform_data.firm_gpio)) {
         ret = gpio_request(platform_data.firm_gpio, "nfc_firm_gpio");
         if (ret) {
@@ -385,6 +436,7 @@ static int nfc_probe(struct i2c_client *client,
         pr_err("%s: firm gpio not provided\n", __func__);
         goto err_irq_gpio;
     }
+
     if (gpio_is_valid(platform_data.ese_pwr_gpio)) {
         ret = gpio_request(platform_data.ese_pwr_gpio, "nfc-ese_pwr");
         if (ret) {
@@ -405,6 +457,7 @@ static int nfc_probe(struct i2c_client *client,
 
     nfc_dev->ven_gpio = platform_data.ven_gpio;
     nfc_dev->irq_gpio = platform_data.irq_gpio;
+    //nfc_dev->clk_req = platform_data.clk_req;
     nfc_dev->firm_gpio  = platform_data.firm_gpio;
     nfc_dev->ese_pwr_gpio  = platform_data.ese_pwr_gpio;
     /* init mutex and queues */
@@ -414,7 +467,7 @@ static int nfc_probe(struct i2c_client *client,
     spin_lock_init(&nfc_dev->irq_enabled_lock);
 
     nfc_dev->nfc_device.minor = MISC_DYNAMIC_MINOR;
-    nfc_dev->nfc_device.name = "nq-nci";
+    nfc_dev->nfc_device.name = "pn557";
     nfc_dev->nfc_device.fops = &nfc_dev_fops;
 
     ret = misc_register(&nfc_dev->nfc_device);
@@ -432,16 +485,27 @@ static int nfc_probe(struct i2c_client *client,
     }
     device_init_wakeup(&client->dev, true);
     device_set_wakeup_capable(&client->dev, true);
-    i2c_set_clientdata(client, nfc_dev);
-    nfc_disable_irq(nfc_dev);
+
     nfc_dev->irq_wake_up = false;
+
+    i2c_set_clientdata(client, nfc_dev);
+    /*Enable IRQ and VEN*/
+    //nfc_enable_irq(nfc_dev);
+    nfc_disable_irq(nfc_dev);
     /*call to platform specific probe*/
     ret = func(NFC_PLATFORM, _nfc_probe)(nfc_dev);
     if (ret != 0) {
         pr_err("%s: probing platform failed\n", __func__);
         goto err_request_irq_failed;
     };
+    //liuhaibo,set nfc hadrware default info
+    // hardwareinfo_set_prop(HARDWARE_NFC, "nxp-pn557");
     pr_info("%s: probing NXP NFC exited successfully\n", __func__);
+    //ret = i2c_master_send(nfc_dev->client,buf,2);
+    //if(ret)
+    //  pr_err("%s: liyou1 i2c success\n", __func__);
+    //else
+    //  pr_err("%s: liyou1 i2c failed\n", __func__);
     return 0;
 
 err_request_irq_failed:
@@ -453,6 +517,8 @@ err_ese_pwr_gpio:
     gpio_free(platform_data.ese_pwr_gpio);
 err_firm_gpio:
     gpio_free(platform_data.firm_gpio);
+//err_clk_req:
+  //  gpio_free(platform_data.clk_req);
 err_irq_gpio:
     gpio_free(platform_data.irq_gpio);
 err_en_gpio:
@@ -488,11 +554,13 @@ static int nfc_remove(struct i2c_client *client)
     gpio_free(nfc_dev->ese_pwr_gpio);
     gpio_free(nfc_dev->firm_gpio);
     gpio_free(nfc_dev->irq_gpio);
+  //  gpio_free(nfc_dev->clk_req);
     gpio_free(nfc_dev->ven_gpio);
     kfree(nfc_dev);
 err:
     return ret;
 }
+
 
 static int nfc_suspend(struct device *device)
 {
@@ -500,13 +568,14 @@ static int nfc_suspend(struct device *device)
     struct nfc_dev *nfc_dev = i2c_get_clientdata(client);
 
     pr_info("%s\n", __func__);
-    if (device_may_wakeup(&client->dev)&& nfc_dev->irq_enabled) {
+    if (device_may_wakeup(&client->dev) && nfc_dev->irq_enabled) {
         if (!enable_irq_wake(client->irq))
             nfc_dev->irq_wake_up = true;
             pr_info("%s enable irq wake \n", __func__);
     }
     return 0;
 }
+
 
 static int nfc_resume(struct device *device)
 {
@@ -526,13 +595,14 @@ static int nfc_resume(struct device *device)
 static const struct dev_pm_ops nfc_pm_ops = {
     SET_SYSTEM_SLEEP_PM_OPS(nfc_suspend, nfc_resume)
 };
+
 static const struct i2c_device_id nfc_id[] = {
-        { "pn5xx", 0 },
+        { "pn557", 0 },
         { }
 };
 
 static struct of_device_id nfc_match_table[] = {
-    {.compatible = "nxp,pn5xx",},
+    {.compatible = "nxp,pn557",},
     {}
 };
 MODULE_DEVICE_TABLE(of, nfc_match_table);
@@ -543,9 +613,9 @@ static struct i2c_driver nfc_driver = {
         .remove     = nfc_remove,
         .driver     = {
                 .owner = THIS_MODULE,
-                .name  = "pn5xx",
-                .pm = &nfc_pm_ops,
+                .name  = "pn557",
                 .of_match_table = nfc_match_table,
+        .pm = &nfc_pm_ops,
         },
 };
 

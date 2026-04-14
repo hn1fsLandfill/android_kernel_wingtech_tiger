@@ -43,16 +43,18 @@ struct nfc_dev    {
     struct miscdevice   nfc_device;
     /* NFC GPIO variables */
     unsigned int        irq_gpio;
+//    unsigned int        clk_req;
     unsigned int        ven_gpio;
     unsigned int        firm_gpio;
     unsigned int        ese_pwr_gpio;
     /* NFC_IRQ state */
     bool                irq_enabled;
-    bool                irq_wake_up;
     spinlock_t          irq_enabled_lock;
     unsigned int        count_irq;
     /* NFC additional parameters for old platforms */
     void *pdata_op;
+    bool                irq_wake_up;
+    bool                release_read;
 };
 
 void nfc_disable_irq(struct nfc_dev *nfc_dev);

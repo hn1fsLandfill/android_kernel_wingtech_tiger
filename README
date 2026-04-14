@@ -16,6 +16,7 @@ Modem (SMS isn't tested but it may work given mobile data and phone calls work)
 Audio
 Side fingerprint scanner
 Connectivity (Wi-Fi, Bluetooth, GPS via https://github.com/hn1fsLandfill/tiger_kernel_modules TODO: integrate into kernel)
+NFC
 
 What partially works:
 USB (OTG doesn't work)
@@ -23,7 +24,6 @@ USB (OTG doesn't work)
 What doesn't:
 SD Cards
 Camera
-NFC
 
 TODO for camera image sensors: 
 [ ] dt2_main_xl_hi5021_mipi_raw (Bare minimum!)

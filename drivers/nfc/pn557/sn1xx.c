@@ -51,7 +51,7 @@
 /*
  * Power management of the eSE
  */
-long sn1xx_nfc_ese_ioctl(struct nfc_dev *nfc_dev,  unsigned int cmd, unsigned int arg)
+long sn1xx_nfc_ese_ioctl(struct nfc_dev *nfc_dev,  unsigned int cmd, unsigned long arg)
 {
     int ret = 0;
     pr_debug("%s: cmd = %u, arg = %lu\n", __func__, cmd, arg);
@@ -80,9 +80,9 @@ long sn1xx_nfc_ese_ioctl(struct nfc_dev *nfc_dev,  unsigned int cmd, unsigned in
  *
  * Return: -ENOIOCTLCMD if arg is not supported, 0 in any other case
  */
-static long sn1xx_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
+static long sn1xx_nfc_pwr(struct nfc_dev *nfc_dev, unsigned long arg)
 {
-    pr_info("%s: %lu\n", __func__, arg);
+    pr_debug("%s: %lu\n", __func__, arg);
     switch(arg) {
         case 1:
         case 6:
@@ -90,7 +90,6 @@ static long sn1xx_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
                 gpio_set_value(nfc_dev->firm_gpio, 0);
                 usleep_range(10000, 10100);
             }
-			gpio_set_value(nfc_dev->ven_gpio, 0);
             break;
         case 2:
         case 5:
@@ -124,10 +123,10 @@ static long sn1xx_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
 
 
 long  sn1xx_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd,
-        unsigned int arg)
+        unsigned long arg)
 {
     int ret = 0;
-    pr_info("%s: cmd = %u, arg = %lu\n", __func__, cmd, arg);
+    pr_debug("%s: cmd = %u, arg = %lu\n", __func__, cmd, arg);
     switch (cmd) {
     case SN1XX_SET_PWR:
         ret = sn1xx_nfc_pwr(nfc_dev, arg);
@@ -141,7 +140,7 @@ long  sn1xx_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd,
 
 int sn1xx_nfc_probe(struct nfc_dev *nfc_dev)
 {
-    pr_info("%s: enter\n", __func__);
+    pr_debug("%s: enter\n", __func__);
     /* VBAT--> VDDIO(HIGH) + Guardtime of min 5ms --> VEN(HIGH) */
     nfc_ese_acquire(nfc_dev);
     msleep(5);

@@ -48,11 +48,16 @@
 #include <linux/sched/signal.h>
 #include <linux/workqueue.h>
 #include <linux/timer.h>
+// #include <linux/hardware_info.h>
 
 #include "nfc.h"
 #include "pn8xt.h"
 
 #define SIG_NFC 44
+//liuhaibo_wt,add,2022/7/28,add nfc info
+// #define NFC_INFO_LEN 20
+
+// extern char nfc_version[HARDWARE_MAX_ITEM_LONGTH];
 
 struct pn8xt_dev {
     pn8xt_access_st_t       cur_state;
@@ -121,7 +126,7 @@ static int signal_handler(pn8xt_access_st_t state, long nfc_pid)
     task = pid_task(find_vpid(pid), PIDTYPE_PID);
     if(task) {
         pr_info("%s: %s\n", __func__, task->comm);
-        sigret = force_sig_info(SIG_NFC, &sinfo, task);
+       // sigret = force_sig_info(SIG_NFC, &sinfo, task);
         if(sigret < 0) {
             pr_err("%s: send_sig_info failed, sigret %d\n", __func__, sigret);
             return -1;
@@ -175,7 +180,7 @@ static int trigger_onoff(struct pn8xt_dev *pn8xt_dev, pn8xt_access_st_t state)
  * (arg = 2):FW_DL GPIO = 1, KEEP VEN down/up - firmware download mode
  * Return: 0 on success and error on failure
  */
-static long pn8xt_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
+static long pn8xt_nfc_pwr(struct nfc_dev *nfc_dev, unsigned long arg)
 {
     struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
     pn8xt_access_st_t *cur_state = pn8xt_get_state(pn8xt_dev);
@@ -183,12 +188,11 @@ static long pn8xt_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
         pr_err("%s: pn8xt_dev doesn't exist anymore\n", __func__);
         return -ENODEV;
     }
-
     switch(arg) {
         case 0:
             /* power off */
             pr_debug("%s power off\n", __func__);
-                nfc_disable_irq(nfc_dev);
+            nfc_disable_irq(nfc_dev);
             if (nfc_dev->firm_gpio) {
                 if ((*cur_state & (ST_WIRED | ST_SPI | ST_SPI_PRIO))== 0){
                     pn8xt_update_state(pn8xt_dev, ST_IDLE, true);
@@ -205,7 +209,7 @@ static long pn8xt_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
         case 1:
             /* power on */
             pr_debug("%s power on\n", __func__);
-                nfc_enable_irq(nfc_dev);
+            nfc_enable_irq(nfc_dev);
             if (nfc_dev->firm_gpio) {
                 if ((*cur_state & (ST_WIRED|ST_SPI|ST_SPI_PRIO))== 0){
                     pn8xt_update_state(pn8xt_dev, ST_IDLE, true);
@@ -270,7 +274,7 @@ static long pn8xt_nfc_pwr(struct nfc_dev *nfc_dev, unsigned int arg)
     return 0;
 }
 
-static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int arg)
+static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned long arg)
 {
     bool isSignalTriggerReqd = !(arg & 0x10);/*5th bit to/not trigger signal*/
     unsigned long pwrLevel = arg & 0x0F;
@@ -280,7 +284,6 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
         pr_err("%s: pn8xt_dev doesn't exist anymore\n", __func__);
         return -ENODEV;
     }
-
     switch(pwrLevel) {
         case 0:
             pr_debug("%s: power off ese\n", __func__);
@@ -306,7 +309,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                     usleep_range(25000, 30000);
 
                 if (!(*cur_state & ST_WIRED) && !(pn8xt_dev->secure_timer_cnt)) {
-                    gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+                    //gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
                     /* Delay (2.5ms) after SVDD_PWR_OFF for the shutdown settlement time */
                     usleep_range(2500, 3000);
                     trigger_onoff(pn8xt_dev, ST_SPI_SVDD_SY_END);
@@ -332,8 +335,9 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                         usleep_range(25000, 30000);
 
                     if (!(pn8xt_dev->secure_timer_cnt)) {
-                        gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
-                        /* Delay (2.5ms) after SVDD_PWR_OFF for the shutdown settlement time */
+                        //gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+                        /*
+ Delay (2.5ms) after SVDD_PWR_OFF for the shutdown settlement time */
                         usleep_range(2500, 3000);
                         if(*cur_state & ST_SPI_FAILED) {
                             pn8xt_update_state(pn8xt_dev, ST_SPI_FAILED, false);
@@ -364,7 +368,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                         }
                     }
                     if(pn8xt_dev->pwr_scheme == PN80T_LEGACY_PWR_SCM) {
-                        gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+                       // gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
                         if(*cur_state & ST_SPI_FAILED) {
                             pn8xt_update_state(pn8xt_dev, ST_SPI_FAILED, false);
                         }
@@ -409,7 +413,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                     msleep(10);
                 }
                 /* pull the gpio to high once NFCC is power on*/
-                gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
+                //gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
                 /* Delay (10ms) after SVDD_PWR_ON to allow JCOP to bootup (5ms jcop boot time + 5ms guard time) */
                 usleep_range(10000, 12000);
                 if(*cur_state & ST_SPI_FAILED) {
@@ -420,7 +424,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                     up(&pn8xt_dev->dwp_complete_sema);
                 }
             } else if ((*cur_state & (ST_SPI|ST_SPI_PRIO))
-                 && (gpio_get_value(nfc_dev->ese_pwr_gpio)) && (gpio_get_value(nfc_dev->ven_gpio))) {
+                 && (gpio_get_value(nfc_dev->ven_gpio))) {
                 /* Returning success if SET_SPI_PWR called while already SPI is open */
                 return 0;
             } else {
@@ -441,12 +445,12 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                 }
                 if(pn8xt_dev->pwr_scheme != PN80T_EXT_PMU_SCM  && !(pn8xt_dev->secure_timer_cnt)) {
                     trigger_onoff(pn8xt_dev, ST_SPI_SVDD_SY_START);
-                    gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+                    //gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
                     trigger_onoff(pn8xt_dev, ST_SPI_SVDD_SY_END);
                     msleep(10);
-                    if(!gpio_get_value(nfc_dev->ese_pwr_gpio))
-                        gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
-                    msleep(10);
+                    //if(!gpio_get_value(nfc_dev->ese_pwr_gpio))
+                      //  gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
+                    //msleep(10);
                 }
             } else {
                 pr_err("%s : PN61_SET_SPI_PWR - reset  failed \n", __func__);
@@ -468,7 +472,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
                         msleep(10);
                     }
                     /* pull the gpio to high once NFCC is power on*/
-                    gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
+                    //gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
 
                     /* Delay (10ms) after SVDD_PWR_ON to allow JCOP to bootup (5ms jcop boot time + 5ms guard time) */
                     usleep_range(10000, 12000);
@@ -504,7 +508,7 @@ static long pn8xt_ese_pwr(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned in
     return 0;
 }
 
-static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned int arg)
+static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned long arg)
 {
     long ret = 0;
     pn8xt_access_st_t *cur_state = pn8xt_get_state(pn8xt_dev);
@@ -513,7 +517,7 @@ static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned int ar
         case JCP_DN_INIT:
             if(pn8xt_dev->service_pid) {
                 pr_err("%s:nfc service pid %ld", __func__, pn8xt_dev->service_pid);
-                signal_handler(JCP_DN_INIT, pn8xt_dev->service_pid);
+                signal_handler(0x8010, pn8xt_dev->service_pid);
             } else {
                 if (*cur_state & ST_JCP_DN) {
                     ret = -EINVAL;
@@ -530,7 +534,7 @@ static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned int ar
             }
             break;
         case JCP_SPI_DN_COMP:
-            signal_handler(JCP_DWP_DN_COMP, pn8xt_dev->service_pid);
+            signal_handler(0x8080, pn8xt_dev->service_pid);
             pn8xt_update_state(pn8xt_dev, ST_JCP_DN, false);
             break;
         case JCP_DWP_DN_COMP:
@@ -543,7 +547,7 @@ static long set_jcop_download_state(struct pn8xt_dev *pn8xt_dev, unsigned int ar
     return ret;
 }
 
-static int set_wired_access(struct nfc_dev *nfc_dev, unsigned int arg)
+static int set_wired_access(struct nfc_dev *nfc_dev, unsigned long arg)
 {
     struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
     pn8xt_access_st_t *cur_state = pn8xt_get_state(pn8xt_dev);
@@ -582,13 +586,13 @@ static int set_wired_access(struct nfc_dev *nfc_dev, unsigned int arg)
             up(&pn8xt_dev->ese_access_sema);
             break;
         case 5:
-            gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
-            if (gpio_get_value(nfc_dev->ese_pwr_gpio)) {
-                pr_info("%s: ese_pwr gpio is enabled\n", __func__);
-            }
+         //   gpio_set_value(nfc_dev->ese_pwr_gpio, 1);
+           // if (gpio_get_value(nfc_dev->ese_pwr_gpio)) {
+             //   pr_info("%s: ese_pwr gpio is enabled\n", __func__);
+           // }
             break;
         case 6:
-            gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+        //    gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
             pr_info("%s: ese_pwr gpio set to low\n", __func__);
             break;
         default:
@@ -642,7 +646,7 @@ static void secure_timer_workqueue(struct work_struct *wq)
 
     if((*cur_state & (ST_SPI|ST_SPI_PRIO)) == 0) {
         pr_debug("%s: make se_pwer_gpio low, state = %d", __func__, *cur_state);
-        gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
+        //gpio_set_value(nfc_dev->ese_pwr_gpio, 0);
         /* Delay (2.5ms) after SVDD_PWR_OFF for the shutdown settlement time */
         usleep_range(2500, 3000);
         if(pn8xt_dev->service_pid == 0x00) {
@@ -657,7 +661,7 @@ static void secure_timer_workqueue(struct work_struct *wq)
 }
 
 
-static long secure_timer_operation(struct pn8xt_dev *pn8xt_dev, unsigned int arg)
+static long secure_timer_operation(struct pn8xt_dev *pn8xt_dev, unsigned long arg)
 {
     long ret = -EINVAL;
     unsigned long timer_value =  arg;
@@ -679,7 +683,33 @@ static long secure_timer_operation(struct pn8xt_dev *pn8xt_dev, unsigned int arg
     return ret;
 }
 
-long pn8xt_nfc_ese_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int arg)
+//liuhaibo_wt,add,2022/7/28,add nfc info
+#if 0
+static int set_nfc_info(long nfc_info_addr)
+{
+    char *tmp = NULL;
+    int ret = 0;
+	memset(nfc_version, 0x00, HARDWARE_MAX_ITEM_LONGTH);
+
+    tmp = memdup_user((char __user*)nfc_info_addr,NFC_INFO_LEN);
+    if (IS_ERR(tmp)) {
+			pr_err("%s: memdup_user failed\n",
+				__func__);
+			ret = PTR_ERR(tmp);
+			return ret;
+	}
+
+	memcpy(nfc_version,tmp,NFC_INFO_LEN);
+    // hardwareinfo_set_prop(HARDWARE_NFC, nfc_version);
+    pr_info("%s: nfc_version is %s\n", __func__,nfc_version);
+
+	kfree(tmp);
+    return ret;
+}
+#endif
+//liuhaibo_wt,add,2022/7/28,add nfc info
+
+long pn8xt_nfc_ese_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned long arg)
 {
     long ret = 0;
     struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
@@ -718,7 +748,7 @@ long pn8xt_nfc_ese_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int
     return ret;
 }
 
-long pn8xt_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int arg)
+long pn8xt_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned long arg)
 {
     long ret = 0;
     struct pn8xt_dev *pn8xt_dev = (struct pn8xt_dev *)nfc_dev->pdata_op;
@@ -726,7 +756,7 @@ long pn8xt_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int arg
         pr_err("%s: pn8xt_dev doesn't exist anymore\n", __func__);
         return -ENODEV;
     }
-    pr_info("%s :enter cmd = %u, arg = %ld\n", __func__, cmd, arg);
+    pr_err("%s :enter cmd = %u, arg = %ld\n", __func__, cmd, arg);
 
     switch(cmd) {
         case PN8XT_SET_PWR:
@@ -752,6 +782,12 @@ long pn8xt_nfc_ioctl(struct nfc_dev *nfc_dev, unsigned int cmd, unsigned int arg
             }
             pr_debug("Dwp On/Off release wait protection : released");
             break;
+        //liuhaibo_wt,add,2022/7/28,add nfc info
+        /*case PN8XT_NFC_SET_NFC_INFO:
+            pr_debug("%sset_nfc_info enter %u,arg = %ld\n", __func__, cmd, arg);
+            ret = set_nfc_info(arg);
+            break; */
+        //liuhaibo_wt,add,2022/7/28,add nfc info
         default:
             ret = pn8xt_nfc_ese_ioctl(nfc_dev, cmd, arg);
             if (ret)
