@@ -1002,7 +1002,6 @@ static void cqhci_recovery_start(struct mmc_host *mmc)
 		cq_host->ops->disable(mmc, true);
 	mmc->cqe_on = false;
 
-	mmc->cqe_on = false;
 }
 
 static int cqhci_error_from_flags(unsigned int flags)

@@ -4318,6 +4318,8 @@ static int msdc_ops_get_cd(struct mmc_host *mmc)
 
 	/* spin_lock_irqsave(&host->lock, flags); */
 
+	host->block_bad_card = 0;
+
 	/* for emmc, MSDC_REMOVABLE not set, always return 1 */
 	if (mmc->caps & MMC_CAP_NONREMOVABLE) {
 		host->card_inserted = 1;
@@ -4604,6 +4606,7 @@ static struct mmc_host_ops mt_msdc_ops = {
 	.hw_reset                      = msdc_card_reset,
 	.card_busy                     = msdc_card_busy,
 	.prepare_hs400_tuning          = msdc_prepare_hs400_tuning,
+	.remove_bad_sdcard             = msdc_ops_set_bad_card_and_remove,
 };
 
 static void msdc_irq_cmd_complete(struct msdc_host *host)
