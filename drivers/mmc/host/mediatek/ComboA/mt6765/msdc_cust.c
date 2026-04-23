@@ -110,6 +110,15 @@ int msdc_regulator_set_and_enable(struct regulator *reg, int powerVolt)
 #endif
 }
 
+//bug 782977,linaiyu.wt,2022/8/16,add for sdcard power off quickly,start
+void msdc_sd_power_off_quick(void)
+{
+	regmap_update_bits(regmap,MT6357_RG_LDO_VMCH_SW_OP_EN_ADDR,MT6357_RG_LDO_VMCH_SW_OP_EN_MASK,1);
+	regmap_update_bits(regmap,MT6357_RG_LDO_VMCH_EN_ADDR,MT6357_RG_LDO_VMCH_EN_MASK,0);
+	pr_err("sdcard removed and power off VMCH first");
+}
+//bug 782977,linaiyu.wt,2022/8/16,add for sdcard power off quickly,end
+
 void msdc_ldo_power(u32 on, struct regulator *reg, int voltage_mv, u32 *status)
 {
 #if !defined(CONFIG_MTK_MSDC_BRING_UP_BYPASS)
@@ -449,6 +458,9 @@ void msdc_HQA_set_voltage(struct msdc_host *host)
 	vio18_cal = 0;
 #endif
 
+	pmic_config_interface(REG_VCORE_VOSEL_SW, vcore,
+		VCORE_VOSEL_SW_MASK, VCORE_VOSEL_SW_SHIFT);
+
 	if (vio18_cal)
 		pmic_config_interface(REG_VIO_VOCAL_SW, vio18_cal,
 			VIO_VOCAL_SW_MASK, VIO_VOCAL_SW_SHIFT);
@@ -481,6 +493,7 @@ u32 *hclks_msdc;
 int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 	struct msdc_host *host)
 {
+	u32 clk_freq;
 	static char const * const clk_names[] = {
 		MSDC0_CLK_NAME, MSDC1_CLK_NAME, MSDC3_CLK_NAME
 	};
@@ -509,6 +522,11 @@ int msdc_get_ccf_clk_pointer(struct platform_device *pdev,
 		pr_notice("[msdc%d] can not prepare hclock control\n",
 			pdev->id);
 		return 1;
+	}
+	if (host->clk_ctl) {
+		clk_freq = clk_get_rate(host->clk_ctl);
+		if (clk_freq > 0)
+			host->hclk = clk_freq;
 	}
 
 #if defined(CONFIG_MTK_HW_FDE) || defined(CONFIG_MMC_CRYPTO)

@@ -54,7 +54,8 @@
 #endif
 
 #include "dbg.h"
-
+//bug782977, linaiyu.wt, add, 20220727, proc file for sdcard slot detect
+#include <linux/proc_fs.h>
 #define CAPACITY_2G             (2 * 1024 * 1024 * 1024ULL)
 
 /* FIX ME: Check if its reference in mtk_sd_misc.h can be removed */
@@ -193,7 +194,7 @@ void msdc_dump_register_core(char **buff, unsigned long *size,
 	char buffer[PRINTF_REGISTER_BUFFER_SIZE + 1];
 	char *buffer_cur_ptr = buffer;
 
-	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE + 1);
+	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE);
 	SPREAD_PRINTF(buff, size, m, "MSDC%d normal register\n", id);
 	for (i = 0; msdc_offsets[i] != (u16)0xFFFF; i++) {
 		offset = msdc_offsets[i];
@@ -276,7 +277,7 @@ void msdc_dump_dbg_register(char **buff, unsigned long *size,
 	char buffer[PRINTF_REGISTER_BUFFER_SIZE + 1];
 	char *buffer_cur_ptr = buffer;
 
-	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE + 1);
+	memset(buffer, 0, PRINTF_REGISTER_BUFFER_SIZE);
 	SPREAD_PRINTF(buff, size, m, "MSDC debug register [set:out]\n");
 	for (i = 0; i < MSDC_DEBUG_REGISTER_COUNT + 1; i++) {
 		msg_size += ONE_REGISTER_STRING_SIZE;
@@ -696,11 +697,9 @@ static void msdc_set_busy_timeout_ms(struct msdc_host *host, u32 ms)
 	}
 	MSDC_SET_FIELD(SDC_CFG, SDC_CFG_WRDTOC, (u32)timeout);
 
-	N_MSG(OPS, "Set CMD%d busy tmo: %dms(%d x1M cycles), freq=%dKHz\n",
-		host->cmd->opcode,
+	N_MSG(OPS, "Set busy tmo: %dms(%d x1M cycles), freq=%dKHz\n",
 		(ms > host->max_busy_timeout_ms) ? host->max_busy_timeout_ms :
-		ms,
-		(u32)timeout + 1, (host->sclk / 1000));
+		ms, (u32)timeout + 1, (host->sclk / 1000));
 }
 
 static void msdc_set_timeout(struct msdc_host *host, u32 ns, u32 clks)
@@ -1106,7 +1105,7 @@ int msdc_switch_part(struct msdc_host *host, char part_id)
 	if (ret)
 		return ret;
 
-	if (part_id != (l_buf[EXT_CSD_PART_CONFIG] & 0x7)) {
+	if ((part_id >= 0) && (part_id != (l_buf[EXT_CSD_PART_CONFIG] & 0x7))) {
 		l_buf[EXT_CSD_PART_CONFIG] &= ~0x7;
 		l_buf[EXT_CSD_PART_CONFIG] |= (part_id & 0x7);
 		ret = mmc_switch(host->mmc->card, 0, EXT_CSD_PART_CONFIG,
@@ -4673,6 +4672,7 @@ skip:
 			 * if data CRC error
 			 */
 			mrq->cmd->error = (unsigned int)-EILSEQ;
+			pr_err("saved intsts: 0x%08x\n", host->intsts);
 		} else {
 			dbg_add_host_log(host->mmc, 3, 0, 0);
 			msdc_dma_clear(host);
@@ -5010,8 +5010,6 @@ static int msdc_drv_probe(struct platform_device *pdev)
 	if (host->hw->host_function == MSDC_EMMC)
 		mmc->caps |= MMC_CAP_CMD23;
 #endif
-	if (host->hw->host_function == MSDC_SD)
-		mmc->caps |= MMC_CAP_AGGRESSIVE_PM;
 
 	mmc->caps |= MMC_CAP_ERASE;
 
