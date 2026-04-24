@@ -1857,12 +1857,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 				return;
 			}
 		}
-		if (host->pins_default) {
-			pinctrl_select_state(host->pinctrl, host->pins_default);
-			mdelay(1);
-		}
-		if (host->mclk != ios->clock || host->timing != ios->timing)
-			msdc_set_mclk(host, ios->timing, ios->clock);
+		pinctrl_select_state(host->pinctrl, host->pins_default);
+		mdelay(1);
 		break;
 	case MMC_POWER_ON:
 		if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
@@ -1872,12 +1868,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			else
 				host->vqmmc_enabled = true;
 		}
-		if (host->pins_default) {
-			pinctrl_select_state(host->pinctrl, host->pins_default);
-			mdelay(1);
-		}
-		if (host->mclk != ios->clock || host->timing != ios->timing)
-			msdc_set_mclk(host, ios->timing, ios->clock);
+		pinctrl_select_state(host->pinctrl, host->pins_default);
+		mdelay(1);
 		break;
 	case MMC_POWER_OFF:
 		if (!IS_ERR(mmc->supply.vmmc))
@@ -1887,12 +1879,6 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			regulator_disable(mmc->supply.vqmmc);
 			host->vqmmc_enabled = false;
 		}
-            	//S96818AA1-2199,wangchunhua2.wt,add 2023.6.6,modify for emmc power off timing start
-#if defined(CONFIG_WT_PROJECT_S96818AA1) || defined(CONFIG_WT_PROJECT_S96818BA1)
-		if (host->mclk != ios->clock || host->timing != ios->timing)
-			msdc_set_mclk(host, ios->timing, ios->clock);
-#endif
-            	//S96818AA1-2199,wangchunhua2.wt,add 2023.6.6,modify for emmc power off timing end
 		if (host->pins_pull_down) {
 			dev_info(host->dev, "%s pins_pull_down", __func__);
 			pinctrl_select_state(host->pinctrl, host->pins_pull_down);
@@ -1903,6 +1889,8 @@ static void msdc_ops_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		break;
 	}
 
+	if (host->mclk != ios->clock || host->timing != ios->timing)
+		msdc_set_mclk(host, ios->timing, ios->clock);
 }
 
 static u32 test_delay_bit(u32 delay, u32 bit)
@@ -2664,6 +2652,38 @@ static int check_boot_type(struct platform_device *pdev)
 	return ret;
 }
 
+
+extern int gpio_value;
+static int sim_card_status_show(struct seq_file *m, void *v)
+{
+    pr_debug("%s: gpio_value is %d\n", __func__, gpio_value);
+    seq_printf(m, "%d\n", gpio_value);
+    return 0;
+}
+static int sim_card_status_proc_open(struct inode *inode, struct file *file)
+{
+    return single_open(file, sim_card_status_show, NULL);
+}
+static const struct file_operations sim_card_status_fops = {
+    .open       = sim_card_status_proc_open,
+    .read       = seq_read,
+    .llseek     = seq_lseek,
+    .release    = single_release
+};
+static int sim_card_tray_create_proc(void)
+{
+    struct proc_dir_entry *status_entry;
+    status_entry = proc_create("sd_tray_gpio_value", 0, NULL, &sim_card_status_fops);
+    if (!status_entry) {
+        return -ENOMEM;
+    }
+    return 0;
+}
+static void sim_card_tray_remove_proc(void)
+{
+    remove_proc_entry("sd_tray_gpio_value", NULL);
+}
+
 static int msdc_drv_probe(struct platform_device *pdev)
 {
 	struct mmc_host *mmc;
@@ -2804,7 +2824,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
 
 	host->irq = platform_get_irq(pdev, 0);
 	if (host->irq < 0) {
-		ret = host->irq;
+		ret = -EINVAL;
 		goto host_free;
 	}
 
@@ -2950,6 +2970,11 @@ static int msdc_drv_probe(struct platform_device *pdev)
 #endif
 	msdc_debug_set_host(mmc);
 
+	if(sim_card_tray_create_proc()) {
+		dev_err(&pdev->dev, "creat proc sim_card_status failed\n");
+	} else {
+		dev_dbg(&pdev->dev, "creat proc sim_card_status successed\n");
+	}
 
 	return 0;
 end:

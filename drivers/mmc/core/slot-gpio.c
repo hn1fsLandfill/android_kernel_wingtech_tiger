@@ -76,6 +76,8 @@ int mmc_gpio_get_ro(struct mmc_host *host)
 }
 EXPORT_SYMBOL(mmc_gpio_get_ro);
 
+int gpio_value = 0;
+
 int mmc_gpio_get_cd(struct mmc_host *host)
 {
 	struct mmc_gpio *ctx = host->slot.handler_priv;
@@ -85,6 +87,9 @@ int mmc_gpio_get_cd(struct mmc_host *host)
 		return -ENOSYS;
 
 	cansleep = gpiod_cansleep(ctx->cd_gpio);
+	pr_debug("Slot-gpio mmc_gpio_get_cd = %d\n", gpiod_get_value(ctx->cd_gpio));
+	gpio_value = gpiod_get_value(ctx->cd_gpio);
+
 	if (ctx->override_cd_active_level) {
 		int value = cansleep ?
 				gpiod_get_raw_value_cansleep(ctx->cd_gpio) :
