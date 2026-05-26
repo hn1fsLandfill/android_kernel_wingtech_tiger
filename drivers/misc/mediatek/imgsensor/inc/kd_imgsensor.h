@@ -605,7 +605,10 @@
 #define SENSOR_DRVNAME_OV02B10_MIPI_RAW         "ov02b10_mipi_raw"
 
 #define HI5021SQT_SENSOR_ID_BLADE                  0x5021
-#define SENSOR_DRVNAME_HI5021SQT_MIPI_RAW_BLADE    "dt2_main_xl_hi5021_mipi_raw"
+#define SENSOR_DRVNAME_HI5021SQT_MIPI_RAW_BLADE    "hi5021sqt_mipi_raw_blade"
+
+#define N26_HI5021Q_REAR_DELTA_SENSOR_ID              0x5023
+#define SENSOR_DRVNAME_N26_HI5021Q_REAR_DELTA_MIPI_RAW "dt2_main_xl_hi5021_mipi_raw"
 
 /******************************************************************************
  *

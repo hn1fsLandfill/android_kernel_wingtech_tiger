@@ -386,4 +386,17 @@ extern int GT9772AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
 extern int GT9772AF_PowerDown(struct i2c_client *pstAF_I2Cclient,
 				int *pAF_Opened);
 extern int GT9772AF_GetFileName(unsigned char *pFileName);
+
+#define DELTA_HI5021Q_GT9778AF_SetI2Cclient DELTA_HI5021Q_GT9778AF_SetI2Cclient_Main
+#define DELTA_HI5021Q_GT9778AF_Ioctl DELTA_HI5021Q_GT9778AF_Ioctl_Main
+#define DELTA_HI5021Q_GT9778AF_Release DELTA_HI5021Q_GT9778AF_Release_Main
+#define DELTA_HI5021Q_GT9778AF_PowerDown DELTA_HI5021Q_GT9778AF_PowerDown_Main
+#define DELTA_HI5021Q_GT9778AF_GetFileName DELTA_HI5021Q_GT9778AF_GetFileName_Main
+extern int DELTA_HI5021Q_GT9778AF_SetI2Cclient(struct i2c_client *pstAF_I2Cclient,
+				 spinlock_t *pAF_SpinLock, int *pAF_Opened);
+extern long DELTA_HI5021Q_GT9778AF_Ioctl(struct file *a_pstFile, unsigned int a_u4Command,
+			   unsigned long a_u4Param);
+extern int DELTA_HI5021Q_GT9778AF_Release(struct inode *a_pstInode, struct file *a_pstFile);
+extern int DELTA_HI5021Q_GT9778AF_PowerDown(struct i2c_client *pstAF_I2Cclient, int *pAF_Opened);
+extern int DELTA_HI5021Q_GT9778AF_GetFileName(unsigned char *pFileName);
 #endif
