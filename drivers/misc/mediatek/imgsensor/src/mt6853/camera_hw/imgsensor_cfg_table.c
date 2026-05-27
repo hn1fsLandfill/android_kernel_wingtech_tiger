@@ -79,7 +79,7 @@ struct IMGSENSOR_HW_CFG imgsensor_custom_config[] = {
 	},
 	{
 		IMGSENSOR_SENSOR_IDX_MAIN3,
-		IMGSENSOR_I2C_DEV_1,
+		IMGSENSOR_I2C_DEV_2,
 		{
 			{IMGSENSOR_HW_PIN_MCLK,  IMGSENSOR_HW_ID_MCLK},
 			{IMGSENSOR_HW_PIN_AVDD,  IMGSENSOR_HW_ID_GPIO},
@@ -233,6 +233,25 @@ struct IMGSENSOR_HW_POWER_SEQ platform_power_sequence[] = {
 		IMGSENSOR_SENSOR_IDX_MAIN3,
 	},
 #endif
+
+	{
+		SENSOR_DRVNAME_N26_HI5021Q_REAR_DELTA_MIPI_RAW,
+		{
+			{DOVDD, Vol_1800, 1},
+			{DVDD, Vol_1200, 1},
+			{RST_SUB, Vol_High, 2},
+			{AVDD, Vol_2800, 2},
+			{RST_SUB, Vol_Low, 0},
+			{DVDD, 0, 0},
+			{DVDD_1V1, Vol_High, 1},
+			{DVDD_1V2, Vol_Low, 1},
+			{DVDD_EN, Vol_High, 1},
+			{AFVDD, Vol_2800, 1},
+			{SensorMCLK, Vol_High,5 },
+			{RST, Vol_Low, 2},
+			{RST, Vol_High, 5},
+		},
+	},
 
 	{NULL}
 };

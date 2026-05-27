@@ -52,15 +52,111 @@
 #include "imgsensor_ca.h"
 #endif
 
+//-bug604664,zhouyikuan.wt,ADD,2020/12/17,add wide angle info for mmigroup apk
+#include <linux/pinctrl/pinctrl.h>//bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+
 static DEFINE_MUTEX(gimgsensor_mutex);
 static DEFINE_MUTEX(gimgsensor_open_mutex);
 
 struct IMGSENSOR gimgsensor;
 MUINT32 last_id;
+//+bug767771 liudijin.wt, add, 2022/07/22, distinguish depth camera params for dualcam
+kal_uint32 main_sensor_id = 0xffffffff;
+//+bug767771 liudijin.wt, add, 2022/07/22, distinguish depth camera params for dualcam
 
 /******************************************************************************
  * Profiling
  ******************************************************************************/
+//+bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+struct mutex cam1_pinctrl_mutex;
+struct pinctrl       *cam1_pinctrl = NULL;
+struct pinctrl_state *cam1_vcamd_1v2_pin_en0 = NULL;
+struct pinctrl_state *cam1_vcamd_1v1_pin_en1 = NULL;
+struct pinctrl_state *cam1_vcamd_pin_en0 = NULL;
+struct pinctrl_state *cam1_vcamd_pin_en1 = NULL;
+struct pinctrl_state *cam1_rst_pin_en0 = NULL;
+struct pinctrl_state *cam1_rst_pin_en1 = NULL;
+int sc1300mcs_is_alive = 0;
+//+bug 788904,liangyiyi.wt,modify,2022/8/6,modify for fix open double camera exception
+int sc1300mcs_power_off(enum IMGSENSOR_SENSOR_IDX sensor_idx)
+{
+    int ret = -1;
+    pr_info("sc1300mcs_power_off enter\n");
+    if(!IS_ERR(cam1_pinctrl))
+    {
+        if(sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3)
+        {
+            if(!IS_ERR(cam1_vcamd_1v2_pin_en0))
+            {
+                ret = pinctrl_select_state(cam1_pinctrl, cam1_vcamd_1v2_pin_en0);
+                if(ret < 0){
+                    pr_err("%s pinctrl_select_state cam1_vcamd_1v2_pin_en0  failed ! \n", __func__);
+                    return ret;
+                } else {
+                    PK_DBG("%s pinctrl_select_state cam1_vcamd_1v2_pin_en0 succeed ! \n", __func__);
+                }
+            }
+            if(!IS_ERR(cam1_vcamd_pin_en1))
+            {
+                ret = pinctrl_select_state(cam1_pinctrl, cam1_vcamd_pin_en1);
+                if(ret < 0){
+                    pr_err("%s pinctrl_select_state cam1_vcamd_pin_en1  failed ! \n", __func__);
+                    return ret;
+                } else {
+                    PK_DBG("%s pinctrl_select_state cam1_vcamd_pin_en1 succeed ! \n", __func__);
+                }
+            }
+            mdelay(1);
+        }
+        if(!IS_ERR(cam1_rst_pin_en1))
+        {
+            ret = pinctrl_select_state(cam1_pinctrl, cam1_rst_pin_en1);
+            if(ret < 0){
+                pr_err("%s pinctrl_select_state cam1_rst_pin_en1  failed ! \n", __func__);
+                return ret;
+            } else {
+                PK_DBG("%s pinctrl_select_state cam1_rst_pin_en1 succeed ! \n", __func__);
+            }
+        }
+        mdelay(2);
+        if(!IS_ERR(cam1_rst_pin_en0))
+        {
+            ret = pinctrl_select_state(cam1_pinctrl, cam1_rst_pin_en0);
+            if(ret < 0){
+                pr_err("%s pinctrl_select_state cam1_rst_pin_en0  failed ! \n", __func__);
+                return ret;
+            } else {
+                PK_DBG("%s pinctrl_select_state cam1_rst_pin_en0 succeed ! \n", __func__);
+            }
+        }
+        mdelay(1);
+        if(sensor_idx == IMGSENSOR_SENSOR_IDX_MAIN3)
+        {
+            if(!IS_ERR(cam1_vcamd_pin_en0))
+            {
+                ret = pinctrl_select_state(cam1_pinctrl, cam1_vcamd_pin_en0);
+                if(ret < 0){
+                    pr_err("%s pinctrl_select_state cam1_vcamd_pin_en0  failed ! \n", __func__);
+                    return ret;
+                } else {
+                    PK_DBG("%s pinctrl_select_state cam1_vcamd_pin_en0 succeed ! \n", __func__);
+                }
+            }
+        }
+        mdelay(1);
+        if(ret < 0){
+        pr_err("sc1300mcs_power_off failed\n");
+        }else{
+            pr_info("sc1300mcs_power_off succeed\n");
+        }
+    }else{
+        pr_err("sc1300mcs_power_off failed\n");
+    }
+    return ret;
+}
+//-bug 788904,liangyiyi.wt,modify,2022/8/6,modify for fix open double camera exception
+//-bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+
 #define IMGSENSOR_PROF 1
 #if IMGSENSOR_PROF
 void IMGSENSOR_PROFILE_INIT(struct timeval *ptv)
@@ -169,15 +265,27 @@ MINT32 imgsensor_sensor_open(struct IMGSENSOR_SENSOR *psensor)
 
 		/* turn on power */
 		IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
-
+		//+bug 767771,liangyiyi.wt,modify,2022/11/8,fix ANR problems caused by poweron
+		mutex_lock(&cam1_pinctrl_mutex);
 		ret = imgsensor_hw_power(&pimgsensor->hw,
 				psensor,
 				IMGSENSOR_HW_POWER_STATUS_ON);
+		mutex_unlock(&cam1_pinctrl_mutex);
+		//-bug 767771,liangyiyi.wt,modify,2022/11/8,fix ANR problems caused by poweron
+        //+bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+        if(psensor_inst->sensor_idx != IMGSENSOR_SENSOR_IDX_SUB && (sc1300mcs_is_alive == 1)){
+            mutex_lock(&cam1_pinctrl_mutex);
+            sc1300mcs_power_off(psensor_inst->sensor_idx);
+            mutex_unlock(&cam1_pinctrl_mutex);
+        }
+        //-bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
 
 		if (ret != IMGSENSOR_RETURN_SUCCESS) {
 			PK_PR_ERR("[%s]", __func__);
 			return ret;
 		}
+
+		usleep_range(5000, 7000);
 
 		IMGSENSOR_PROFILE(&psensor_inst->profile_time,
 			"kdCISModulePowerOn");
@@ -529,9 +637,20 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 	struct IMGSENSOR_SENSOR_INST *psensor_inst = &psensor->inst;
 
 	IMGSENSOR_PROFILE_INIT(&psensor_inst->profile_time);
+	//+bug 767771,liangyiyi.wt,modify,2022/11/8,fix ANR problems caused by poweron
+	mutex_lock(&cam1_pinctrl_mutex);
 	ret = imgsensor_hw_power(&pimgsensor->hw,
 			psensor,
 			IMGSENSOR_HW_POWER_STATUS_ON);
+	mutex_unlock(&cam1_pinctrl_mutex);
+	//-bug 767771,liangyiyi.wt,modify,2022/11/8,fix ANR problems caused by poweron
+    //+bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+    if(psensor_inst->sensor_idx != IMGSENSOR_SENSOR_IDX_SUB && (sc1300mcs_is_alive == 1)){
+        mutex_lock(&cam1_pinctrl_mutex);
+        sc1300mcs_power_off(psensor_inst->sensor_idx);
+        mutex_unlock(&cam1_pinctrl_mutex);
+    }
+    //-bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
 
 	if (ret != IMGSENSOR_RETURN_SUCCESS)
 		return ERROR_SENSOR_CONNECT_FAIL;
@@ -545,7 +664,7 @@ static inline int imgsensor_check_is_alive(struct IMGSENSOR_SENSOR *psensor)
 		PK_DBG("Fail to get sensor ID %x\n", sensorID);
 		err = ERROR_SENSOR_CONNECT_FAIL;
 	} else {
-		PK_DBG("Sensor found ID = 0x%x\n", sensorID);
+		pr_info("Sensor found ID = 0x%x\n", sensorID);
 		err = ERROR_NONE;
 	}
 
@@ -1075,6 +1194,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 	{
 		struct IMGSENSOR_SENSOR_LIST *psensor_list =
 			(struct IMGSENSOR_SENSOR_LIST *)pFeaturePara;
+
 		/* NOTICE: MUINT32 (*init)(struct SENSOR_FUNCTION_STRUCT **pfFunc) */
 		/* Not used and don't use due to A32+K64 no support ioctl of address type */
 		if (FeatureParaLen < (1 * sizeof(MUINT32) + 32 * sizeof(MUINT8))) {
@@ -1955,9 +2075,7 @@ static inline int adopt_CAMERA_HW_FeatureControl(void *pBuf)
 					((void *)pData, (void __user *)usr_ptr,
 					sizeof(struct SET_SENSOR_PATTERN_SOLID_COLOR))) {
 					kfree(pData);
-					kfree(pFeaturePara);
 					PK_DBG("[CAMERA_HW]ERROR: copy_from_user fail\n");
-					return -EFAULT;
 				}
 				//pr_debug("%x %x %x %x",pData->COLOR_R,pData->COLOR_Gr,
 				//pData->COLOR_Gb,pData->COLOR_B);
@@ -2412,6 +2530,59 @@ static int imgsensor_probe(struct platform_device *pplatform_device)
 	}
 
 	phw->common.pplatform_device = pplatform_device;
+
+    //+bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
+    mutex_init(&cam1_pinctrl_mutex);
+    cam1_pinctrl = devm_pinctrl_get(&(phw->common.pplatform_device->dev));
+    if(IS_ERR(cam1_pinctrl)){
+        pr_err("cam1_pinctrl get pinctrl failed !");
+        //return -1;
+    } else {
+        PK_DBG("cam1_pinctrl get pinctrl succeed");
+        cam1_vcamd_1v2_pin_en0 = pinctrl_lookup_state(cam1_pinctrl, "cam1_vcamd_1v2_en0");
+        if (IS_ERR(cam1_vcamd_1v2_pin_en0)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_1v2_pin_en0 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_1v2_pin_en0 succeed");
+        }
+        cam1_vcamd_1v1_pin_en1 = pinctrl_lookup_state(cam1_pinctrl, "cam1_vcamd_1v1_en1");
+        if (IS_ERR(cam1_vcamd_1v1_pin_en1)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_1v1_pin_en1 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_1v1_pin_en1 succeed");
+        }
+        cam1_vcamd_pin_en0 = pinctrl_lookup_state(cam1_pinctrl, "cam1_vcamd_en0");
+        if (IS_ERR(cam1_vcamd_pin_en0)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_pin_en0 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_pin_en0 succeed");
+        }
+        cam1_vcamd_pin_en1 = pinctrl_lookup_state(cam1_pinctrl, "cam1_vcamd_en1");
+        if (IS_ERR(cam1_vcamd_pin_en1)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_pin_en1 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_vcamd_pin_en1 succeed");
+        }
+        cam1_rst_pin_en0 = pinctrl_lookup_state(cam1_pinctrl, "cam1_rst_en0");
+        if (IS_ERR(cam1_rst_pin_en0)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_rst_pin_en0 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_rst_pin_en0 succeed");
+        }
+        cam1_rst_pin_en1 = pinctrl_lookup_state(cam1_pinctrl, "cam1_rst_en1");
+        if (IS_ERR(cam1_rst_pin_en1)) {
+            pr_err("cam1_pinctrl pinctrl_lookup_state cam1_rst_pin_en1 failed !");
+            //return -1;
+        } else {
+            PK_DBG("cam1_pinctrl pinctrl_lookup_state cam1_rst_pin_en1 succeed");
+        }
+    }
+    //-bug 767771,liangyiyi.wt,modify,2022/8/2,fix front sc1300mcs sensor current leak
 
 	imgsensor_hw_init(phw);
 	imgsensor_i2c_create();
