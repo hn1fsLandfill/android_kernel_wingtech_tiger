@@ -17,12 +17,12 @@ Audio
 Side fingerprint scanner
 Connectivity (Wi-Fi, Bluetooth, GPS via https://github.com/hn1fsLandfill/tiger_kernel_modules TODO: integrate into kernel)
 NFC
+SD Cards
 
 What partially works:
 USB (OTG doesn't work)
 
 What doesn't:
-SD Cards
 Camera
 
 TODO for camera image sensors: 

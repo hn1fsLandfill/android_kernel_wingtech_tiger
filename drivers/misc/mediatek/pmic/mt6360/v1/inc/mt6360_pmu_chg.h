@@ -6,6 +6,9 @@
 #ifndef __MT6360_PMU_CHG_H
 #define __MT6360_PMU_CHG_H
 
+/* Define this macro if detecting apple samsung TA is needed */
+#define MT6360_APPLE_SAMSUNG_TA_SUPPORT
+
 /* Define this macro if DCD timeout is supported */
 #define CONFIG_MT6360_DCDTOUT_SUPPORT
 
@@ -14,6 +17,9 @@ struct mt6360_chg_platform_data {
 	u32 aicr;
 	u32 mivr;
 	u32 cv;
+#if defined (CONFIG_W2_CHARGER_PRIVATE)
+	u32 vrechg;
+#endif
 	u32 ieoc;
 	u32 safety_timer;
 	u32 ircmp_resistor;
@@ -40,6 +46,7 @@ struct mt6360_chg_platform_data {
 
 /* MT6360_PMU_CHG_CTRL2 : 0x12 */
 #define MT6360_MASK_SHIP_MODE	BIT(7)
+#define MT6360_MASK_SHIP_DELAY	BIT(6)
 #define MT6360_MASK_IINLMTSEL	(0x0C)
 #define MT6360_SHFT_IINLMTSEL	(2)
 #define MT6360_MASK_TE_EN	BIT(4)
@@ -134,9 +141,6 @@ struct mt6360_chg_platform_data {
 #define MT6360_MASK_DISCHG	BIT(2)
 #define MT6360_SHFT_DISCHG	(2)
 
-/* MT6360_PMU_CHG_HIDDEN_CTRL22 : 0x45 */
-#define MT6360_MASK_BATOVP_LVL (0x60)
-
 /* MT6360_PMU_CHG_STAT : 0x4A */
 #define MT6360_MASK_CHG_STAT	(0xC0)
 #define MT6360_SHFT_CHG_STAT	(6)
@@ -153,6 +157,10 @@ struct mt6360_chg_platform_data {
 /* MT6360_PMU_CHG_CTRL19 : 0x61 */
 #define MT6360_MASK_CHG_VIN_OVP_VTHSEL	(0x60)
 #define MT6360_SHFT_CHG_VIN_OVP_VTHSEL	(5)
+
+/* MT6360_PMU_CHRDET_CTRL1 : 0x2D */
+#define MT6360_MASK_CHRDETB_VIN_OVP_VTHSEL	(0xF)
+#define MT6360_SHFT_CHRDETB_VIN_OVP_VTHSEL	(0)
 
 /* MT6360_PMU_FOD_CTRL : 0x65 */
 #define MT6360_MASK_FOD_SWEN	BIT(7)
