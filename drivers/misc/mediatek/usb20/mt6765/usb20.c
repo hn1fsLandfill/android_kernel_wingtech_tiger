@@ -13,18 +13,20 @@
 #include <linux/regmap.h>
 #include <linux/clk.h>
 
-#include <usb20.h>
-#include <musb.h>
-#include <musb_core.h>
-#include <mtk_musb.h>
-#include <musb_dr.h>
-#include <musbhsdma.h>
+#include "usb20.h"
+#include "../musb.h"
+#include "../musb_core.h"
+#include "../mtk_musb.h"
+#include "../musb_dr.h"
+#include "../musbhsdma.h"
 
 #ifdef CONFIG_MTK_MUSB_PHY
 #include <usb20_phy.h>
 #endif
 
 #include <mt-plat/mtk_boot_common.h>
+
+#include <linux/usb_notify.h>
 
 MODULE_LICENSE("GPL v2");
 
@@ -80,6 +82,10 @@ EXPORT_SYMBOL(register_usb_hal_disconnect_check);
 
 #if defined(CONFIG_MTK_BASE_POWER)
 #include "mtk_spm_resource_req.h"
+
+#if defined(CONFIG_CABLE_TYPE_NOTIFIER)
+#include <linux/cable_type_notifier.h>
+#endif
 
 static int dpidle_status = USB_DPIDLE_ALLOWED;
 module_param(dpidle_status, int, 0644);
@@ -205,8 +211,9 @@ void Charger_Detect_Init(void)
 	/* wait 50 usec. */
 	udelay(50);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SW_SET);
-
+#endif
 	usb_prepare_enable_clock(false);
 
 	DBG(0, "%s\n", __func__);
@@ -217,7 +224,9 @@ void Charger_Detect_Release(void)
 {
 	usb_prepare_enable_clock(true);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode_ext(glue->phy, PHY_MODE_USB_DEVICE, PHY_MODE_BC11_SW_CLR);
+#endif
 
 	udelay(1);
 
@@ -817,6 +826,15 @@ bool mt_usb_is_device(void)
 	return true;
 #endif
 }
+#if defined (CONFIG_N26_CHARGER_PRIVATE)
+bool mt_usb_is_connected(void)
+{
+	if (mtk_musb->usb_connected)
+		return true;
+	else
+		return false;
+}
+#endif
 static struct delayed_work disconnect_check_work;
 static bool musb_hal_is_vbus_exist(void);
 void do_disconnect_check_work(struct work_struct *data)
@@ -893,37 +911,10 @@ static bool cmode_effect_on(void)
 	return effect;
 }
 
-static void set_usb_phy_mode(int mode)
-{
-	switch (mode) {
-	case PHY_MODE_USB_DEVICE:
-	/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=1, IDPULLUP=1 */
-		USBPHY_CLR32(0x6C, (0x10<<0));
-		USBPHY_SET32(0x6C, (0x2F<<0));
-		USBPHY_SET32(0x6C, (0x3F<<8));
-		break;
-	case PHY_MODE_USB_HOST:
-	/* VBUSVALID=1, AVALID=1, BVALID=1, SESSEND=0, IDDIG=0, IDPULLUP=1 */
-		USBPHY_CLR32(0x6c, (0x12<<0));
-		USBPHY_SET32(0x6c, (0x2d<<0));
-		USBPHY_SET32(0x6c, (0x3f<<8));
-		break;
-	case PHY_MODE_INVALID:
-	/* VBUSVALID=0, AVALID=0, BVALID=0, SESSEND=1, IDDIG=0, IDPULLUP=1 */
-		USBPHY_SET32(0x6c, (0x11<<0));
-		USBPHY_CLR32(0x6c, (0x2e<<0));
-		USBPHY_SET32(0x6c, (0x3f<<8));
-		break;
-	default:
-		DBG(0, "mode error %d\n", mode);
-	}
-	DBG(0, "force PHY to mode %d, 0x6c=%x\n", mode, USBPHY_READ32(0x6c));
-}
-
 void do_connection_work(struct work_struct *data)
 {
 	unsigned long flags = 0;
-	int usb_clk_state = NO_CHANGE;
+	int usb_clk_state = NO_CHANGE, phy_mode = -1;
 	bool usb_on, usb_connected;
 	struct mt_usb_work *work =
 		container_of(data, struct mt_usb_work, dwork.work);
@@ -941,9 +932,9 @@ void do_connection_work(struct work_struct *data)
 	/* additional check operation here */
 	if (musb_force_on)
 		usb_on = true;
-	else if (work->ops == CONNECTION_OPS_CHECK)
+	else if (work->ops == CONNECTION_OPS_CHECK) {
 		usb_on = usb_connected;
-	else
+	} else
 		usb_on = (work->ops ==
 			CONNECTION_OPS_CONN ? true : false);
 
@@ -976,11 +967,9 @@ void do_connection_work(struct work_struct *data)
 		/* note this already put SOFTCON */
 		musb_start(mtk_musb);
 		usb_clk_state = OFF_TO_ON;
-
-		/* Set USB phy mode here. */
-		set_usb_phy_mode(PHY_MODE_USB_DEVICE);
-
+		phy_mode = PHY_MODE_USB_DEVICE;
 	} else if (mtk_musb->power && (usb_on == false)) {
+		phy_mode = PHY_MODE_INVALID;
 		/* disable usb */
 		musb_stop(mtk_musb);
 		if (mtk_musb->usb_lock->active) {
@@ -995,6 +984,13 @@ void do_connection_work(struct work_struct *data)
 				usb_on, mtk_musb->power);
 exit:
 	spin_unlock_irqrestore(&mtk_musb->lock, flags);
+#ifdef CONFIG_PHY_MTK_TPHY
+	/* set PHY mode after spinlock released */
+	if(phy_mode == PHY_MODE_USB_DEVICE)
+		phy_set_mode(glue->phy, PHY_MODE_USB_DEVICE);
+	else if (phy_mode == PHY_MODE_INVALID)
+		phy_set_mode(glue->phy, PHY_MODE_INVALID);
+#endif
 
 	if (usb_clk_state == ON_TO_OFF) {
 		/* clock on -> of: clk_prepare_cnt -2 */
@@ -1148,6 +1144,9 @@ EXPORT_SYMBOL(musb_platform_reset);
 void musb_sync_with_bat(struct musb *musb, int usb_state)
 {
 	DBG(1, "BATTERY_SetUSBState, state=%d\n", usb_state);
+#if defined (CONFIG_N23_CHARGER_PRIVATE)
+	BATTERY_SetUSBState(usb_state);
+#endif
 }
 EXPORT_SYMBOL(musb_sync_with_bat);
 
@@ -1810,8 +1809,10 @@ static int __init mt_usb_init(struct musb *musb)
 
 	DBG(1, "%s\n", __func__);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	musb->phy = glue->phy;
 	musb->xceiv = glue->xceiv;
+#endif
 	musb->dma_irq = (int)SHARE_IRQ;
 	musb->fifo_cfg = fifo_cfg;
 	musb->fifo_cfg_size = ARRAY_SIZE(fifo_cfg);
@@ -1821,9 +1822,11 @@ static int __init mt_usb_init(struct musb *musb)
 	musb->fifo_size = 8 * 1024;
 	musb->usb_lock = wakeup_source_register(NULL, "USB suspend lock");
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	ret = phy_init(glue->phy);
 	if (ret)
 		goto err_phy_init;
+#endif
 
 #ifdef CONFIG_MTK_UART_USB_SWITCH
 	in_uart_mode = usb_phy_check_in_uart_mode();
@@ -1832,6 +1835,8 @@ static int __init mt_usb_init(struct musb *musb)
 		DBG(0, "At UART mode. Switch to USB is not support\n");
 	}
 #endif
+
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_set_mode(glue->phy, glue->phy_mode);
 
 	if (glue->phy_mode != PHY_MODE_UART)
@@ -1839,7 +1844,7 @@ static int __init mt_usb_init(struct musb *musb)
 
 	if (ret)
 		goto err_phy_power_on;
-
+#endif
 #ifndef FPGA_PLATFORM
 	reg_vusb = regulator_get(musb->controller, "vusb");
 	if (!IS_ERR(reg_vusb)) {
@@ -1919,10 +1924,11 @@ static int __init mt_usb_init(struct musb *musb)
 
 	return 0;
 
+#ifdef CONFIG_PHY_MTK_TPHY
 err_phy_power_on:
 	phy_exit(glue->phy);
 err_phy_init:
-
+#endif
 	return ret;
 }
 
@@ -1944,8 +1950,11 @@ static int mt_usb_exit(struct musb *musb)
 #ifdef CONFIG_USB_MTK_OTG
 	mt_usb_otg_exit(musb);
 #endif
+
+#ifdef CONFIG_PHY_MTK_TPHY
 	phy_power_off(glue->phy);
 	phy_exit(glue->phy);
+#endif
 
 	return 0;
 }
@@ -2024,6 +2033,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	glue->phy = devm_of_phy_get_by_index(&pdev->dev, np, 0);
 	if (IS_ERR(glue->phy)) {
 		dev_err(&pdev->dev, "fail to getting phy %ld\n",
@@ -2043,7 +2053,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 		ret = PTR_ERR(glue->xceiv);
 		goto err_unregister_usb_phy;
 	}
-
+#endif
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata) {
 		dev_notice(&pdev->dev, "failed to allocate musb platform data\n");
@@ -2163,6 +2173,7 @@ static int mt_usb_probe(struct platform_device *pdev)
 	of_property_read_u32(np, "dr_mode", (u32 *) &pdata->dr_mode);
 #endif
 
+#ifdef CONFIG_PHY_MTK_TPHY
 	switch (pdata->dr_mode) {
 	case USB_DR_MODE_HOST:
 		glue->phy_mode = PHY_MODE_USB_HOST;
@@ -2179,11 +2190,12 @@ static int mt_usb_probe(struct platform_device *pdev)
 	}
 
 	DBG(0, "get dr_mode: %d\n", pdata->dr_mode);
+#endif
 
+#ifdef CONFIG_MTK_MUSB_DUAL_ROLE
 	/* assign usb-role-sw */
 	otg_sx = &glue->otg_sx;
 
-#ifdef CONFIG_MTK_MUSB_DUAL_ROLE
 	otg_sx->manual_drd_enabled =
 		of_property_read_bool(np, "enable-manual-drd");
 	otg_sx->role_sw_used = of_property_read_bool(np, "usb-role-switch");
@@ -2221,8 +2233,10 @@ static int mt_usb_probe(struct platform_device *pdev)
 err2:
 	platform_device_put(musb_pdev);
 	platform_device_unregister(glue->musb_pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 err_unregister_usb_phy:
 	usb_phy_generic_unregister(glue->usb_phy);
+#endif
 err1:
 	kfree(glue);
 err0:
@@ -2232,10 +2246,13 @@ err0:
 static int mt_usb_remove(struct platform_device *pdev)
 {
 	struct mt_usb_glue *glue = platform_get_drvdata(pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 	struct platform_device *usb_phy = glue->usb_phy;
-
+#endif
 	platform_device_unregister(glue->musb_pdev);
+#ifdef CONFIG_PHY_MTK_TPHY
 	usb_phy_generic_unregister(usb_phy);
+#endif
 	kfree(glue);
 
 	return 0;

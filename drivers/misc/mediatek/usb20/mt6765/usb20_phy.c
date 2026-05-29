@@ -792,6 +792,11 @@ void usb_phy_recover(struct musb *musb)
 
 	/* disc threshold to max, RG_USB20_DISCTH[7:4], dft:1000, MAX:1111 */
 	USBPHY_SET32(0x18, (0xf0<<0));
+
+	USBPHY_SET32(0x14, (0x1<<16));
+
+	DBG(0, "0x14 test value = 0x%0x\n", USBPHY_READ32(0x14));
+
 	usb_phy_tuning();
 
 	DBG(0, "usb recovery success\n");

@@ -154,6 +154,22 @@ static void _set_vbus(int is_on)
 	}
 }
 
+void mt_usb_set_vbus(struct musb *musb, int is_on)
+{
+#ifndef FPGA_PLATFORM
+
+	DBG(0, "is_on<%d>, control<%d>\n", is_on, vbus_control);
+
+	if (!vbus_control)
+		return;
+
+	if (is_on)
+		_set_vbus(1);
+	else
+		_set_vbus(0);
+#endif
+}
+void mt_otg_accessory_power(int is_on) {}
 int mt_usb_get_vbus_status(struct musb *musb)
 {
 	return true;
@@ -223,13 +239,6 @@ void mt_usb_host_connect(int delay)
 }
 EXPORT_SYMBOL(mt_usb_host_connect);
 
-void set_usb_phy_clear(void)
-{
-	/* Clear USB phy U2PHYDTM1 */
-	USBPHY_CLR32(0x6c, (0xFFFF));
-	DBG(0, "Clear PHY setting, 0x6c=%x\n", USBPHY_READ32(0x6c));
-}
-
 void mt_usb_host_disconnect(int delay)
 {
 	typec_req_host = false;
@@ -238,7 +247,7 @@ void mt_usb_host_disconnect(int delay)
 }
 EXPORT_SYMBOL(mt_usb_host_disconnect);
 
-static bool musb_is_host(void)
+bool musb_is_host(void)
 {
 	bool host_mode = 0;
 
@@ -380,8 +389,9 @@ static void do_host_work(struct work_struct *data)
 	int usb_clk_state = NO_CHANGE;
 	struct mt_usb_work *work =
 		container_of(data, struct mt_usb_work, dwork.work);
+#ifdef CONFIG_PHY_MTK_TPHY
 	struct mt_usb_glue *glue = mtk_musb->glue;
-
+#endif
 	/*
 	 * kernel_init_done should be set in
 	 * early-init stage through init.$platform.usb.rc
@@ -459,8 +469,9 @@ static void do_host_work(struct work_struct *data)
 		musb_writeb(mtk_musb->mregs,
 				MUSB_DEVCTL, (devctl&(~MUSB_DEVCTL_SESSION)));
 
+#ifdef CONFIG_PHY_MTK_TPHY
 		phy_set_mode(glue->phy, PHY_MODE_INVALID);
-
+#endif
 		/* wait */
 		mdelay(5);
 		/* restart session */
@@ -468,8 +479,9 @@ static void do_host_work(struct work_struct *data)
 		musb_writeb(mtk_musb->mregs,
 				MUSB_DEVCTL, (devctl | MUSB_DEVCTL_SESSION));
 
+#ifdef CONFIG_PHY_MTK_TPHY
 		phy_set_mode(glue->phy, PHY_MODE_USB_HOST);
-
+#endif
 		musb_start(mtk_musb);
 
 		if (!typec_control && !host_plug_test_triggered)
@@ -496,9 +508,10 @@ static void do_host_work(struct work_struct *data)
 		if (mtk_musb->usb_lock->active)
 			__pm_relax(mtk_musb->usb_lock);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 		/* for no VBUS sensing IP */
 		phy_set_mode(glue->phy, PHY_MODE_INVALID);
-
+#endif
 		musb_stop(mtk_musb);
 
 		if (!typec_control && !host_plug_test_triggered)
@@ -513,7 +526,9 @@ static void do_host_work(struct work_struct *data)
 		/* to make sure all event clear */
 		msleep(32);
 
+#ifdef CONFIG_PHY_MTK_TPHY
 		mtk_musb->xceiv->otg->state = OTG_STATE_B_IDLE;
+#endif
 		/* switch to DEV state after turn off VBUS */
 		MUSB_DEV_MODE(mtk_musb);
 

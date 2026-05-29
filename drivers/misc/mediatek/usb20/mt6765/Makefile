@@ -29,6 +29,7 @@ ifeq ($(CONFIG_TCPC_CLASS),y)
 endif
 # for ep0 test
 ccflags-y += -I$(srctree)/drivers/usb/core/
+ccflags-y += -I$(srctree)/drivers/power/supply
 ccflags-y += -I$(srctree)/drivers/misc/mediatek/usb20
 
 # Phy
