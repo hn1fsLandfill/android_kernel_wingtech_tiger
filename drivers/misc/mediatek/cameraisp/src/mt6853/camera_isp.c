@@ -641,6 +641,7 @@ struct ISP_IRQ_ERR_WAN_CNT_STRUCT {
 };
 
 static int FirstUnusedIrqUserKey = 1;
+#define USERKEY_STR_LEN 32
 
 struct UserKeyInfo {
 	/* name for the user that register a userKey */
@@ -1568,7 +1569,7 @@ static void ISP_RecordCQAddr(enum ISP_DEV_NODE_ENUM regModule)
 		    ((reg_module_array[0] == ISP_CAM_C_IDX) &&
 		     (twinStatus.Bits.MASTER_MODULE != CAM_C))) {
 			LOG_NOTICE(
-				"twin module is invalid! recover fail\n");
+				"twin module is invalid! recover fail");
 		}
 
 		switch (twinStatus.Bits.TWIN_MODULE) {
@@ -1580,7 +1581,7 @@ static void ISP_RecordCQAddr(enum ISP_DEV_NODE_ENUM regModule)
 		break;
 		default:
 		LOG_NOTICE(
-			"twin module is invalid! recover fail\n");
+		"twin module is invalid! recover fail");
 		}
 
 		reg_module_count = twinStatus.Bits.SLAVE_CAM_NUM + 1;
@@ -1594,9 +1595,10 @@ static void ISP_RecordCQAddr(enum ISP_DEV_NODE_ENUM regModule)
 		tmp_module = reg_module_array[i] - ISP_CAMSYS_RAWC_CONFIG_IDX;
 		index = tmp_module - ISP_CAM_A_INNER_IDX;
 
-		if (index > (ISP_CAM_C_INNER_IDX - ISP_CAM_A_INNER_IDX)) {
+		if ((index > (ISP_CAM_C_INNER_IDX - ISP_CAM_A_INNER_IDX)) ||
+			(index < 0)) {
 			LOG_NOTICE(
-				"index is invalid! recover fail\n");
+				"index is invalid! recover fail");
 			return;
 		}
 
@@ -3688,12 +3690,6 @@ static int ISP_WaitIrq(struct ISP_WAIT_IRQ_STRUCT *WaitIrq)
 	bool freeze_passbysigcnt = false;
 	unsigned long long sec = 0;
 	unsigned long usec = 0;
-
-	if ((idx < 0) || (idx > 31)) {
-		LOG_NOTICE("Invalid EventInfo.Status(0x%x)\n",
-			WaitIrq->EventInfo.Status);
-		return -EFAULT;
-	}
 
 	/* do_gettimeofday(&time_getrequest); */
 	sec = cpu_clock(0);	  /* ns */
@@ -7134,7 +7130,7 @@ static int ISP_probe(struct platform_device *pDev)
 	/*    struct resource *pRes = NULL; */
 	int i = 0, j = 0;
 	unsigned char n;
-	unsigned int irq_info[3] = {0}; /* Record interrupts info from device tree */
+	unsigned int irq_info[3]; /* Record interrupts info from device tree */
 	struct isp_device *_ispdev = NULL;
 
 #ifdef CONFIG_OF
@@ -7938,7 +7934,7 @@ static int ISP_resume(struct platform_device *pDev)
 	ISP_EnableClock(module, MTRUE);
 
 	if (SuspnedRecord[module]) {
-		LOG_INF("%s_resume,enable VF,wakelock:%d,clk:%p,devct:%d\n",
+		LOG_INF("%s_resume,enable VF,wakelock:%d,clk:0x%x,devct:%d\n",
 			moduleName, g_WaitLockCt, G_u4EnableClockCount,
 			atomic_read(&G_u4DevNodeCt));
 
@@ -7951,7 +7947,7 @@ static int ISP_resume(struct platform_device *pDev)
 		regVal = ISP_RD32(CAMX_REG_TG_VF_CON(module));
 		ISP_WR32(CAMX_REG_TG_VF_CON(module), (regVal | 0x01));
 	} else {
-		LOG_INF("%s_resume,wakelock:%d,clk:%p,devct:%d\n", moduleName,
+		LOG_INF("%s_resume,wakelock:%d,clk:0x%x,devct:%d\n", moduleName,
 			g_WaitLockCt, G_u4EnableClockCount,
 			atomic_read(&G_u4DevNodeCt));
 	}
@@ -10376,7 +10372,7 @@ unsigned int *reg_module_count)
 	}
 	LOG_NOTICE("+CQ recover");
 
-	if (irq_module >= ISP_IRQ_TYPE_AMOUNT) {
+	if ((irq_module < 0) || (irq_module >= ISP_IRQ_TYPE_AMOUNT)) {
 		LOG_NOTICE("[Error] invalid index : irq_module");
 		return -1;
 	}

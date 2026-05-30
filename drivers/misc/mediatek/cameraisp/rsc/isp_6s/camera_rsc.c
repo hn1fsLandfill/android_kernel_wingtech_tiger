@@ -1577,6 +1577,13 @@ static signed int RSC_ReadReg(struct RSC_REG_IO_STRUCT *pRegIo)
 		goto EXIT;
 	}
 
+	if (pData->Addr < 0x0 || pData->Addr > 0x1000) {
+		LOG_ERR("%s pData->addr is out of range",
+			__func__);
+		Ret = -EFAULT;
+		goto EXIT;
+	}
+
 	for (i = 0; i < pRegIo->Count; i++) {
 		if (get_user(reg.Addr, (unsigned int *) &pData->Addr) != 0) {
 			LOG_ERR("get_user failed");
@@ -2069,9 +2076,9 @@ static long RSC_ioctl(struct file *pFile, unsigned int Cmd, unsigned long Param)
 							g_RSC_ReqRing.WriteIdx].
 				    State) {
 					if (enqueNum >
-					_SUPPORT_MAX_RSC_FRAME_REQUEST_) {
+					_SUPPORT_MAX_RSC_FRAME_REQUEST_ || enqueNum < 0) {
 						LOG_ERR(
-						"RSC Enque Num is bigger than enqueNum:%d\n",
+						"RSC Enque Num is bigger than enqueNum or NEG:%d\n",
 						     enqueNum);
 						break;
 					}

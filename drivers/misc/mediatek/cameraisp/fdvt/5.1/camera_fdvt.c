@@ -2346,6 +2346,13 @@ static signed int fdvt_read_reg(FDVT_REG_IO_STRUCT *pRegIo)
 		goto EXIT;
 	}
 
+	if (pData->addr < 0x0 || pData->addr > 0x1000) {
+		log_err("%s pData->addr is out of range",
+			__func__);
+		ret = -EFAULT;
+		goto EXIT;
+	}
+
 	for (i = 0; i < pRegIo->count; i++) {
 		if (get_user(reg.addr, (unsigned int *)&pData->addr) != 0) {
 			log_err("get_user failed");
@@ -2872,9 +2879,9 @@ static long FDVT_ioctl(struct file *pFile,
 			if (FDVT_REQUEST_STATE_EMPTY ==
 				request->state) {
 				if (enqueNum >
-					MAX_FDVT_FRAME_REQUEST) {
+					MAX_FDVT_FRAME_REQUEST || enqueNum < 0) {
 					log_err(
-					"FDVT Enque Num is bigger than enqueNum:%d\n",
+					"FDVT Enque Num is bigger than enqueNum or negtive:%d\n",
 					enqueNum);
 					break;
 				}
