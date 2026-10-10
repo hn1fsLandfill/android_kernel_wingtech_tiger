@@ -1280,6 +1280,11 @@ static u32 resolve_rel_crc(const s32 *crc)
 	return *(u32 *)((void *)crc + *crc);
 }
 
+// this is to allow using the stock vendor's connectivity drivers
+// to get connectivity working without needing to patch the vendor.
+// dirty but it should be a drop in replacement in my opinion
+static const char *whitelist_bad_crc_modules[] = {"wmt_drv", "wmt_chrdev_wifi", "fmradio_drv_mt6631_6635", "connfem", "gps_drv", "wlan_drv_gen4m", "bt_drv_connac1x", "met", 0};
+
 static int check_version(const struct load_info *info,
 			 const char *symname,
 			 struct module *mod,
@@ -1289,6 +1294,11 @@ static int check_version(const struct load_info *info,
 	unsigned int versindex = info->index.vers;
 	unsigned int i, num_versions;
 	struct modversion_info *versions;
+
+	for(i = 0; whitelist_bad_crc_modules[i] != 0; i++) {
+		if(strcmp(info->name, whitelist_bad_crc_modules[i]) == 0)
+			return 1;
+	}
 
 	/* Exporting module didn't supply crcs?  OK, we're already tainted. */
 	if (!crc)
