@@ -271,7 +271,7 @@ static int mtk_usb_extcon_set_vbus_v1(bool is_on) {
 			1500000); 
 #else
 		charger_dev_set_boost_current_limit(primary_charger,
-			1100000);  //churui1.wt, decrease the OTG current limit
+			1300000); 
 #endif			
 		#if 0
 		{// # workaround
