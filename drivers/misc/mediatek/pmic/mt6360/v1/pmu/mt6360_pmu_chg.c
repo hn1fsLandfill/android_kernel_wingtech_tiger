@@ -19,6 +19,8 @@
 #include <linux/kthread.h>
 #include <linux/of.h>
 #include <linux/phy/phy.h>
+#include <linux/pinctrl/consumer.h>
+#include <linux/pinctrl/pinctrl.h>
 
 #include "../inc/mt6360_pmu.h"
 #include "../inc/mt6360_pmu_chg.h"
@@ -115,6 +117,9 @@ struct mt6360_pmu_chg_info {
 	struct workqueue_struct *pe_wq;
 	struct work_struct pe_work;
 	u8 ctd_dischg_status;
+
+	struct pinctrl *chgdev_pinctrl;
+	struct pinctrl_state *otg_state[2];
 };
 
 /* for recive bat oc notify */
@@ -1607,6 +1612,11 @@ static int mt6360_enable_otg(struct charger_device *chg_dev, bool en)
 	else
 		dev_err(mpci->dev, "%s: propval.intval = %d\n",	__func__, propval.intval);
 #endif
+
+	if (mpci->chgdev_pinctrl)
+		pinctrl_select_state(mpci->chgdev_pinctrl,
+			en ? mpci->otg_state[0] : mpci->otg_state[1]);
+
 	dev_dbg(mpci->dev, "%s: en = %d\n", __func__, en);
 	ret = mt6360_enable_otg_wdt(mpci, en ? true : false);
 	if (ret < 0) {
@@ -1614,11 +1624,11 @@ static int mt6360_enable_otg(struct charger_device *chg_dev, bool en)
 		return ret;
 	}
 //+bug680167, lvyuanchuan.wt modify ,20200803,Unable to recognize OTG device after stablility test
-#ifdef WT_COMPILE_FACTORY_VERSION
+//#ifdef WT_COMPILE_FACTORY_VERSION
 	if(en){
 		mt6360_pmu_reg_update_bits(mpci->mpi, MT6360_PMU_CHG_CTRL1,MT6360_MASK_HZ_EN,0);
 	}
-#endif
+//#endif
 //-bug680167, lvyuanchuan.wt modify ,20200803,Unable to recognize OTG device after stablility test
 	return mt6360_pmu_reg_update_bits(mpci->mpi, MT6360_PMU_CHG_CTRL1,
 					  MT6360_MASK_OPA_MODE, en ? 0xff : 0);
@@ -3136,6 +3146,13 @@ static int mt6360_pmu_chg_probe(struct platform_device *pdev)
 	if (!mpci)
 		return -ENOMEM;
 	mpci->dev = &pdev->dev;
+	mpci->chgdev_pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (mpci->chgdev_pinctrl) {
+		mpci->otg_state[0] = pinctrl_lookup_state(mpci->chgdev_pinctrl,
+						"otg_on");
+		mpci->otg_state[1] = pinctrl_lookup_state(mpci->chgdev_pinctrl,
+							"otg_off");
+	}
 	mpci->mpi = dev_get_drvdata(pdev->dev.parent);
 	mpci->hidden_mode_cnt = 0;
 	mutex_init(&mpci->hidden_mode_lock);
