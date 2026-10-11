@@ -125,7 +125,7 @@ static struct imgsensor_info_struct imgsensor_info = {
          .mipi_pixel_rate =600000000,//1500Mbps*4/10=600 000 000
      },
      .normal_video = { 
-         .pclk = 0,
+         .pclk = 124000000,
          .linelength =  859,
          .framelength = 4732,
          .startx = 0,
@@ -133,7 +133,7 @@ static struct imgsensor_info_struct imgsensor_info = {
          .grabwindow_width = 4096,
          .grabwindow_height = 2312,
          /*     following for MIPIDataLowPwr2HighSpeedSettleDelayCountby different scenario    */
-         .mipi_data_lp2hs_settle_dc = 0,
+         .mipi_data_lp2hs_settle_dc = 85,
          /*     following for GetDefaultFramerateByScenario()    */
          .max_framerate = 300,
          .mipi_pixel_rate = 600000000,
@@ -283,17 +283,35 @@ static struct imgsensor_struct imgsensor = {
      .i2c_write_id = 0x40,
 };
 
-/* Sensor output window information */
-static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[9] = {
-     {8224, 6176, 16,   16, 8192, 6144, 2048, 1536,    0, 0,  2048, 1536, 0,0, 2048, 1536},  //preview(2048x1536)@30fps
-     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072, 0,0, 4096, 3072},  //capture(4096 x 3072)@30fps
-     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072, 0,0, 4096, 3072},  //capture1(4096 x 3072)@30fps
-     {8224, 6176, 16,   24, 8192, 6128, 4096, 3064,   0,380,  4096, 2304, 0,0, 4096, 2304},  //normal_video(4096 x 2304)@30fps
-     {8224, 6176, 16,   16, 8192, 6144, 2048, 1536,  384,408, 1280,  720, 0,0, 1280,  720},  //hs_video(1280 x 720)@120fps
-     {8224, 6176, 16,   16, 8192, 6144, 2048, 1536,  384,408, 1280,  720, 0,0, 1280,  720},  //slim video(1280 x 720)@120fps
-     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072, 0,0, 4096, 3072},  //custom(4096 x 3072)
-     {8224, 6176, 16,   16, 8192, 6144, 8192, 6144,    0, 0,  8192, 6144, 0,0, 8192, 6144},  //custom Q2B_full(8192 x 6144)@10fps
-     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072, 0,0, 4096, 3072},  //custom(4096 x 3072)@24fps
+/* Sensor output window information.
+ *
+ * Extracted byte-exact from the stock kernel Image at file offset 0x162bd20
+ * (VA ffffff9d132abd20), array of 8 x SENSOR_WINSIZE_INFO_STRUCT (32 bytes each).
+ *
+ * Field order (kd_imgsensor_define.h):
+ *   full_w, full_h, x0_offset, y0_offset, w0_size, h0_size, scale_w, scale_h,
+ *   x1_offset, y1_offset, w1_size, h1_size, x2_tg_offset, y2_tg_offset,
+ *   w2_tg_size, h2_tg_size
+ *
+ * NOTE: entries are indexed in canonical imgsensor mode order, which is what
+ * SENSOR_FEATURE_GET_CROP_INFO must use:
+ *   [0] preview  [1] capture  [2] normal_video  [3] hs_video
+ *   [4] slim_video  [5] custom1  [6] custom2  [7] custom3
+ *
+ * Each entry's w2_tg_size/h2_tg_size matches that mode's grabwindow in
+ * imgsensor_info. That equality is what lsc_mgr_dft's checkSensorCropRules
+ * ("Rule #2") asserts; violating it raises SIGKILL and takes camerahalserver
+ * down. Do not re-indent or re-order these entries.
+ */
+static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[8] = {
+     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072,    0,   0,  4096, 3072},  //preview(4096 x 3072)@30fps
+     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072,    0,   0,  4096, 3072},  //capture(4096 x 3072)@30fps
+     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 380, 4096, 2312,   0,   0,  4096, 2312},  //normal_video(4096 x 2312)@30fps
+     {8224, 6176, 16,   16, 8192, 6144, 2048, 1536,    0, 188, 2048, 1060,   0,   0,  2048, 1160},  //hs_video(2048 x 1160)@120fps
+     {8224, 6176, 16,  176, 8192, 5824, 2048, 1456,   64, 188, 1920, 1080,    0,   0,  1920, 1080},  //slim_video(1920 x 1080)@120fps
+     {8224, 6176, 16,   16, 8192, 6144, 4096, 3072,    0, 0,  4096, 3072,    0,   0,  4096, 3072},  //custom1(4096 x 3072)@24fps
+     {8224, 6176, 16,   16, 8192, 6144, 8192, 6144,    0, 0,  8192, 6144,    0,   0,  8192, 6144},  //custom2(8192 x 6144)@10fps
+     {8224, 6176, 16,  176, 8192, 5824, 2048, 1456,   64, 188, 1920, 1080,    0,   0,  1920, 1080},  //custom3(1920 x 1080)@30fps
 };
 
 #if ENABLE_PDAF
@@ -7076,7 +7094,7 @@ static struct stCAM_CAL_DATAINFO_STRUCT n26_hi5021q_rear_delta_eeprom_data ={
      .sensorID= N26_HI5021Q_REAR_DELTA_SENSOR_ID,
      .deviceID = 0x01,
      .dataLength = 0x2149,
-     // 0x1d -> 0x06 
+     // 0x1d -> 0x06
      .sensorVendorid = 0x06000101,
      .vendorByte = {1,2,3,4},
      .dataBuffer = NULL,
@@ -8157,32 +8175,32 @@ static kal_uint32 feature_control(
          break;
          case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
              memcpy((void *)wininfo,
-                 (void *)&imgsensor_winsize_info[3],
+                 (void *)&imgsensor_winsize_info[2],
                  sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
              memcpy((void *)wininfo,
-                 (void *)&imgsensor_winsize_info[4],
+                 (void *)&imgsensor_winsize_info[3],
                  sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_SLIM_VIDEO:
              memcpy((void *)wininfo,
-                 (void *)&imgsensor_winsize_info[5],
+                 (void *)&imgsensor_winsize_info[4],
                  sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_CUSTOM1:
              memcpy((void *)wininfo,
-                 (void *)&imgsensor_winsize_info[6],
+                 (void *)&imgsensor_winsize_info[5],
                  sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_CUSTOM2:
              memcpy((void *)wininfo,
-                 (void *)&imgsensor_winsize_info[7],
+                 (void *)&imgsensor_winsize_info[6],
                  sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_CUSTOM3:
          memcpy((void *)wininfo,
-             (void *)&imgsensor_winsize_info[8],
+             (void *)&imgsensor_winsize_info[7],
              sizeof(struct SENSOR_WINSIZE_INFO_STRUCT));
          break;
          case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
