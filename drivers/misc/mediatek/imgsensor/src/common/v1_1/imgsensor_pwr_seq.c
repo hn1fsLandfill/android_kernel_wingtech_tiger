@@ -60,7 +60,20 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 		},
 	},
 #endif
-
+//#if defined(N26_HI5021Q_REAR_DELTA_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_N26_HI5021Q_REAR_DELTA_MIPI_RAW,
+		{
+			{DOVDD, Vol_1800, 1},
+			{AVDD, Vol_2800, 2},
+			{DVDD, Vol_High, 1},
+			{AFVDD, Vol_2800, 1},
+			{SensorMCLK, Vol_High, 5},
+			{RST, Vol_Low, 2},
+			{RST, Vol_High, 5},
+		},
+	},
+//#endif
 #if defined(W2SC202CSDEPLH_MIPI_MONO)
 	{
 		SENSOR_DRVNAME_W2SC202CSDEPLH_MIPI_MONO,
