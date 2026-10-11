@@ -29,17 +29,10 @@
 #define LOG_INF(format, args...)    \
      pr_info(PFX "[%s] " format, __func__, ##args)
 
-#define EEPROM_BL24SA64D_ID 0xA0
-
-static kal_uint16 hi5021q_read_eeprom(kal_uint32 addr)
-{
-     kal_uint16 get_byte=0;
-
-     char pu_send_cmd[2] = { (char)(addr >> 8), (char)(addr & 0xFF) };
-     iReadRegI2C(pu_send_cmd, 2, (u8*)&get_byte, 1, EEPROM_BL24SA64D_ID);
-
-     return get_byte;
-}
+/* NOTE: stock hi5021q has no raw EEPROM probe here. The OTP/EEPROM is read via
+ * imgSensorReadEepromData() -> CAM_CAL -> /dev/camera_eeprom0, on a separate
+ * i2c bus. Do not add a raw iReadRegI2C(...,0xA0) vendor check here: it reads
+ * the sensor's own i2c client, not the eeprom device, and silently returns 0. */
 //PDAF
 #define ENABLE_PDAF 1
 
@@ -131,22 +124,8 @@ static struct imgsensor_info_struct imgsensor_info = {
          .max_framerate = 300,
          .mipi_pixel_rate =600000000,//1500Mbps*4/10=600 000 000
      },
-     .normal_video = { //unused in stock: all zero
+     .normal_video = { 
          .pclk = 0,
-         .linelength =  0,
-         .framelength = 0,
-         .startx = 0,
-         .starty = 0,
-         .grabwindow_width = 0,
-         .grabwindow_height = 0,
-         /*     following for MIPIDataLowPwr2HighSpeedSettleDelayCountby different scenario    */
-         .mipi_data_lp2hs_settle_dc = 0,
-         /*     following for GetDefaultFramerateByScenario()    */
-         .max_framerate = 0,
-         .mipi_pixel_rate =0,
-     },
-     .hs_video = {//4096X2312
-         .pclk = 124000000,
          .linelength =  859,
          .framelength = 4732,
          .startx = 0,
@@ -154,12 +133,12 @@ static struct imgsensor_info_struct imgsensor_info = {
          .grabwindow_width = 4096,
          .grabwindow_height = 2312,
          /*     following for MIPIDataLowPwr2HighSpeedSettleDelayCountby different scenario    */
-         .mipi_data_lp2hs_settle_dc = 85,
+         .mipi_data_lp2hs_settle_dc = 0,
          /*     following for GetDefaultFramerateByScenario()    */
          .max_framerate = 300,
-         .mipi_pixel_rate = 600000000,//1500Mbps*4/10=600 000 000
+         .mipi_pixel_rate = 600000000,
      },
-     .slim_video = {//2048X1160@1200fps
+     .hs_video = {//4096X2312
          .pclk = 124000000,
          .linelength =  1022,
          .framelength = 1010,
@@ -173,7 +152,7 @@ static struct imgsensor_info_struct imgsensor_info = {
          .max_framerate = 1200,
          .mipi_pixel_rate = 600000000,//1500Mbps*4/10=600 000 000
      },
-     .custom1 = {//1920X1080
+     .slim_video = {//2048X1160@1200fps
          .pclk = 124000000,
          .linelength =  969,
          .framelength = 2129,
@@ -185,9 +164,9 @@ static struct imgsensor_info_struct imgsensor_info = {
          .mipi_data_lp2hs_settle_dc = 85,
          /*     following for GetDefaultFramerateByScenario()    */
          .max_framerate = 600,
-         .mipi_pixel_rate =600000000,//1500mBPS*4/10=600 000 000
+         .mipi_pixel_rate = 600000000,//1500Mbps*4/10=600 000 000
      },
-     .custom2 = {//4096X3072
+     .custom1 = {//1920X1080
          .pclk = 124000000,
          .linelength =  938,
          .framelength = 5485,
@@ -199,9 +178,9 @@ static struct imgsensor_info_struct imgsensor_info = {
          .mipi_data_lp2hs_settle_dc = 85,
          /*     following for GetDefaultFramerateByScenario()    */
          .max_framerate = 240,
-         .mipi_pixel_rate = 600000000,//1500Mbps*4/10=6000000000/10=600000000
+         .mipi_pixel_rate =600000000,//1500mBPS*4/10=600 000 000
      },
-      .custom3 = {//8192X6144
+     .custom2 = {//4096X3072
          .pclk = 124000000,
          .linelength =  891,
          .framelength = 13779,
@@ -213,9 +192,9 @@ static struct imgsensor_info_struct imgsensor_info = {
          .mipi_data_lp2hs_settle_dc = 85,
          /*     following for GetDefaultFramerateByScenario()    */
          .max_framerate = 100,
-         .mipi_pixel_rate = 600000000,//1500Mbps*4/10=600 000 000
+         .mipi_pixel_rate = 600000000,//1500Mbps*4/10=6000000000/10=600000000
      },
-     .custom4 = {//1920X1080, same tuning as custom1
+      .custom3 = {//8192X6144
          .pclk = 124000000,
          .linelength =  969,
          .framelength = 4258,
@@ -229,6 +208,18 @@ static struct imgsensor_info_struct imgsensor_info = {
          .max_framerate = 300,
          .mipi_pixel_rate = 600000000,//1500Mbps*4/10=600 000 000
      },
+     .custom4 = {
+         .pclk = 0,
+         .linelength =  0,
+         .framelength = 0,
+         .startx = 0,
+         .starty = 0,
+         .grabwindow_width = 0,
+         .grabwindow_height = 0,
+         .mipi_data_lp2hs_settle_dc = 0,
+         .max_framerate = 0,
+         .mipi_pixel_rate = 0,
+     },
 
      .margin = 16,
      .min_shutter = 16,
@@ -236,9 +227,9 @@ static struct imgsensor_info_struct imgsensor_info = {
      .min_gain = 64,
      .max_gain = 2048,
      .min_gain_iso = 100,
-     .exp_step = 1,
-     .gain_step = 8,//64/16=4
-     .gain_type = 3,
+     .exp_step = 4,
+     .gain_step = 3,//64/16=4
+     .gain_type = 1,
      .max_frame_length = 0xFFFFFFFF,
 #if per_frame
      .ae_shut_delay_frame = 0,
@@ -251,22 +242,23 @@ static struct imgsensor_info_struct imgsensor_info = {
 #endif
      .ihdr_support = 0,      //1, support; 0,not support
      .ihdr_le_firstline = 0,  //1,le first ; 0, se first
-     .sensor_mode_num = 10,      //support sensor mode num
+     .sensor_mode_num = 8,      //support sensor mode num
 
      .cap_delay_frame = 2,
      .pre_delay_frame = 2,
      .video_delay_frame = 2,
-     .frame_time_delay_frame = 2,
+     .frame_time_delay_frame = 1,
      .hs_video_delay_frame = 3,
      .slim_video_delay_frame = 3,
      .custom1_delay_frame = 2,
      .custom2_delay_frame = 2,
      .custom3_delay_frame = 2,
      .custom4_delay_frame = 2,
-     .isp_driving_current = ISP_DRIVING_2MA,
-     .sensor_interface_type = SENSOR_INTERFACE_TYPE_PARALLEL,
-     .mipi_sensor_type = MIPI_OPHY_CSI2,
-     .mipi_settle_delay_mode = MIPI_SETTLEDELAY_MANUAL,
+     .custom5_delay_frame = 0,
+     .isp_driving_current = ISP_DRIVING_4MA,
+     .sensor_interface_type = SENSOR_INTERFACE_TYPE_MIPI,
+     .mipi_sensor_type = MIPI_OPHY_NCSI2,
+     .mipi_settle_delay_mode = MIPI_SETTLEDELAY_AUTO,
 //0,MIPI_SETTLEDELAY_AUTO; 1,MIPI_SETTLEDELAY_MANNUAL
      .sensor_output_dataformat = SENSOR_OUTPUT_FORMAT_RAW_4CELL_HW_BAYER_Gr,
      .mclk = 24,
@@ -7084,7 +7076,8 @@ static struct stCAM_CAL_DATAINFO_STRUCT n26_hi5021q_rear_delta_eeprom_data ={
      .sensorID= N26_HI5021Q_REAR_DELTA_SENSOR_ID,
      .deviceID = 0x01,
      .dataLength = 0x2149,
-     .sensorVendorid = 0x1D000101,
+     // 0x1d -> 0x06 
+     .sensorVendorid = 0x06000101,
      .vendorByte = {1,2,3,4},
      .dataBuffer = NULL,
 };
@@ -7121,16 +7114,12 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
          do {
              *sensor_id = return_sensor_id()+2;
              if (*sensor_id == imgsensor_info.sensor_id) {
-             LOG_INF("delta i2c write id : 0x%x, sensor id: 0x%x\n",imgsensor.i2c_write_id, *sensor_id);
-             if((n26_hi5021q_rear_delta_eeprom_data.sensorVendorid >> 24) != hi5021q_read_eeprom(0x0001)){
-               *sensor_id = 0xFFFFFFFF;
-               return ERROR_SENSOR_CONNECT_FAIL;
-          }
+             LOG_INF("hi5021 read id i2c write id : 0x%x, sensor id: 0x%x succeed , start read otp\n",imgsensor.i2c_write_id, *sensor_id);
 #if 1
   //// add maincamera hi5021q otp code
              size = imgSensorReadEepromData(&n26_hi5021q_rear_delta_eeprom_data,n26_hi5021q_rear_delta_Checksum);
              if(size != n26_hi5021q_rear_delta_eeprom_data.dataLength) {
-                 LOG_INF("get eeprom data failed\n");
+                 LOG_INF("hi5021 get eeprom data failed %d\n", size);
                  if(n26_hi5021q_rear_delta_eeprom_data.dataBuffer != NULL) {
                      kfree(n26_hi5021q_rear_delta_eeprom_data.dataBuffer);
                      n26_hi5021q_rear_delta_eeprom_data.dataBuffer = NULL;
