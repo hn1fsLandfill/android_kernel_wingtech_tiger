@@ -445,6 +445,7 @@ static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSet
      kal_uint32 total_set_count = nSetSize;
      kal_uint16 set_count = 0;
      kal_uint16 buf_count = 0;
+     kal_uint32 nFlush = 0;
 
      for (set_count = 0; set_count < (total_set_count-2); set_count+=2)
      {
@@ -468,9 +469,12 @@ static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSet
           }
 
           err = iBurstWriteReg(Hynix_i2c_buf, buf_count, imgsensor.i2c_write_id); // i2c write fuction
-
-          if (err)
+          nFlush++;
+          if (err) {
+               LOG_INF("[burst] i2c FAIL flush#%u buf_count=%u addr=0x%04x\n",
+                       nFlush, buf_count, setting_table[set_count]);
                return true;
+          }
 
           buf_count = 0;
      }
@@ -478,12 +482,17 @@ static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSet
      if (buf_count > 0) // exception handling. (Last buffer command processing)
      {
           err = iBurstWriteReg(Hynix_i2c_buf, buf_count, imgsensor.i2c_write_id); // i2c write fuction
-          if (err)
+          nFlush++;
+          if (err) {
+               LOG_INF("[burst] i2c FAIL tail flush#%u buf_count=%u\n",
+                       nFlush, buf_count);
                return true;
+          }
           buf_count = 0;
      }
 
      write_cmos_sensor(setting_table[total_set_count-2], setting_table[total_set_count-1]);
+     LOG_INF("[burst] done flushes=%u\n", nFlush);
      return false;
 }
 
@@ -535,22 +544,13 @@ static void apply_sensor_Cali(void)
      TEMP1= read_cmos_sensor(0x0318);
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("XGC_TEPM1 = %d", TEMP1);
-     /* GUESS-FIX: do NOT clear bit 4 of 0x0319 here.
-      *
-      * Stock reads 0x0318/0x0319 back unmodified at all three calibration
-      * stages (XGC_Flag == XGC_TEPM1 == 125, QGC_Flag == 109, PGC_Flag == 101).
-      * Our build reads back the masked value instead (109 / 101 / 69), i.e.
-      * stock never performs these writes. The three masks below cleared
-      * bits 4, 3 and 5 of 0x0319 in sequence and nothing ever restored
-      * them, so the sensor was left with the "data loading disable"
-      * bits set. Hypothesis: that disables the sensor's data path and is
-      * why it accepts 0x0b00=0x0100 but puts nothing on the wire.
-      *
-      * Writing TEMP1 back unchanged reproduces stock's observed register
-      * behaviour exactly. If preview comes up, this was it; if not, revert
-      * and the next step is the full write-trace instrumentation.
+     /* The "XGC data loading disable B[4]" write is NOT done here. Stock logs
+      * XGC_Flag == XGC_TEPM1 == 125, i.e. 0x0318/0x0319 is still unmodified
+      * when read back. Stock clears the bit AFTER the XGC burst writes -- see
+      * the "XGC Gr Line End" block below. Clearing it here (as this driver
+      * did) disables data loading BEFORE the calibration is pushed, so the
+      * burst write has nothing to load into.
       */
-     write_cmos_sensor(0x0318, TEMP1); // was: TEMP1 & 0xFFEF (XGC B[4])
      XGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("XGC_Flag = %d", XGC_Flag);
      // XGC(Gb line) SRAM memory access enable
@@ -637,6 +637,11 @@ static void apply_sensor_Cali(void)
           write_cmos_sensor(0x0b32, 0xAAAA); //F/W run and qbgc data copy
           LOG_INF("[End]:XGC Gr Line End\n");
 
+          /***********XGC data loading disable B[4]*******************
+           * Applied AFTER the XGC burst, which is what reproduces stock's
+           * register evolution 0x7D -> 0x6D -> 0x65 across the three stages. */
+          write_cmos_sensor(0x0318, TEMP1 & 0xFFEF);
+
           //*********Burst write apply XGC GR line end**************//
      }
 
@@ -647,8 +652,7 @@ static void apply_sensor_Cali(void)
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("QGC_TEPM1 = %d", TEMP1);
 
-     /* GUESS-FIX: was TEMP1 & 0xFFF7 (QBGC B[3]); stock leaves 0x0319 alone. */
-     write_cmos_sensor(0x0318, TEMP1);
+     /* QBGC B[3] is cleared after the QBGC burst, not here -- see XGC note. */
      QGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("QGC_Flag = %d", QGC_Flag);
 
@@ -695,14 +699,16 @@ static void apply_sensor_Cali(void)
      }
      LOG_INF("[End]:QBGC End\n");
 
+     /***********QBGC data loading disable B[3]**********************/
+     write_cmos_sensor(0x0318, TEMP1 & 0xFFF7);
+
      ///////////// PGC_calibration_write///////
      nReadData = 0;
      nWriteData = 0;
      TEMP1= read_cmos_sensor(0x0318);
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("PGC_TEPM1 = %d", TEMP1);
-     /* GUESS-FIX: was TEMP1 & 0xFFDF (PGC B[5]); stock leaves 0x0319 alone. */
-     write_cmos_sensor(0x0318, TEMP1);
+     /* PGC B[5] is cleared after the PGC burst, not here -- see XGC note. */
      PGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("PGC_Flag = %d", PGC_Flag);
      write_cmos_sensor(0xffff, 0x0B40); // PGC(Gb line) enable
@@ -784,6 +790,9 @@ static void apply_sensor_Cali(void)
           // PGC(GR line) SRAM memory access disable
           write_cmos_sensor(0xffff, 0x0000); // PGC(Gr line) disable
           LOG_INF("[End]:PGC Gr Line End\n");
+
+          /***********PGC data loading disable B[5]**********************/
+          write_cmos_sensor(0x0318, TEMP1 & 0xFFDF);
           //*********Burst write apply PGC GR line end**************//
      }
 }
@@ -7175,6 +7184,34 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 memcpy(XGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_XGC_OFFSET+1], hi5021Q_OTP_XGC_LEN);
 memcpy(QGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_QGC_OFFSET+1], hi5021Q_OTP_QGC_LEN);
 memcpy(PGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_PGC_OFFSET+1], hi5021Q_OTP_PGC_LEN);
+/* Diagnostic: these three buffers are what gets burst-written
+ * into the sensor's calibration SRAM. If any is all-zero (bad offset, short
+ * OTP read, or a memcpy that ran before imgSensorReadEepromData) the sensor
+ * gets garbage programmed and nothing in the log would show it. Cheap
+ * 16-bit additive checksum + first/last pair for each.
+ */
+{
+    kal_uint32 k, cs;
+    kal_uint16 *b;
+    const char *nm[3];
+    void *bufs[3];
+    kal_uint32 lens[3];
+    int bi;
+
+    nm[0]="XGC"; nm[1]="QGC"; nm[2]="PGC";
+    bufs[0]=XGCbuffer; bufs[1]=QGCbuffer; bufs[2]=PGCbuffer;
+    lens[0]=hi5021Q_OTP_XGC_LEN; lens[1]=hi5021Q_OTP_QGC_LEN; lens[2]=hi5021Q_OTP_PGC_LEN;
+
+    for (bi = 0; bi < 3; bi++) {
+        b = (kal_uint16 *)bufs[bi];
+        cs = 0;
+        for (k = 0; k + 1 < lens[bi]; k += 2)
+            cs += b[k >> 1];
+        LOG_INF("[otp] %s len=%u sum=0x%x first=0x%04x last=0x%04x%s\n",
+                nm[bi], lens[bi], cs & 0xFFFF, b[0], b[(lens[bi] >> 1) - 1],
+                (cs == 0) ? "  *** ALL ZERO ***" : "");
+    }
+}
 
 #if hi5021q_OTP_DUMP
 
