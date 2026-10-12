@@ -428,8 +428,14 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
 {
      char pu_send_cmd[4] = {(char)(addr >> 8),
          (char)(addr & 0xFF), (char)(para >> 8), (char)(para & 0xFF)};
+     kal_int32 ret;
 
-     iWriteRegI2C(pu_send_cmd, 4, imgsensor.i2c_write_id);
+     ret = iWriteRegI2C(pu_send_cmd, 4, imgsensor.i2c_write_id);
+     /* Previously the return value was discarded, so an I2C failure was
+      * completely silent. Only log failures to avoid flooding the log. */
+     if (ret < 0)
+         LOG_INF("i2c write fail addr 0x%04x para 0x%04x ret %d\n",
+             addr, para, ret);
 }
 
 static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSetSize)
@@ -529,7 +535,22 @@ static void apply_sensor_Cali(void)
      TEMP1= read_cmos_sensor(0x0318);
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("XGC_TEPM1 = %d", TEMP1);
-     write_cmos_sensor(0x0318, TEMP1 & 0xFFEF); // XGC data loading disable B[4]
+     /* GUESS-FIX: do NOT clear bit 4 of 0x0319 here.
+      *
+      * Stock reads 0x0318/0x0319 back unmodified at all three calibration
+      * stages (XGC_Flag == XGC_TEPM1 == 125, QGC_Flag == 109, PGC_Flag == 101).
+      * Our build reads back the masked value instead (109 / 101 / 69), i.e.
+      * stock never performs these writes. The three masks below cleared
+      * bits 4, 3 and 5 of 0x0319 in sequence and nothing ever restored
+      * them, so the sensor was left with the "data loading disable"
+      * bits set. Hypothesis: that disables the sensor's data path and is
+      * why it accepts 0x0b00=0x0100 but puts nothing on the wire.
+      *
+      * Writing TEMP1 back unchanged reproduces stock's observed register
+      * behaviour exactly. If preview comes up, this was it; if not, revert
+      * and the next step is the full write-trace instrumentation.
+      */
+     write_cmos_sensor(0x0318, TEMP1); // was: TEMP1 & 0xFFEF (XGC B[4])
      XGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("XGC_Flag = %d", XGC_Flag);
      // XGC(Gb line) SRAM memory access enable
@@ -626,7 +647,8 @@ static void apply_sensor_Cali(void)
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("QGC_TEPM1 = %d", TEMP1);
 
-     write_cmos_sensor(0x0318, TEMP1 & 0xFFF7); // QBGC data loading disable B[3]
+     /* GUESS-FIX: was TEMP1 & 0xFFF7 (QBGC B[3]); stock leaves 0x0319 alone. */
+     write_cmos_sensor(0x0318, TEMP1);
      QGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("QGC_Flag = %d", QGC_Flag);
 
@@ -679,7 +701,8 @@ static void apply_sensor_Cali(void)
      TEMP1= read_cmos_sensor(0x0318);
      TEMP1=(TEMP1<<8)+(read_cmos_sensor(0x0319));
      LOG_INF("PGC_TEPM1 = %d", TEMP1);
-     write_cmos_sensor(0x0318, TEMP1 & 0xFFDF); // PGC data loading disable B[5]
+     /* GUESS-FIX: was TEMP1 & 0xFFDF (PGC B[5]); stock leaves 0x0319 alone. */
+     write_cmos_sensor(0x0318, TEMP1);
      PGC_Flag=((read_cmos_sensor(0x0318) << 8) | read_cmos_sensor(0x0319));
      LOG_INF("PGC_Flag = %d", PGC_Flag);
      write_cmos_sensor(0xffff, 0x0B40); // PGC(Gb line) enable
@@ -7937,11 +7960,37 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 
 static kal_uint32 streaming_control(kal_bool enable)
 {
-     pr_debug("streaming_enable(0=Sw Standby,1=streaming): %d\n", enable);
+     int i;
+     /* LOG_INF, not pr_debug: pr_debug is normally compiled out, which left no way
+      * to tell from the log whether the sensor was ever switched into streaming. */
+     LOG_INF("streaming_enable(0=Sw Standby,1=streaming): %d\n", enable);
      if (enable)
          write_cmos_sensor(0x0b00, 0x0100); // stream on
      else
          write_cmos_sensor(0x0b00, 0x0000); // stream off
+     /* Read back the stream-enable register so we can tell "sensor never
+      * entered streaming" apart from "sensor streaming but CSI sees nothing".
+      * NOTE: read_cmos_sensor() reads only 1 byte (iReadRegI2C len=1), so a
+      * 16-bit value written as 0x0100 reads back as 0x0001. Compare the low
+      * byte only. */
+     LOG_INF("stream reg 0x0b00 = 0x%04x (expect low byte 0x%02x)\n",
+         read_cmos_sensor(0x0b00), enable ? 0x01 : 0x00);
+     if (enable) {
+         /* Post-stream-on register census.
+          * The sensor accepts the stream-on write but puts nothing on the
+          * wire, so dump the registers that decide whether it is actually
+          * transmitting: the GC/flag byte that apply_sensor_Cali() touches,
+          * plus a coarse sweep of the low page. Cheap, one-shot, only on
+          * stream-on.
+          */
+         LOG_INF("--- post-stream-on census ---\n");
+         LOG_INF("0x0318=0x%02x 0x0319=0x%02x  (expect unchanged from calibration)\n",
+             read_cmos_sensor(0x0318), read_cmos_sensor(0x0319));
+         LOG_INF("page sweep:");
+         for (i = 0; i < 0x40; i++)
+             LOG_INF(" [%04x]=0x%02x", i, read_cmos_sensor(i));
+         LOG_INF("\n");
+     }
      mdelay(5);
      return ERROR_NONE;
 }
@@ -8078,6 +8127,54 @@ static kal_uint32 feature_control(
     default:
       *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
         = imgsensor_info.pre.pclk;
+      break;
+    }
+    break;
+     case SENSOR_FEATURE_GET_PERIOD_BY_SCENARIO:
+    /* (framelength << 16) + linelength. The HAL uses this to derive the
+     * per-line/per-frame timing for the TG port; if this is left 0 the
+     * NormalPipe SignalProfileChk rejects the profile with "lineT can't be 0". */
+    switch (*feature_data) {
+    case MSDK_SCENARIO_ID_CAMERA_CAPTURE_JPEG:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.cap.framelength << 16)
+          + imgsensor_info.cap.linelength;
+      break;
+    case MSDK_SCENARIO_ID_VIDEO_PREVIEW:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.normal_video.framelength << 16)
+          + imgsensor_info.normal_video.linelength;
+      break;
+    case MSDK_SCENARIO_ID_HIGH_SPEED_VIDEO:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.hs_video.framelength << 16)
+          + imgsensor_info.hs_video.linelength;
+      break;
+    case MSDK_SCENARIO_ID_SLIM_VIDEO:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.slim_video.framelength << 16)
+          + imgsensor_info.slim_video.linelength;
+      break;
+    case MSDK_SCENARIO_ID_CUSTOM1:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.custom1.framelength << 16)
+          + imgsensor_info.custom1.linelength;
+      break;
+    case MSDK_SCENARIO_ID_CUSTOM2:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.custom2.framelength << 16)
+          + imgsensor_info.custom2.linelength;
+      break;
+    case MSDK_SCENARIO_ID_CUSTOM3:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.custom3.framelength << 16)
+          + imgsensor_info.custom3.linelength;
+      break;
+    case MSDK_SCENARIO_ID_CAMERA_PREVIEW:
+    default:
+      *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
+        = (imgsensor_info.pre.framelength << 16)
+          + imgsensor_info.pre.linelength;
       break;
     }
     break;
@@ -8267,6 +8364,11 @@ static kal_uint32 feature_control(
          default:
              *(MUINT32 *)(uintptr_t)(*(feature_data + 1))
                  = imgsensor_info.pre.mipi_pixel_rate;
+             /* Matches stock's diagnostic string; the preview/default branch had
+              * none, which made 3111 look "unanswered" in the logcat. */
+             LOG_INF(
+                 "SENSOR_FEATURE_GET_MIPI_PIXEL_RATE data %d \n",
+                 imgsensor_info.pre.mipi_pixel_rate);
              break;
          }
      }
