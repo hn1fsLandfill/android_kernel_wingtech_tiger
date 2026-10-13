@@ -213,13 +213,14 @@ MINT32 seninf_dump_reg(void)
 
 		PK_DBG(
 		"seninf%d_csi2: SENINF%d_CSI2_EN(0x%x) SENINF%d_CSI2_IRQ_STATUS(0x%x) SENINF%d_CSI2_PACKET_CNT_STATUS(0x%x)\n",
-		  i + 1,
-		  i + 1,
-		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0A00),
-		  i + 1,
-		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0AC8),
-		  i + 1,
-		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0ADC));
+			i + 1,
+			i + 1,
+			SENINF_RD32(gseninf.pseninf_base[i] + 0x0A00),
+			i + 1,
+			SENINF_RD32(gseninf.pseninf_base[i] + 0x0AC8),
+			i + 1,
+			SENINF_RD32(gseninf.pseninf_base[i] + 0x0ADC));
+		SENINF_WR32(gseninf.pseninf_base[i] + 0x0AC8, 0xFFFFFFFF);
 
 		PK_DBG(
 		"seninf%d_mux: SENINF%d_MUX_CTRL_0(0x%x) SENINF%d_MUX_IRQ_STATUS(0x%x) SENINF%d_MUX_SIZE(0x%x)\n",
