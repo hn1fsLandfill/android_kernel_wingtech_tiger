@@ -166,45 +166,6 @@ extern MUINT32 Switch_Tg_For_Stagger(MUINT16 camtg)
 }
 EXPORT_SYMBOL(Switch_Tg_For_Stagger);
 
-/*
- * Render a CSI2_IRQ_STATUS bitmask as a short symbol list.
- *
- * The CSI2 IRQ bit names are not present as strings anywhere in the Image,
- * so they cannot be recovered at runtime; the labels below are the
- * conventional MTK meanings and unknown bits are printed raw. Best effort
- * only -- this exists purely to make the ESD-triggered dumps readable.
- */
-static void seninf_csi2_irq_str(char *buf, MUINT32 st)
-{
-	MUINT32 i;
-	int n = 0;
-
-	buf[0] = '\0';
-	for (i = 0; i < 32; i++) {
-		if (!((st >> i) & 1))
-			continue;
-		switch (i) {
-		case 2:
-			n += scnprintf(buf + n, sizeof(buf) - n, "VSS_SHORT,");
-			break;
-		case 5:
-			n += scnprintf(buf + n, sizeof(buf) - n, "LANE_FIFO_OF,");
-			break;
-		case 8:
-			n += scnprintf(buf + n, sizeof(buf) - n, "HS_SHORT,");
-			break;
-		case 9:
-			n += scnprintf(buf + n, sizeof(buf) - n, "HS_SYNC,");
-			break;
-		default:
-			n += scnprintf(buf + n, sizeof(buf) - n, "B%u,", i);
-			break;
-		}
-	}
-	if (!n)
-		scnprintf(buf, sizeof(buf), "none");
-}
-
 MINT32 seninf_dump_reg(void)
 {
 	int i = 0;
@@ -250,26 +211,15 @@ MINT32 seninf_dump_reg(void)
 			i + 1,
 			SENINF_RD32(gseninf.pseninf_base[i] + 0x0210));
 
-		/*
-		 * PK_DBG() is pr_debug() and compiles out, so these per-seninf
-		 * lines never reached the log and CSI2_PACKET_CNT_STATUS -- the
-		 * register that shows whether the receiver saw any MIPI traffic
-		 * at all -- was never observable. Use PK_PR_ERR() (pr_err) here so
-		 * it survives. This dump only runs on the seninf IRQ/ESD path, so
-		 * the cost is bounded.
-		 */
-		{
-			MUINT32 en  = SENINF_RD32(gseninf.pseninf_base[i] + 0x0A00);
-			MUINT32 irq = SENINF_RD32(gseninf.pseninf_base[i] + 0x0AC8);
-			MUINT32 pkt = SENINF_RD32(gseninf.pseninf_base[i] + 0x0ADC);
-			char irqname[32];
-
-			seninf_csi2_irq_str(irqname, irq);
-			PK_PR_ERR(
-		"seninf%d_csi2: CSI2_EN(0x%x) CSI2_IRQ(0x%x)[%s] CSI2_PACKET_CNT(0x%x)\n",
-			i + 1, en, irq, irqname, pkt);
-		}
-		SENINF_WR32(gseninf.pseninf_base[i] + 0x0AC8, 0xFFFFFFFF);
+		PK_DBG(
+		"seninf%d_csi2: SENINF%d_CSI2_EN(0x%x) SENINF%d_CSI2_IRQ_STATUS(0x%x) SENINF%d_CSI2_PACKET_CNT_STATUS(0x%x)\n",
+		  i + 1,
+		  i + 1,
+		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0A00),
+		  i + 1,
+		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0AC8),
+		  i + 1,
+		  SENINF_RD32(gseninf.pseninf_base[i] + 0x0ADC));
 
 		PK_DBG(
 		"seninf%d_mux: SENINF%d_MUX_CTRL_0(0x%x) SENINF%d_MUX_IRQ_STATUS(0x%x) SENINF%d_MUX_SIZE(0x%x)\n",

@@ -28,15 +28,6 @@ struct stCAM_CAL_LIST_STRUCT g_camCalList[] = {
 	{IMX350_SENSOR_ID, 0xA0, Common_read_region},
 	{IMX386_MONO_SENSOR_ID, 0xA0, Common_read_region},
 	{IMX499_SENSOR_ID, 0xA0, Common_read_region},
-	/* N26_HI5021Q_REAR_DELTA_MIPI_RAW (0x5023): OTP payload is 0x2149 (8521)
-	 * bytes, which exceeds DEFAULT_MAX_EEPROM_SIZE_8K (0x2000). Without an
-	 * entry here get_list() falls through to the {0,0,0} sentinel, so
-	 * maxEepromSize == 0 and read_region() rejects the read with
-	 * "offset + size > size_limit" -> returns 0 ->
-	 * "CAM_CAL[imgSensorReadEepromData] all eeprom data read failed" and
-	 * -EFAULT, which fails CHECK_SENSOR_ID and drops the sensor from HAL
-	 * enumeration. 0xA0 matches EEPROM_BL24SA64D_ID in the sensor driver.
-	 */
 	{N26_HI5021Q_REAR_DELTA_SENSOR_ID, 0xA0, Common_read_region, MAX_EEPROM_SIZE_16K},
 	/*  ADD before this line */
 	{0, 0, 0}       /*end of list */

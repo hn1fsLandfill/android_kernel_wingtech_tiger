@@ -144,29 +144,13 @@ extern MINT32 _seninf_set_tg_for_switch(unsigned int cam_tg, unsigned int camsv_
 
 extern MINT32 _seninf_irq(MINT32 Irq, void *DeviceId, struct SENINF *pseninf)
 {
-	/*
-	 * pr_debug() compiles out, so this handler has been completely
-	 * silent: the seninf CSI2 IRQ status has never been visible at
-	 * runtime even though the registers are being read. Add the packet
-	 * counter (0x0ADC) alongside it -- that register is what shows
-	 * whether the receiver saw any MIPI traffic at all, and it is the
-	 * missing half of the diagnosis (nothing arriving vs arriving
-	 * malformed). pr_err() so it survives.
-	 *
-	 * Offsets used here are the same 0x0AC8 the original code already
-	 * read, plus 0x0ADC which seninf_dump_reg() in common/v1_1/seninf.c
-	 * already uses for CSI2_PACKET_CNT_STATUS. No new addressing scheme.
-	 */
-	MUINT32 i;
-
-	for (i = 0; i < 6; i++) {
-		MUINT32 irq = SENINF_RD32(pseninf->pseninf_base[i] + 0x0AC8);
-		MUINT32 pkt = SENINF_RD32(pseninf->pseninf_base[i] + 0x0ADC);
-
-		if (irq || pkt)
-			pr_err("seninf%u csi2 irq: IRQ_STATUS=0x%08x PACKET_CNT=0x%08x\n",
-				i, irq, pkt);
-	}
+	pr_debug("seninf crc/ecc erorr irq 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x 0x%08x\n",
+	SENINF_RD32(pseninf->pseninf_base[0] + 0x0Ac8),
+	SENINF_RD32(pseninf->pseninf_base[1] + 0x0Ac8),
+	SENINF_RD32(pseninf->pseninf_base[2] + 0x0Ac8),
+	SENINF_RD32(pseninf->pseninf_base[3] + 0x0Ac8),
+	SENINF_RD32(pseninf->pseninf_base[4] + 0x0Ac8),
+	SENINF_RD32(pseninf->pseninf_base[5] + 0x0Ac8));
 	return 0;
 }
 #endif
