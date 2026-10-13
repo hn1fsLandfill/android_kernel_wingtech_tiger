@@ -438,6 +438,25 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
              addr, para, ret);
 }
 
+/* 16-bit register address with an 8-bit payload -- needed for the gain register
+ * 0x0213. The vendor's own write for it uses a 3-byte I2C transfer
+ * (mov w1,#0x3 at ffffff9dd2d75c80, and imgsensor_i2c_write treats
+ * that argument as the buffer length -- `add x28, x1, w2, UXTH`). Sending the
+ * usual 4 bytes would make the sensor read the trailing data byte as the start of
+ * the next register address.
+ */
+static void write_cmos_sensor_8(kal_uint32 addr, kal_uint32 para)
+{
+     char pu_send_cmd[3] = {(char)(addr >> 8),
+         (char)(addr & 0xFF), (char)(para & 0xFF)};
+     kal_int32 ret;
+
+     ret = iWriteRegI2C(pu_send_cmd, 3, imgsensor.i2c_write_id);
+     if (ret < 0)
+         LOG_INF("i2c write8 fail addr 0x%04x para 0x%04x ret %d\n",
+             addr, para, ret);
+}
+
 static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSetSize)
 {
      kal_int8 Hynix_i2c_buf[HYNIX_SIZEOF_I2C_BUF] = {0,};
@@ -814,14 +833,18 @@ static void set_dummy(void)
 {
      LOG_INF("dummyline = %d, dummypixels = %d\n",
          imgsensor.dummy_line, imgsensor.dummy_pixel);
-     /* Register addresses corrected to match the vendor driver.
-      * Stock writes frame_length to 0x1002 and line_length to 0x0602. This driver
-      * had 0x0210 / 0x0206, which are different sensor registers -- so the frame
-      * timing was never actually applied to the sensor. Verified by decoding the
-      * stock Image: "mov w8,#0x1002" at VA 0xffffff8008974ef8 etc., and there is
-      * no 0x0210 / 0x0206 immediate anywhere in the stock hi5021q code region. */
-     write_cmos_sensor(0x1002, imgsensor.frame_length & 0xFFFF);
-     write_cmos_sensor(0x0602,imgsensor .line_length);
+     /* CORRECTED: the S37 "fix" here was WRONG -- it byte-swapped
+      * the register addresses. The vendor's `mov wN,#imm` + `strh` stores the value
+      * LITTLE-ENDIAN, so the immediate is the byte-swapped address:
+      *     mov w9,#0x1002 ; strh w9,[sp]  -> payload bytes 0x02,0x10 -> register 0x0210
+      *     mov w9,#0x602  ; strh w9,[sp]  -> payload bytes 0x02,0x06 -> register 0x0206
+      *     mov w8,#0xb    ; strh w8,[sp,#4] -> bytes 0x0b,0x00  -> register 0x0b00
+      * The last line is the control: our own write_cmos_sensor(0x0b00,...) produces
+      * the identical bytes 0b 00 01 00, and streaming demonstrably turns on (S14).
+      * So frame_length is 0x0210 and line_length is 0x0206 -- i.e. exactly what this
+      * driver had BEFORE S37. S37 changed two correct registers into two wrong ones. */
+     write_cmos_sensor(0x0210, imgsensor.frame_length & 0xFFFF);
+     write_cmos_sensor(0x0206,imgsensor .line_length);
 }    /*    set_dummy  */
 
 static kal_uint32 return_sensor_id(void)
@@ -880,17 +903,20 @@ static void write_shutter(kal_uint32 shutter)
          else if (realtime_fps >= 147 && realtime_fps <= 150)
              set_max_framerate(146, 0);
          else
-             write_cmos_sensor(0x1002, imgsensor.frame_length);
+             write_cmos_sensor(0x0210, imgsensor.frame_length);
 
      } else{
-             write_cmos_sensor(0x1002, imgsensor.frame_length);
+             write_cmos_sensor(0x0210, imgsensor.frame_length);
      }
 
-     /* Exposure goes to 0x1005 (low 16 bits) and 0x1205 (high 16 bits); the
-        vendor driver splits it across both. This driver wrote a single 0x0510,
-        which is neither address. */
-     write_cmos_sensor(0x1005, shutter & 0xFFFF);
-     write_cmos_sensor(0x1205, (shutter >> 16) & 0xFFFF);
+     /* CORRECTED: S37 byte-swapped these. Vendor immediates 0x1005
+      * and 0x1205 are stored little-endian by `strh`, so the real registers are
+      * 0x0510 (low) and 0x0512 (high). S37's 0x1005 / 0x1205 were dead registers --
+      * which is why the AE could vary shutter and gain and the image never changed.
+      * 0x0510 is what this driver originally wrote; 0x0512 is the genuinely new half.
+      */
+     write_cmos_sensor(0x0510, shutter & 0xFFFF);
+     write_cmos_sensor(0x0512, (shutter >> 16) & 0xFFFF);
 
      LOG_INF("frame_length = %d , shutter = %d \n",imgsensor.frame_length, shutter);
 }    /*    write_shutter  */
@@ -930,12 +956,12 @@ static void set_shutter_frame_length(kal_uint16 shutter, kal_uint16 frame_length
              set_max_framerate(146, 0);
      } else {
          // Extend frame length
-         write_cmos_sensor(0x1002, imgsensor.frame_length & 0xFFFF);
+         write_cmos_sensor(0x0210, imgsensor.frame_length & 0xFFFF);
      }
 
      // Update Shutter
-     write_cmos_sensor(0x1005, shutter & 0xFFFF);
-     write_cmos_sensor(0x1205, (shutter >> 16) & 0xFFFF);
+     write_cmos_sensor(0x0510, shutter & 0xFFFF);
+     write_cmos_sensor(0x0512, (shutter >> 16) & 0xFFFF);
      LOG_INF("Exit! shutter =%d, framelength =%d\n", shutter,imgsensor.frame_length);
 }    /*    write_shutter  */
 
@@ -1016,7 +1042,25 @@ static kal_uint16 set_gain(kal_uint16 gain)
      spin_unlock(&imgsensor_drv_lock);
      LOG_INF("gain = %d , reg_gain = 0x%x\n ", gain, reg_gain);
 
-     write_cmos_sensor(0x050A,reg_gain);
+     /* CORRECTED: the gain register is 0x0213, not 0x050A.
+      *
+      * Vendor, inside hi5021q feature_control (0xffffff9dd2d744fc, SET_GAIN case):
+      *   ffffff9dd2d75c44: ubfx w8,  w20, #0x2, #0xe  ; (gain >> 2) & 0x3FFF
+      *   ffffff9dd2d75c4c: sub  w21, w8,  #0x10       ; - 16  <- identical to gain2reg()
+      *   ffffff9dd2d75c5c: strh w21, [x8, #0x27c]     ; imgsensor.gain = reg_gain
+      *   ffffff9dd2d75c78: mov  w8,  #0x1302          ; strh -> bytes 0x02,0x13 -> reg 0x0213
+      *   ffffff9dd2d75c80: mov  w1,  #0x3             ; payload = 16-bit addr + 8-bit data
+      *
+      * So the FORMULA (gain/4 - 16) was always right; only the register was wrong.
+      * 0x050A is the Sony/OmniVision 0x350A/0x350B gain pair -- copy-pasted from
+      * another sensor family -- and it appears in none of the vendor's 9 tables.
+      *
+      * The 3-byte payload matters: the vendor sends [addr_hi, addr_lo, data]. Our
+      * write_cmos_sensor() always emits 4 bytes, so for this register we need the
+      * 8-bit variant, or the trailing data byte gets consumed as the next register
+      * address by the sensor's I2C slave.
+      */
+     write_cmos_sensor_8(0x0213, reg_gain);
      return gain;
 
 }
