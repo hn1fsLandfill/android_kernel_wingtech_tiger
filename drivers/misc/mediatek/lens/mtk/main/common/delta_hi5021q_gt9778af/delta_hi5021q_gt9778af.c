@@ -151,8 +151,8 @@ static int initAF(void)
          ret = s4AF_WriteReg(0, 0x02, 0x00); //CONTROL
 
          s4AF_WriteReg(0, 0x02, 0x02); // + AAC mode
-         s4AF_WriteReg(0, 0x06, 0x61);
-         s4AF_WriteReg(0, 0x07, 0x3E);
+         s4AF_WriteReg(0, 0x06, 0xA1);
+         s4AF_WriteReg(0, 0x07, 0x26);
 
          spin_lock(g_pAF_SpinLock);
          *g_pAF_Opened = 2;
