@@ -29,6 +29,8 @@
 #define LOG_INF(format, args...)    \
      pr_info(PFX "[%s] " format, __func__, ##args)
 
+// #define CLANKER_DEBUGGING
+
 /* NOTE: stock hi5021q has no raw EEPROM probe here. The OTP/EEPROM is read via
  * imgSensorReadEepromData() -> CAM_CAL -> /dev/camera_eeprom0, on a separate
  * i2c bus. Do not add a raw iReadRegI2C(...,0xA0) vendor check here: it reads
@@ -438,24 +440,59 @@ static void write_cmos_sensor(kal_uint32 addr, kal_uint32 para)
              addr, para, ret);
 }
 
-/* 16-bit register address with an 8-bit payload -- needed for the gain register
- * 0x0213. The vendor's own write for it uses a 3-byte I2C transfer
- * (mov w1,#0x3 at ffffff9dd2d75c80, and imgsensor_i2c_write treats
- * that argument as the buffer length -- `add x28, x1, w2, UXTH`). Sending the
- * usual 4 bytes would make the sensor read the trailing data byte as the start of
- * the next register address.
+#ifdef CLANKER_DEBUGGING
+/* An 8-bit-payload variant of write_cmos_sensor() is NOT needed for this sensor.
+ * S55 added one because it mis-attributed the gain register to 0x0213 with a
+ * 3-byte transfer; the register actually belongs to a different LTO-merged sensor.
+ * Every hi5021q runtime write is a 4-byte [addr_hi, addr_lo, data_hi, data_lo]
+ * transfer, including gain on 0x050A.
  */
-static void write_cmos_sensor_8(kal_uint32 addr, kal_uint32 para)
-{
-     char pu_send_cmd[3] = {(char)(addr >> 8),
-         (char)(addr & 0xFF), (char)(para & 0xFF)};
-     kal_int32 ret;
 
-     ret = iWriteRegI2C(pu_send_cmd, 3, imgsensor.i2c_write_id);
-     if (ret < 0)
-         LOG_INF("i2c write8 fail addr 0x%04x para 0x%04x ret %d\n",
-             addr, para, ret);
+/* 16-bit register read-back. iReadRegI2C is asked for 2 data bytes here instead
+ * of the 1 that read_cmos_sensor() uses. The sensor sends the high byte first and
+ * the driver stores it in the low byte of the little-endian u16, so the value is
+ * byte-swapped relative to the register's real contents -- swap it back.
+ */
+static kal_uint32 read_cmos_sensor16(kal_uint32 addr)
+{
+     kal_uint16 buf = 0;
+     char pu_send_cmd[2] = {(char)(addr >> 8), (char)(addr & 0xFF)};
+
+     iReadRegI2C(pu_send_cmd, 2, (u8 *)&buf, 2, imgsensor.i2c_write_id);
+
+     return ((kal_uint32)(buf & 0xFF) << 8) | (kal_uint32)(buf >> 8);
 }
+
+/* Diagnostic: read the timing and gain registers back after the
+ * AE writes them, so the log proves the values actually landed instead of
+ * inferring it from the frame rate (which cannot separate 4777 from 4811 -- both
+ * are ~33 ms, and that mistake is what produced S57's overstated conclusion).
+ *
+ * Frame rate is NOT a usable proxy for frame_length: the difference between the
+ * table default (4777 lines) and the AE's 4811 is 1%.
+ *
+ * Rate-limited to the first 24 writes and then every 400th, because a 2-byte read
+ * is several I2C transactions and write_shutter runs ~1000x per preview session.
+ */
+static kal_uint32 dbg_census_n = 0;
+static void dbg_reg_census(const char *who)
+{
+     kal_uint32 fl, ll, sh, shhi, gain;
+
+     if (++dbg_census_n > 24 && (dbg_census_n % 400) != 0)
+          return;
+
+     fl    = read_cmos_sensor16(0x0210);
+     ll    = read_cmos_sensor16(0x0206);
+     sh    = read_cmos_sensor16(0x0510);
+     shhi  = read_cmos_sensor16(0x0512);
+     gain  = read_cmos_sensor16(0x050A);
+
+     LOG_INF("[census]%s n=%u  0x0210=0x%04x(frame_length) 0x0206=0x%04x(line_length) "
+             "0x0510=0x%04x(shutter_lo) 0x0512=0x%04x(shutter_hi) 0x050A=0x%04x(gain)\n",
+             who, dbg_census_n, fl, ll, sh, shhi, gain);
+}
+#endif
 
 static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSetSize)
 {
@@ -466,6 +503,7 @@ static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSet
      kal_uint16 buf_count = 0;
      kal_uint32 nFlush = 0;
 
+#ifdef CLANKER_DEBUGGING
      /* Diagnostic: every caller of this function used to
       * discard the return value, so a burst write failing left the sensor's
       * calibration SRAM unprogrammed with nothing in the log. Log size,
@@ -478,6 +516,7 @@ static bool skhynix_write_burst_mode(kal_uint16 setting_table[], kal_uint32 nSet
           LOG_INF("[burst] last  addr=0x%04x data=0x%04x\n",
                   setting_table[total_set_count - 2],
                   setting_table[total_set_count - 1]);
+#endif
 
      for (set_count = 0; set_count < (total_set_count-2); set_count+=2)
      {
@@ -919,6 +958,9 @@ static void write_shutter(kal_uint32 shutter)
      write_cmos_sensor(0x0512, (shutter >> 16) & 0xFFFF);
 
      LOG_INF("frame_length = %d , shutter = %d \n",imgsensor.frame_length, shutter);
+#ifdef CLANKER_DEBUGGING
+     dbg_reg_census("write_shutter");
+#endif
 }    /*    write_shutter  */
 
 
@@ -1042,25 +1084,36 @@ static kal_uint16 set_gain(kal_uint16 gain)
      spin_unlock(&imgsensor_drv_lock);
      LOG_INF("gain = %d , reg_gain = 0x%x\n ", gain, reg_gain);
 
-     /* CORRECTED: the gain register is 0x0213, not 0x050A.
+     /* Register 0x050A -- PROVEN correct, and S55's "fix" to 0x0213 was WRONG.
       *
-      * Vendor, inside hi5021q feature_control (0xffffff9dd2d744fc, SET_GAIN case):
-      *   ffffff9dd2d75c44: ubfx w8,  w20, #0x2, #0xe  ; (gain >> 2) & 0x3FFF
-      *   ffffff9dd2d75c4c: sub  w21, w8,  #0x10       ; - 16  <- identical to gain2reg()
-      *   ffffff9dd2d75c5c: strh w21, [x8, #0x27c]     ; imgsensor.gain = reg_gain
-      *   ffffff9dd2d75c78: mov  w8,  #0x1302          ; strh -> bytes 0x02,0x13 -> reg 0x0213
-      *   ffffff9dd2d75c80: mov  w1,  #0x3             ; payload = 16-bit addr + 8-bit data
+      * Decoded from the vendor's own hi5021q set_gain at file offset 0x8f4ac0
+      * (/kernel base 0xffffff8008080000, VA 0xffffff8008974ac0):
       *
-      * So the FORMULA (gain/4 - 16) was always right; only the register was wrong.
-      * 0x050A is the Sony/OmniVision 0x350A/0x350B gain pair -- copy-pasted from
-      * another sensor family -- and it appears in none of the vendor's 9 tables.
+      *   ffffff8008974ae8: ubfx  w8,  w20, #0x2, #0xe ; (gain >> 2) & 0x3FFF
+      *   ffffff8008974af0: sub   w21, w8,  #0x10      ; w21 = gain/4 - 16 == reg_gain
+      *   ffffff8008974b1c: adrp  x9, -0x7ff65c5000   ; x9 = 0xffffff8009a3b000
+      *   ffffff8008974b20: ldrb  w2,  [x9, #0x28]    ; == hi5021q imgsensor.i2c_write_id
+      *   ffffff8008974b24: mov   w8,  #0xa0 5        ; strh -> bytes 05,0a -> REGISTER 0x050A
+      *   ffffff8008974b2c: lsr   w8,  w21, #0x8      ; data = reg_gain, 16-bit
+      *   ffffff8008974b34: strb  w21, [sp, #0x3]
+      *   ffffff80089745f0: mov   w1,  #0x4           ; PAYLOAD LENGTH = 4 bytes
       *
-      * The 3-byte payload matters: the vendor sends [addr_hi, addr_lo, data]. Our
-      * write_cmos_sensor() always emits 4 bytes, so for this register we need the
-      * 8-bit variant, or the trailing data byte gets consumed as the next register
-      * address by the sensor's I2C slave.
+      * Why this is hi5021q and not some other LTO-merged sensor (S57/S58):
+      *  - the printk immediately before it formats
+      *    "hi5021q_camera_sensor[%s] gain = %d , reg_gain" -- hi5021q's own tag;
+      *  - its adrp resolves to 0xffffff8009a3b000, the same struct base that
+      *    hi5021q set_shutter uses for i2c_write_id (DAT_ffffff8009a3b028).
+      * The rival 0x0213 site (0xffffff8008975c78) resolves to 0xffffff8009a3c000
+      * -- a DIFFERENT sensor's struct, 0x1000 away. It only shares the gain/4-16
+      * formula, which is generic MTK boilerplate.
+      *
+      * Also confirmed here: the clamp to [BASEGAIN=0x40, 32*BASEGAIN=0x800]
+      * (cmp #0x800 / csel / cmp #0x40 / csel) matches this driver's own clamp.
       */
-     write_cmos_sensor_8(0x0213, reg_gain);
+     write_cmos_sensor(0x050A, reg_gain);
+#ifdef CLANKER_DEBUGGING
+     dbg_reg_census("set_gain");
+#endif
      return gain;
 
 }
@@ -7252,6 +7305,7 @@ static kal_uint32 get_imgsensor_id(UINT32 *sensor_id)
 memcpy(XGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_XGC_OFFSET+1], hi5021Q_OTP_XGC_LEN);
 memcpy(QGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_QGC_OFFSET+1], hi5021Q_OTP_QGC_LEN);
 memcpy(PGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5021Q_OTP_PGC_OFFSET+1], hi5021Q_OTP_PGC_LEN);
+#ifdef CLANKER_DEBUGGING
 /* Diagnostic: these three buffers are what gets burst-written
  * into the sensor's calibration SRAM. If any is all-zero (bad offset, short
  * OTP read, or a memcpy that ran before imgSensorReadEepromData) the sensor
@@ -7280,6 +7334,7 @@ memcpy(PGCbuffer, (kal_uint8*)&n26_hi5021q_rear_delta_eeprom_data.dataBuffer[hi5
                 (cs == 0) ? "  *** ALL ZERO ***" : "");
     }
 }
+#endif
 
 #if hi5021q_OTP_DUMP
 
@@ -8069,7 +8124,9 @@ static kal_uint32 set_test_pattern_mode(kal_bool enable)
 
 static kal_uint32 streaming_control(kal_bool enable)
 {
+#ifdef CLANKER_DEBUGGING
      int i;
+#endif
      /* LOG_INF, not pr_debug: pr_debug is normally compiled out, which left no way
       * to tell from the log whether the sensor was ever switched into streaming. */
      LOG_INF("streaming_enable(0=Sw Standby,1=streaming): %d\n", enable);
@@ -8077,6 +8134,7 @@ static kal_uint32 streaming_control(kal_bool enable)
          write_cmos_sensor(0x0b00, 0x0100); // stream on
      else
          write_cmos_sensor(0x0b00, 0x0000); // stream off
+#ifdef CLANKER_DEBUGGING
      /* Read back the stream-enable register so we can tell "sensor never
       * entered streaming" apart from "sensor streaming but CSI sees nothing".
       * NOTE: read_cmos_sensor() reads only 1 byte (iReadRegI2C len=1), so a
@@ -8085,7 +8143,7 @@ static kal_uint32 streaming_control(kal_bool enable)
      LOG_INF("stream reg 0x0b00 = 0x%04x (expect low byte 0x%02x)\n",
          read_cmos_sensor(0x0b00), enable ? 0x01 : 0x00);
      if (enable) {
-         /* Post-stream-on register census.
+         /* Post-stream-on register census (diagnostic).
           * The sensor accepts the stream-on write but puts nothing on the
           * wire, so dump the registers that decide whether it is actually
           * transmitting: the GC/flag byte that apply_sensor_Cali() touches,
@@ -8100,6 +8158,7 @@ static kal_uint32 streaming_control(kal_bool enable)
              LOG_INF(" [%04x]=0x%02x", i, read_cmos_sensor(i));
          LOG_INF("\n");
      }
+#endif
      mdelay(5);
      return ERROR_NONE;
 }

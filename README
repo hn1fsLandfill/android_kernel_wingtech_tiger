@@ -15,13 +15,13 @@ Touchscreen
 Modem
 Audio
 Side fingerprint scanner
-Connectivity (Wi-Fi, Bluetooth, GPS via https://github.com/hn1fsLandfill/tiger_kernel_modules TODO: integrate into kernel)
+Connectivity (Wi-Fi, Bluetooth, GPS via https://github.com/hn1fsLandfill/tiger_kernel_modules or stock vendor kernel modules)
 NFC
 SD Cards
 USB
 
 What partially works:
-Camera (main camera is buggy and can't record and has issues with exposure and focus)
+Camera (main camera has issues with exposure/gain)
 
 What doesn't:
 Nothing
